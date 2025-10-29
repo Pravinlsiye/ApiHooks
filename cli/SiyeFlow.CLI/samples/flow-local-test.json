@@ -1,0 +1,109 @@
+{
+  "name": "Local API Test Workflow",
+  "description": "Test workflow for the local SiyeFlow Test API",
+  "variables": {
+    "newUserName": "Test User",
+    "newUserEmail": "testuser@example.com",
+    "postTitle": "Test Post from SiyeFlow",
+    "postBody": "This post was created automatically by SiyeFlow CLI workflow."
+  },
+  "steps": [
+    {
+      "id": "list-existing-users",
+      "name": "List Existing Users",
+      "description": "Get all users currently in the system",
+      "operationId": "getUsers",
+      "extractVariables": {
+        "existingUserCount": "$.length",
+        "firstUserId": "$[0].id",
+        "firstUserName": "$[0].name"
+      }
+    },
+    {
+      "id": "create-new-user",
+      "name": "Create New User",
+      "description": "Create a new test user",
+      "operationId": "createUser",
+      "body": {
+        "name": "{{newUserName}}",
+        "username": "testuser",
+        "email": "{{newUserEmail}}",
+        "address": {
+          "street": "123 Test St",
+          "suite": "Suite 100",
+          "city": "Test City",
+          "zipcode": "12345"
+        },
+        "phone": "555-0123",
+        "website": "testuser.com"
+      },
+      "extractVariables": {
+        "createdUserId": "$.id",
+        "createdUserName": "$.name"
+      },
+      "onFailure": {
+        "stop": true
+      }
+    },
+    {
+      "id": "verify-user-created",
+      "name": "Verify User Created",
+      "description": "Fetch the newly created user to verify",
+      "operationId": "getUser",
+      "parameters": {
+        "userId": "{{createdUserId}}"
+      },
+      "extractVariables": {
+        "verifiedUserEmail": "$.email"
+      }
+    },
+    {
+      "id": "create-post-for-user",
+      "name": "Create Post for New User",
+      "description": "Create a post for the newly created user",
+      "operationId": "createPost",
+      "body": {
+        "userId": "{{createdUserId}}",
+        "title": "{{postTitle}}",
+        "body": "{{postBody}}\n\nCreated by: {{createdUserName}} ({{verifiedUserEmail}})"
+      },
+      "extractVariables": {
+        "createdPostId": "$.id",
+        "createdPostTitle": "$.title"
+      }
+    },
+    {
+      "id": "get-user-posts",
+      "name": "Get Posts by User",
+      "description": "Get all posts created by the new user",
+      "operationId": "getPosts",
+      "parameters": {
+        "userId": "{{createdUserId}}"
+      },
+      "extractVariables": {
+        "userPostCount": "$.length"
+      }
+    },
+    {
+      "id": "update-post",
+      "name": "Update the Created Post",
+      "description": "Update the post with additional information",
+      "operationId": "updatePost",
+      "parameters": {
+        "postId": "{{createdPostId}}"
+      },
+      "body": {
+        "id": "{{createdPostId}}",
+        "userId": "{{createdUserId}}",
+        "title": "{{createdPostTitle}} (Updated)",
+        "body": "{{postBody}}\n\nCreated by: {{createdUserName}}\nUpdated at: {{timestamp}}\nTotal posts by user: {{userPostCount}}"
+      },
+      "onSuccess": {
+        "setVariables": {
+          "workflowStatus": "completed",
+          "message": "Workflow completed successfully!"
+        }
+      }
+    }
+  ]
+}

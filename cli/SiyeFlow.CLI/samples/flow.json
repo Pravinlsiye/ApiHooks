@@ -1,0 +1,80 @@
+{
+  "name": "User and Posts Workflow",
+  "description": "A sample workflow that demonstrates fetching user data and creating posts",
+  "variables": {
+    "targetUserId": 1,
+    "postTitle": "Hello from SiyeFlow!",
+    "postBody": "This is an automated post created by SiyeFlow CLI workflow."
+  },
+  "steps": [
+    {
+      "id": "get-user",
+      "name": "Fetch User Information",
+      "description": "Get details of a specific user",
+      "operationId": "getUser",
+      "parameters": {
+        "userId": "{{targetUserId}}"
+      },
+      "extractVariables": {
+        "userName": "$.name",
+        "userEmail": "$.email",
+        "userWebsite": "$.website"
+      },
+      "onFailure": {
+        "stop": true
+      }
+    },
+    {
+      "id": "list-user-posts",
+      "name": "Get User's Posts",
+      "description": "Fetch all posts by the user",
+      "operationId": "getPosts",
+      "parameters": {
+        "userId": "{{targetUserId}}"
+      },
+      "extractVariables": {
+        "postCount": "$.length",
+        "firstPostId": "$[0].id"
+      }
+    },
+    {
+      "id": "create-post",
+      "name": "Create New Post",
+      "description": "Create a new post for the user",
+      "operationId": "createPost",
+      "body": {
+        "userId": "{{targetUserId}}",
+        "title": "{{postTitle}} - by {{userName}}",
+        "body": "{{postBody}}\n\nPosted by: {{userName}} ({{userEmail}})\nWebsite: {{userWebsite}}"
+      },
+      "extractVariables": {
+        "newPostId": "$.id",
+        "newPostTitle": "$.title"
+      },
+      "retries": 2,
+      "timeout": 30
+    },
+    {
+      "id": "verify-post",
+      "name": "Verify Created Post",
+      "description": "Fetch the newly created post to verify it was created",
+      "operationId": "getPost",
+      "parameters": {
+        "postId": "{{newPostId}}"
+      },
+      "condition": "{{newPostId}} != null",
+      "onSuccess": {
+        "setVariables": {
+          "verificationStatus": "success",
+          "message": "Post created and verified successfully!"
+        }
+      },
+      "onFailure": {
+        "setVariables": {
+          "verificationStatus": "failed",
+          "message": "Post creation could not be verified"
+        }
+      }
+    }
+  ]
+}
