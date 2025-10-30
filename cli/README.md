@@ -1,6 +1,6 @@
-# SiyeFlow - API Workflow Automation
+# SiyeFlow - Block-Based API Workflow Automation
 
-A .NET CLI application that executes API workflows based on OpenAPI specifications and custom flow definitions.
+A modern .NET CLI application for executing block-based API workflows with visual design support.
 
 ## 🚀 Quick Start
 
@@ -35,8 +35,7 @@ cli/
 └── SiyeFlow.CLI/           # Main workflow execution engine
     ├── Models/             # Data models
     ├── Services/           # Core services
-    ├── Interfaces/         # Service contracts
-    └── samples/            # Example workflows
+    └── Interfaces/         # Service contracts
 
 demo/
 └── api1/                   # Sample API for testing
@@ -62,7 +61,7 @@ demo/
 2. In another terminal, run the CLI:
    ```bash
    cd cli/SiyeFlow.CLI
-   dotnet run -- --api ./samples/openapi-local.json --flow ./samples/flow-local-test.json
+   dotnet run -- --api ../../demo/api1/Workflows/openapi-local.json --flow ../../demo/api1/Workflows/simple-project.json
    ```
 
 ## 📚 Documentation

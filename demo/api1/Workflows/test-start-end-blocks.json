@@ -1,0 +1,68 @@
+{
+  "name": "Test Start/End Blocks",
+  "description": "Test workflow inputs and outputs",
+  "blocks": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Start with Inputs",
+      "config": {
+        "inputs": {
+          "userName": {
+            "type": "string",
+            "required": true,
+            "default": "TestUser"
+          },
+          "maxItems": {
+            "type": "number",
+            "required": false,
+            "default": 10
+          },
+          "includeDetails": {
+            "type": "boolean",
+            "required": false,
+            "default": true
+          }
+        }
+      },
+      "onSuccess": "process"
+    },
+    {
+      "id": "process",
+      "type": "variable",
+      "name": "Process Variables",
+      "config": {
+        "variables": {
+          "greeting": "Hello, {{userName}}!",
+          "timestamp": "$now()",
+          "config": {
+            "max": "{{maxItems}}",
+            "detailed": "{{includeDetails}}"
+          }
+        }
+      },
+      "onSuccess": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End with Outputs",
+      "config": {
+        "outputs": {
+          "message": {
+            "type": "string",
+            "value": "{{greeting}}"
+          },
+          "processedAt": {
+            "type": "string",
+            "value": "{{timestamp}}"
+          },
+          "settings": {
+            "type": "object",
+            "value": "{{config}}"
+          }
+        }
+      }
+    }
+  ]
+}

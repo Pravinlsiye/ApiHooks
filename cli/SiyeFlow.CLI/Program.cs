@@ -1,9 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using SiyeFlow.CLI.Interfaces;
-using SiyeFlow.CLI.Models;
 using SiyeFlow.CLI.Services;
+using SiyeFlow.CLI.Services.Blocks;
 using System;
 using System.CommandLine;
 using System.CommandLine.Invocation;
@@ -16,143 +15,155 @@ namespace SiyeFlow.CLI
     {
         static async Task<int> Main(string[] args)
         {
-            var rootCommand = new RootCommand("SiyeFlow CLI - API Workflow Executor");
+            var rootCommand = new RootCommand("SiyeFlow - Visual workflow automation for APIs");
 
-            var apiOption = new Option<FileInfo>(
-                aliases: new[] { "--api", "-a" },
-                description: "Path to OpenAPI 3.0 specification file")
-            {
-                IsRequired = true
-            };
-
-            var flowOption = new Option<FileInfo>(
-                aliases: new[] { "--flow", "-f" },
-                description: "Path to workflow definition file")
-            {
-                IsRequired = true
-            };
-
+            // Execute command options
+            var workflowOption = new Option<string>(
+                new[] { "--workflow", "-w" },
+                "Path to workflow definition file") { IsRequired = true };
+            var apiOption = new Option<string?>(
+                new[] { "--api", "-a" },
+                "Path to OpenAPI specification file (optional)");
+            var inputsOption = new Option<string?>(
+                new[] { "--inputs", "-i" },
+                "Input parameters as JSON string or file path");
             var dryRunOption = new Option<bool>(
-                aliases: new[] { "--dry-run", "-d" },
-                description: "Simulate the flow without making actual HTTP calls",
-                getDefaultValue: () => false);
-
-            var outputOption = new Option<FileInfo?>(
-                aliases: new[] { "--output", "-o" },
-                description: "Save execution results to JSON file");
-
+                new[] { "--dry-run", "-d" },
+                getDefaultValue: () => false,
+                "Simulate execution without making actual HTTP calls");
+            var outputOption = new Option<string?>(
+                new[] { "--output", "-o" },
+                "Save execution results to file");
             var verboseOption = new Option<bool>(
-                aliases: new[] { "--verbose", "-v" },
-                description: "Enable verbose logging",
-                getDefaultValue: () => false);
+                new[] { "--verbose", "-v" },
+                getDefaultValue: () => false,
+                "Enable verbose logging");
 
-            rootCommand.AddOption(apiOption);
-            rootCommand.AddOption(flowOption);
-            rootCommand.AddOption(dryRunOption);
-            rootCommand.AddOption(outputOption);
-            rootCommand.AddOption(verboseOption);
+            var executeCommand = new Command("execute", "Execute a workflow");
+            executeCommand.Add(workflowOption);
+            executeCommand.Add(apiOption);
+            executeCommand.Add(inputsOption);
+            executeCommand.Add(dryRunOption);
+            executeCommand.Add(outputOption);
+            executeCommand.Add(verboseOption);
 
-            rootCommand.SetHandler(async (InvocationContext context) =>
+            executeCommand.SetHandler(async (workflow, api, inputs, dryRun, output, verbose) =>
             {
-                var apiFile = context.ParseResult.GetValueForOption(apiOption)!;
-                var flowFile = context.ParseResult.GetValueForOption(flowOption)!;
-                var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
-                var outputFile = context.ParseResult.GetValueForOption(outputOption);
-                var verbose = context.ParseResult.GetValueForOption(verboseOption);
+                await ExecuteWorkflow(workflow, api, inputs, dryRun, output, verbose);
+            },
+            workflowOption, apiOption, inputsOption, dryRunOption, outputOption, verboseOption);
 
-                await ExecuteFlowAsync(apiFile, flowFile, dryRun, outputFile, verbose);
-            });
+            // Validate command
+            var validateCommand = new Command("validate", "Validate a workflow");
 
-            // Add help command
-            var helpCommand = new Command("help", "Show help information");
-            helpCommand.SetHandler(() =>
+            var workflowOption2 = new Option<string>(
+                new[] { "--workflow", "-w" },
+                "Path to workflow JSON file") { IsRequired = true };
+            var apiOption2 = new Option<string?>(
+                new[] { "--api", "-a" },
+                "Path to OpenAPI specification file");
+            
+            validateCommand.Add(workflowOption2);
+            validateCommand.Add(apiOption2);
+            
+            validateCommand.SetHandler(async (workflow, api) =>
             {
-                var console = new ConsoleWriter();
-                console.ShowHelp();
-            });
-            rootCommand.AddCommand(helpCommand);
+                await ValidateWorkflow(workflow, api);
+            },
+            workflowOption2, apiOption2);
+
+            // Generate docs command
+            var docsCommand = new Command("docs", "Generate workflow documentation");
+
+            var workflowOption3 = new Option<string>(
+                new[] { "--workflow", "-w" },
+                "Path to workflow JSON file") { IsRequired = true };
+            var outputOption2 = new Option<string>(
+                new[] { "--output", "-o" },
+                getDefaultValue: () => "workflow-docs.html",
+                "Output file path");
+            
+            docsCommand.Add(workflowOption3);
+            docsCommand.Add(outputOption2);
+            
+            docsCommand.SetHandler(async (workflow, output) =>
+            {
+                await GenerateDocs(workflow, output);
+            },
+            workflowOption3, outputOption2);
+
+            rootCommand.AddCommand(executeCommand);
+            rootCommand.AddCommand(validateCommand);
+            rootCommand.AddCommand(docsCommand);
 
             return await rootCommand.InvokeAsync(args);
         }
 
-        private static async Task ExecuteFlowAsync(
-            FileInfo apiFile,
-            FileInfo flowFile,
-            bool dryRun,
-            FileInfo? outputFile,
+        private static async Task ExecuteWorkflow(
+            string workflowPath, 
+            string? apiPath, 
+            string? inputs, 
+            bool dryRun, 
+            string? output,
             bool verbose)
         {
-            // Setup dependency injection
-            var services = new ServiceCollection();
-            ConfigureServices(services, verbose);
-            
-            using var serviceProvider = services.BuildServiceProvider();
-            var console = serviceProvider.GetRequiredService<IConsoleWriter>();
+            var services = ConfigureServices(verbose);
+            var executor = services.GetRequiredService<IWorkflowExecutor>();
+            var console = services.GetRequiredService<IConsoleWriter>();
 
             try
             {
-                console.Separator();
-                console.Info("SiyeFlow CLI - Starting execution");
-                console.Separator();
-
-                // Validate files exist
-                if (!apiFile.Exists)
+                console.Info($"Loading workflow from: {workflowPath}");
+                if (!string.IsNullOrEmpty(apiPath))
                 {
-                    console.Error($"API file not found: {apiFile.FullName}");
-                    return;
+                    console.Info($"Loading API from: {apiPath}");
+                }
+                else
+                {
+                    console.Info("Running without API definition (direct HTTP mode)");
                 }
 
-                if (!flowFile.Exists)
+                // Parse inputs if provided
+                var inputDict = ParseInputs(inputs);
+
+                // Execute workflow
+                var result = await executor.ExecuteFromPathAsync(
+                    workflowPath,
+                    apiPath,
+                    inputDict,
+                    dryRun);
+
+                // Display results
+                if (result.Success)
                 {
-                    console.Error($"Flow file not found: {flowFile.FullName}");
-                    return;
+                    console.Success("Workflow executed successfully!");
+                    console.Info($"Duration: {result.Duration.TotalSeconds:F2}s");
+                    
+                    if (result.Outputs.Count > 0)
+                    {
+                        console.Info("\nOutputs:");
+                        foreach (var outputVar in result.Outputs)
+                        {
+                            console.Info($"  {outputVar.Key}: {outputVar.Value}");
+                        }
+                    }
+                }
+                else
+                {
+                    console.Error($"Workflow failed: {result.Error}");
                 }
 
-                // Load API definition
-                var apiLoader = serviceProvider.GetRequiredService<IApiDefinitionLoader>();
-                var apiDocument = await apiLoader.LoadAsync(apiFile.FullName);
-
-                // Validate API document
-                if (!apiLoader.Validate(apiDocument, out var errors))
+                // Save results if requested
+                if (!string.IsNullOrEmpty(output))
                 {
-                    console.Error("API document validation failed. Continuing anyway...");
+                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(result, Newtonsoft.Json.Formatting.Indented);
+                    await File.WriteAllTextAsync(output, json);
+                    console.Success($"Results saved to: {output}");
                 }
-
-                // Load flow definition
-                console.Info($"Loading flow definition from: {flowFile.FullName}");
-                var flowJson = await File.ReadAllTextAsync(flowFile.FullName);
-                var flow = JsonConvert.DeserializeObject<FlowDefinition>(flowJson);
-
-                if (flow == null)
-                {
-                    console.Error("Failed to parse flow definition");
-                    return;
-                }
-
-                console.Success($"Loaded flow: {flow.Name}");
-
-                // Execute flow
-                var executor = serviceProvider.GetRequiredService<IFlowExecutor>();
-                var result = await executor.ExecuteAsync(flow, apiDocument, dryRun);
-
-                // Display summary
-                console.FlowSummary(result);
-
-                // Save output if requested
-                if (outputFile != null)
-                {
-                    console.Info($"Saving results to: {outputFile.FullName}");
-                    var resultJson = JsonConvert.SerializeObject(result, Formatting.Indented);
-                    await File.WriteAllTextAsync(outputFile.FullName, resultJson);
-                    console.Success("Results saved successfully");
-                }
-
-                // Exit with appropriate code
-                Environment.Exit(result.Success ? 0 : 1);
             }
             catch (Exception ex)
             {
-                console.Error($"Fatal error: {ex.Message}");
+                console.Error($"Execution failed: {ex.Message}");
                 if (verbose)
                 {
                     console.Error(ex.ToString());
@@ -161,23 +172,152 @@ namespace SiyeFlow.CLI
             }
         }
 
-        private static void ConfigureServices(IServiceCollection services, bool verbose)
+        private static async Task ValidateWorkflow(string workflowPath, string? apiPath)
         {
-            // Add logging
+            var services = ConfigureServices(false);
+            var executor = services.GetRequiredService<IWorkflowExecutor>();
+            var console = services.GetRequiredService<IConsoleWriter>();
+            var apiLoader = services.GetRequiredService<IApiDefinitionLoader>();
+
+            try
+            {
+                console.Info($"Validating workflow: {workflowPath}");
+
+                // Load workflow
+                var workflowJson = await File.ReadAllTextAsync(workflowPath);
+                var settings = new Newtonsoft.Json.JsonSerializerSettings();
+                settings.Converters.Add(new Models.WorkflowBlockConverter());
+                var workflow = Newtonsoft.Json.JsonConvert.DeserializeObject<Models.WorkflowDefinition>(workflowJson, settings);
+
+                if (workflow == null)
+                {
+                    console.Error("Failed to parse workflow file");
+                    Environment.Exit(1);
+                    return;
+                }
+
+                // Load API if provided
+                Microsoft.OpenApi.Models.OpenApiDocument? api = null;
+                if (!string.IsNullOrEmpty(apiPath))
+                {
+                    api = await apiLoader.LoadAsync(apiPath);
+                }
+
+                // Validate
+                var result = await executor.ValidateAsync(workflow, api);
+
+                if (result.IsValid)
+                {
+                    console.Success("✓ Workflow is valid");
+                }
+                else
+                {
+                    console.Error("✗ Workflow validation failed:");
+                    foreach (var error in result.Errors)
+                    {
+                        console.Error($"  - {error.Message}");
+                    }
+                    Environment.Exit(1);
+                }
+
+                if (result.Warnings.Count > 0)
+                {
+                    console.Warning("\nWarnings:");
+                    foreach (var warning in result.Warnings)
+                    {
+                        console.Warning($"  - {warning.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                console.Error($"Validation failed: {ex.Message}");
+                Environment.Exit(1);
+            }
+        }
+
+        private static async Task GenerateDocs(string workflowPath, string outputDir)
+        {
+            var services = ConfigureServices(false);
+            var console = services.GetRequiredService<IConsoleWriter>();
+
+            try
+            {
+                console.Info($"Generating documentation for: {workflowPath}");
+                console.Info($"Output directory: {outputDir}");
+
+                // TODO: Implement documentation generator for new schema
+                console.Warning("Documentation generator not yet implemented for new schema");
+            }
+            catch (Exception ex)
+            {
+                console.Error($"Documentation generation failed: {ex.Message}");
+                Environment.Exit(1);
+            }
+        }
+
+        private static IServiceProvider ConfigureServices(bool verbose)
+        {
+            var services = new ServiceCollection();
+
+            // Logging
             services.AddLogging(builder =>
             {
-                builder.AddConsole();
                 builder.SetMinimumLevel(verbose ? LogLevel.Debug : LogLevel.Information);
+                builder.AddConsole();
             });
 
-            // Add HttpClient
+            // HTTP
             services.AddHttpClient();
 
-            // Add services
+            // Core services
             services.AddSingleton<IConsoleWriter, ConsoleWriter>();
-            services.AddSingleton<IVariableStore, VariableStore>();
+            services.AddScoped<IVariableStore, VariableStore>();
             services.AddScoped<IApiDefinitionLoader, ApiDefinitionLoader>();
-            services.AddScoped<IFlowExecutor, FlowExecutor>();
+
+            // Block registry
+            services.AddSingleton<IBlockRegistry, BlockRegistry>();
+            
+            // Block executors
+            services.AddScoped<StartBlockExecutor>();
+            services.AddScoped<EndBlockExecutor>();
+            services.AddScoped<HttpRequestBlockExecutor>();
+            services.AddScoped<VariableBlockExecutor>();
+            services.AddScoped<LogBlockExecutor>();
+            services.AddScoped<DelayBlockExecutor>();
+            services.AddScoped<ConditionBlockExecutor>();
+            services.AddScoped<LoopBlockExecutor>();
+            services.AddScoped<EvaluateBlockExecutor>();
+            services.AddScoped<TryCatchBlockExecutor>();
+            services.AddScoped<CollectBlockExecutor>();
+            services.AddScoped<SubWorkflowBlockExecutor>();
+
+            // Workflow executor
+            services.AddScoped<IWorkflowExecutor, WorkflowExecutor>();
+
+            return services.BuildServiceProvider();
+        }
+
+        private static Dictionary<string, object>? ParseInputs(string? inputs)
+        {
+            if (string.IsNullOrEmpty(inputs))
+                return null;
+
+            try
+            {
+                // Check if it's a file path
+                if (File.Exists(inputs))
+                {
+                    inputs = File.ReadAllText(inputs);
+                }
+
+                return Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(inputs);
+            }
+            catch
+            {
+                // If parsing fails, treat as single string input
+                return new Dictionary<string, object> { ["input"] = inputs };
+            }
         }
     }
 }

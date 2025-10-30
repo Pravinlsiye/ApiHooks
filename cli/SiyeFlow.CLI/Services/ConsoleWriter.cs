@@ -37,30 +37,23 @@ namespace SiyeFlow.CLI.Services
             WriteLine($"[{DateTime.Now:HH:mm:ss}] [DEBUG] {message}", ConsoleColor.Gray);
         }
 
-        public void StepStart(FlowStep step)
+        public void BlockStart(WorkflowBlock block)
         {
             EmptyLine();
-            WriteLine($"┌─ Step: {step.Name} [{step.Id}]", ConsoleColor.Cyan);
+            WriteLine($"┌─ Block: {block.Name ?? block.Id} [{block.Type}]", ConsoleColor.Cyan);
             
-            if (!string.IsNullOrEmpty(step.Description))
+            if (!string.IsNullOrEmpty(block.Name) && block.Name != block.Id)
             {
-                WriteLine($"│  {step.Description}", ConsoleColor.Gray);
-            }
-            
-            WriteLine($"│  Method: {step.Method?.ToUpper() ?? "GET"} {step.Path}", ConsoleColor.Gray);
-            
-            if (!string.IsNullOrEmpty(step.OperationId))
-            {
-                WriteLine($"│  Operation: {step.OperationId}", ConsoleColor.Gray);
+                WriteLine($"│  ID: {block.Id}", ConsoleColor.Gray);
             }
         }
 
-        public void StepResult(StepResult result)
+        public void BlockResult(string blockId, BlockExecutionResult result)
         {
             var color = result.Success ? ConsoleColor.Green : ConsoleColor.Red;
             var symbol = result.Success ? "✓" : "✗";
             
-            WriteLine($"│  Status: {result.StatusCode} - {symbol}", color);
+            WriteLine($"│  Result: {symbol}", color);
             WriteLine($"│  Duration: {result.Duration.TotalMilliseconds:F0}ms", ConsoleColor.Gray);
             
             if (!string.IsNullOrEmpty(result.Error))
@@ -68,37 +61,48 @@ namespace SiyeFlow.CLI.Services
                 WriteLine($"│  Error: {result.Error}", ConsoleColor.Red);
             }
             
-            WriteLine($"└─ Completed at {result.ExecutedAt:HH:mm:ss}", ConsoleColor.Cyan);
+            if (result.Outputs != null && result.Outputs.Count > 0)
+            {
+                WriteLine($"│  Outputs: {result.Outputs.Count} variables", ConsoleColor.DarkGray);
+            }
+            
+            WriteLine($"└─ Next: {result.NextBlockId ?? "None"}", ConsoleColor.Cyan);
         }
 
-        public void FlowSummary(FlowExecutionResult result)
+        public void WorkflowSummary(WorkflowExecutionResult result)
         {
             Separator();
-            WriteLine("FLOW EXECUTION SUMMARY", ConsoleColor.White);
+            WriteLine("WORKFLOW EXECUTION SUMMARY", ConsoleColor.White);
             Separator();
             
-            WriteLine($"Flow: {result.FlowName}", ConsoleColor.White);
+            WriteLine($"Workflow: {result.WorkflowName}", ConsoleColor.White);
             WriteLine($"Started: {result.StartedAt:yyyy-MM-dd HH:mm:ss}", ConsoleColor.Gray);
             WriteLine($"Completed: {result.CompletedAt:yyyy-MM-dd HH:mm:ss}", ConsoleColor.Gray);
-            WriteLine($"Total Duration: {result.TotalDuration.TotalSeconds:F2}s", ConsoleColor.Gray);
+            WriteLine($"Total Duration: {result.Duration.TotalSeconds:F2}s", ConsoleColor.Gray);
             
             EmptyLine();
             
-            var successCount = result.StepResults.Count(r => r.Success);
-            var failureCount = result.StepResults.Count - successCount;
+            var successCount = result.ExecutionPath.Count(b => b.Success);
+            var failureCount = result.ExecutionPath.Count - successCount;
             
-            WriteLine($"Steps Executed: {result.StepResults.Count}", ConsoleColor.White);
+            WriteLine($"Blocks Executed: {result.ExecutionPath.Count}", ConsoleColor.White);
             WriteLine($"  Successful: {successCount}", ConsoleColor.Green);
             WriteLine($"  Failed: {failureCount}", failureCount > 0 ? ConsoleColor.Red : ConsoleColor.Gray);
             
             if (failureCount > 0)
             {
                 EmptyLine();
-                WriteLine("Failed Steps:", ConsoleColor.Red);
-                foreach (var failed in result.StepResults.Where(r => !r.Success))
+                WriteLine("Failed Blocks:", ConsoleColor.Red);
+                foreach (var failed in result.ExecutionPath.Where(b => !b.Success))
                 {
-                    WriteLine($"  - {failed.StepName}: {failed.Error}", ConsoleColor.Red);
+                    WriteLine($"  - {failed.BlockId}: {failed.Error ?? "Unknown error"}", ConsoleColor.Red);
                 }
+            }
+            
+            if (result.Outputs != null && result.Outputs.Count > 0)
+            {
+                EmptyLine();
+                WriteLine($"Final Outputs: {result.Outputs.Count} variables", ConsoleColor.Gray);
             }
             
             EmptyLine();

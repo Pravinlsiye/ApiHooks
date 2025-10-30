@@ -5,27 +5,25 @@ namespace SiyeFlow.TestApi.Services
 {
     public interface IDataService
     {
-        // Users
-        List<User> GetAllUsers();
-        User? GetUser(int id);
-        User CreateUser(User user);
-        User? UpdateUser(int id, User user);
-        bool DeleteUser(int id);
+        // Project operations
+        List<Project> GetAllProjects();
+        Project? GetProjectById(Guid id);
+        Project CreateProject(CreateProjectRequest request);
+        Project? UpdateProject(Guid id, UpdateProjectRequest request);
+        bool DeleteProject(Guid id);
 
-        // Posts
-        List<Post> GetAllPosts(int? userId = null);
-        Post? GetPost(int id);
-        Post CreatePost(NewPost newPost);
-        Post? UpdatePost(int id, Post post);
-        bool DeletePost(int id);
+        // Job operations
+        List<Job> GetProjectJobs(Guid projectId);
+        Job? GetJobById(Guid projectId, Guid jobId);
+        Job CreateJob(Guid projectId, CreateJobRequest request);
+        Job? UpdateJob(Guid projectId, Guid jobId, UpdateJobRequest request);
+        bool DeleteJob(Guid projectId, Guid jobId);
     }
 
     public class DataService : IDataService
     {
-        private readonly ConcurrentDictionary<int, User> _users = new();
-        private readonly ConcurrentDictionary<int, Post> _posts = new();
-        private int _nextUserId = 1;
-        private int _nextPostId = 1;
+        private readonly ConcurrentDictionary<Guid, Project> _projects = new();
+        private readonly ConcurrentDictionary<Guid, Job> _jobs = new();
 
         public DataService()
         {
@@ -35,157 +33,267 @@ namespace SiyeFlow.TestApi.Services
 
         private void SeedData()
         {
-            // Add sample users
-            var users = new[]
-            {
-                new User
-                {
-                    Id = _nextUserId++,
-                    Name = "John Doe",
-                    Username = "johndoe",
-                    Email = "john@example.com",
-                    Address = new Address
-                    {
-                        Street = "123 Main St",
-                        Suite = "Apt 4B",
-                        City = "New York",
-                        Zipcode = "10001"
-                    },
-                    Phone = "555-123-4567",
-                    Website = "johndoe.com"
-                },
-                new User
-                {
-                    Id = _nextUserId++,
-                    Name = "Jane Smith",
-                    Username = "janesmith",
-                    Email = "jane@example.com",
-                    Address = new Address
-                    {
-                        Street = "456 Oak Ave",
-                        Suite = "Suite 200",
-                        City = "Los Angeles",
-                        Zipcode = "90001"
-                    },
-                    Phone = "555-987-6543",
-                    Website = "janesmith.io"
+            // Create sample projects
+            var project1 = CreateProject(new CreateProjectRequest 
+            { 
+                Name = "E-Commerce Platform", 
+                Description = "Building a modern e-commerce platform with microservices" 
+            });
+            
+            var project2 = CreateProject(new CreateProjectRequest 
+            { 
+                Name = "Data Analytics Dashboard", 
+                Description = "Real-time analytics dashboard for business intelligence" 
+            });
+            
+            var project3 = CreateProject(new CreateProjectRequest 
+            { 
+                Name = "Mobile App Backend", 
+                Description = "RESTful API backend for mobile application" 
+            });
+            
+            // Add jobs to project 1
+            CreateJob(project1.Id, new CreateJobRequest 
+            { 
+                Name = "Database Migration",
+                Status = "completed",
+                Content = new JobContent 
+                { 
+                    Line1 = "Migrated 50,000 products to new schema", 
+                    Line2 = "Completed in 2 hours with zero downtime" 
                 }
-            };
-
-            foreach (var user in users)
-            {
-                _users[user.Id] = user;
-            }
-
-            // Add sample posts
-            var posts = new[]
-            {
-                new Post
-                {
-                    Id = _nextPostId++,
-                    UserId = 1,
-                    Title = "My First Post",
-                    Body = "This is the body of my first post. It's a great day to start blogging!"
-                },
-                new Post
-                {
-                    Id = _nextPostId++,
-                    UserId = 1,
-                    Title = "Learning ASP.NET Core",
-                    Body = "ASP.NET Core is a fantastic framework for building modern web applications."
-                },
-                new Post
-                {
-                    Id = _nextPostId++,
-                    UserId = 2,
-                    Title = "Hello World",
-                    Body = "Hello everyone! This is Jane's first post on this platform."
+            });
+            
+            CreateJob(project1.Id, new CreateJobRequest 
+            { 
+                Name = "Payment Integration",
+                Status = "running",
+                Content = new JobContent 
+                { 
+                    Line1 = "Integrating Stripe payment gateway", 
+                    Line2 = "Testing webhook endpoints" 
                 }
-            };
+            });
+            
+            CreateJob(project1.Id, new CreateJobRequest 
+            { 
+                Name = "Security Audit",
+                Status = "pending",
+                Content = new JobContent 
+                { 
+                    Line1 = "Scheduled security penetration testing", 
+                    Line2 = "Waiting for security team availability" 
+                }
+            });
+            
+            // Add jobs to project 2
+            CreateJob(project2.Id, new CreateJobRequest 
+            { 
+                Name = "Data Pipeline Setup",
+                Status = "completed",
+                Content = new JobContent 
+                { 
+                    Line1 = "ETL pipeline configured for real-time data", 
+                    Line2 = "Processing 1M records per hour" 
+                }
+            });
+            
+            CreateJob(project2.Id, new CreateJobRequest 
+            { 
+                Name = "Dashboard UI Development",
+                Status = "running",
+                Content = new JobContent 
+                { 
+                    Line1 = "Building interactive charts with D3.js", 
+                    Line2 = "60% of components completed" 
+                }
+            });
+            
+            // Add jobs to project 3
+            CreateJob(project3.Id, new CreateJobRequest 
+            { 
+                Name = "API Documentation",
+                Status = "completed",
+                Content = new JobContent 
+                { 
+                    Line1 = "OpenAPI specification completed", 
+                    Line2 = "Published to developer portal" 
+                }
+            });
+            
+            CreateJob(project3.Id, new CreateJobRequest 
+            { 
+                Name = "Load Testing",
+                Status = "failed",
+                Content = new JobContent 
+                { 
+                    Line1 = "Performance test failed at 10K concurrent users", 
+                    Line2 = "Investigating bottlenecks in database connections" 
+                }
+            });
+        }
 
-            foreach (var post in posts)
+        // Project methods
+        public List<Project> GetAllProjects()
+        {
+            return _projects.Values
+                .OrderByDescending(p => p.UpdatedAt)
+                .ToList();
+        }
+
+        public Project? GetProjectById(Guid id)
+        {
+            if (_projects.TryGetValue(id, out var project))
             {
-                _posts[post.Id] = post;
-            }
-        }
-
-        // User methods
-        public List<User> GetAllUsers()
-        {
-            return _users.Values.OrderBy(u => u.Id).ToList();
-        }
-
-        public User? GetUser(int id)
-        {
-            return _users.GetValueOrDefault(id);
-        }
-
-        public User CreateUser(User user)
-        {
-            user.Id = _nextUserId++;
-            _users[user.Id] = user;
-            return user;
-        }
-
-        public User? UpdateUser(int id, User user)
-        {
-            if (_users.ContainsKey(id))
-            {
-                user.Id = id;
-                _users[id] = user;
-                return user;
+                // Include jobs in the project
+                project.Jobs = _jobs.Values
+                    .Where(j => j.ProjectId == id)
+                    .OrderByDescending(j => j.CreatedAt)
+                    .ToList();
+                return project;
             }
             return null;
         }
 
-        public bool DeleteUser(int id)
+        public Project CreateProject(CreateProjectRequest request)
         {
-            return _users.TryRemove(id, out _);
-        }
-
-        // Post methods
-        public List<Post> GetAllPosts(int? userId = null)
-        {
-            var posts = _posts.Values.AsEnumerable();
-            if (userId.HasValue)
+            var project = new Project
             {
-                posts = posts.Where(p => p.UserId == userId.Value);
-            }
-            return posts.OrderBy(p => p.Id).ToList();
-        }
-
-        public Post? GetPost(int id)
-        {
-            return _posts.GetValueOrDefault(id);
-        }
-
-        public Post CreatePost(NewPost newPost)
-        {
-            var post = new Post
-            {
-                Id = _nextPostId++,
-                UserId = newPost.UserId,
-                Title = newPost.Title,
-                Body = newPost.Body
+                Id = Guid.NewGuid(),
+                Name = request.Name,
+                Description = request.Description,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                Jobs = new List<Job>()
             };
-            _posts[post.Id] = post;
-            return post;
+            
+            _projects[project.Id] = project;
+            return project;
         }
 
-        public Post? UpdatePost(int id, Post post)
+        public Project? UpdateProject(Guid id, UpdateProjectRequest request)
         {
-            if (_posts.ContainsKey(id))
+            if (_projects.TryGetValue(id, out var project))
             {
-                post.Id = id;
-                _posts[id] = post;
-                return post;
+                if (!string.IsNullOrEmpty(request.Name))
+                    project.Name = request.Name;
+                    
+                if (!string.IsNullOrEmpty(request.Description))
+                    project.Description = request.Description;
+                    
+                project.UpdatedAt = DateTime.UtcNow;
+                
+                _projects[id] = project;
+                return project;
             }
             return null;
         }
 
-        public bool DeletePost(int id)
+        public bool DeleteProject(Guid id)
         {
-            return _posts.TryRemove(id, out _);
+            if (_projects.TryRemove(id, out _))
+            {
+                // Also delete all associated jobs
+                var jobsToDelete = _jobs.Values
+                    .Where(j => j.ProjectId == id)
+                    .Select(j => j.Id)
+                    .ToList();
+                    
+                foreach (var jobId in jobsToDelete)
+                {
+                    _jobs.TryRemove(jobId, out _);
+                }
+                
+                return true;
+            }
+            return false;
+        }
+
+        // Job methods
+        public List<Job> GetProjectJobs(Guid projectId)
+        {
+            return _jobs.Values
+                .Where(j => j.ProjectId == projectId)
+                .OrderByDescending(j => j.CreatedAt)
+                .ToList();
+        }
+
+        public Job? GetJobById(Guid projectId, Guid jobId)
+        {
+            if (_jobs.TryGetValue(jobId, out var job) && job.ProjectId == projectId)
+            {
+                return job;
+            }
+            return null;
+        }
+
+        public Job CreateJob(Guid projectId, CreateJobRequest request)
+        {
+            var job = new Job
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                Name = request.Name,
+                Status = request.Status ?? "pending",
+                Content = request.Content ?? new JobContent(),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            
+            _jobs[job.Id] = job;
+            
+            // Update project's updated time
+            if (_projects.TryGetValue(projectId, out var project))
+            {
+                project.UpdatedAt = DateTime.UtcNow;
+            }
+            
+            return job;
+        }
+
+        public Job? UpdateJob(Guid projectId, Guid jobId, UpdateJobRequest request)
+        {
+            if (_jobs.TryGetValue(jobId, out var job) && job.ProjectId == projectId)
+            {
+                if (!string.IsNullOrEmpty(request.Name))
+                    job.Name = request.Name;
+                    
+                if (!string.IsNullOrEmpty(request.Status))
+                    job.Status = request.Status;
+                    
+                if (request.Content != null)
+                    job.Content = request.Content;
+                    
+                job.UpdatedAt = DateTime.UtcNow;
+                
+                _jobs[jobId] = job;
+                
+                // Update project's updated time
+                if (_projects.TryGetValue(projectId, out var project))
+                {
+                    project.UpdatedAt = DateTime.UtcNow;
+                }
+                
+                return job;
+            }
+            return null;
+        }
+
+        public bool DeleteJob(Guid projectId, Guid jobId)
+        {
+            if (_jobs.TryGetValue(jobId, out var job) && job.ProjectId == projectId)
+            {
+                if (_jobs.TryRemove(jobId, out _))
+                {
+                    // Update project's updated time
+                    if (_projects.TryGetValue(projectId, out var project))
+                    {
+                        project.UpdatedAt = DateTime.UtcNow;
+                    }
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

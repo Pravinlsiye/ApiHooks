@@ -1,4 +1,5 @@
 using SiyeFlow.TestApi.Services;
+using SiyeFlow.UI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,13 @@ builder.Services.AddSwaggerGen(c =>
 
 // Register our data service as singleton for in-memory storage
 builder.Services.AddSingleton<IDataService, DataService>();
+
+// Add SiyeFlow Designer UI - visual workflow designer only (no execution)
+builder.Services.AddSiyeFlowDesigner(options =>
+{
+    options.RoutePrefix = "workflows";
+    options.DocumentTitle = "SiyeFlow Workflow Designer";
+});
 
 // Configure CORS to allow CLI to call the API
 builder.Services.AddCors(options =>
@@ -43,6 +51,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors();
+
+// Use SiyeFlow Designer UI - accessible at /workflows
+app.UseSiyeFlowDesigner();
+
 app.UseAuthorization();
 app.MapControllers();
 

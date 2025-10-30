@@ -34,19 +34,19 @@ namespace SiyeFlow.CLI.Interfaces
         void Debug(string message);
 
         /// <summary>
-        /// Writes a step execution start message
+        /// Writes a block execution start message
         /// </summary>
-        void StepStart(FlowStep step);
+        void BlockStart(WorkflowBlock block);
 
         /// <summary>
-        /// Writes a step execution result
+        /// Writes a block execution result
         /// </summary>
-        void StepResult(StepResult result);
+        void BlockResult(string blockId, BlockExecutionResult result);
 
         /// <summary>
-        /// Writes the flow execution summary
+        /// Writes the workflow execution summary
         /// </summary>
-        void FlowSummary(FlowExecutionResult result);
+        void WorkflowSummary(WorkflowExecutionResult result);
 
         /// <summary>
         /// Writes a progress indicator

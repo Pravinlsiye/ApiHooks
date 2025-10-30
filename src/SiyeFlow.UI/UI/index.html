@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{DocumentTitle}}</title>
+    <link rel="stylesheet" href="styles.css">
+    {{CustomCss}}
+</head>
+<body data-theme="{{Theme}}">
+    <div id="siyeflow-app">
+        <header>
+            <h1>SiyeFlow Workflow Designer</h1>
+            <div class="header-controls">
+                <button id="newWorkflowBtn" class="btn btn-primary">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 4v16m8-8H4"/>
+                    </svg>
+                    New Workflow
+                </button>
+                <button id="saveWorkflowBtn" class="btn btn-success" disabled>
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    Save as JSON
+                </button>
+                <button id="loadWorkflowBtn" class="btn btn-secondary">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Load JSON
+                </button>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <!-- Left sidebar - API Endpoints -->
+            <div class="sidebar endpoints-panel">
+                <h2>API Endpoints</h2>
+                <div class="endpoint-search">
+                    <input type="text" id="endpointSearch" placeholder="Search endpoints...">
+                </div>
+                <div id="endpointsList" class="endpoints-list">
+                    <div class="loading">Loading API endpoints...</div>
+                </div>
+            </div>
+
+            <!-- Center - Workflow Canvas -->
+            <div class="canvas-container">
+                <div id="workflowCanvas" class="workflow-canvas designer-mode">
+                    <div class="canvas-toolbar">
+                        <button id="zoomInBtn" class="toolbar-btn" title="Zoom In">+</button>
+                        <button id="zoomOutBtn" class="toolbar-btn" title="Zoom Out">-</button>
+                        <button id="zoomResetBtn" class="toolbar-btn" title="Reset Zoom">100%</button>
+                        <span class="separator"></span>
+                        <button id="autoLayoutBtn" class="toolbar-btn" title="Auto Layout">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="9" y1="3" x2="9" y2="21"/>
+                                <line x1="3" y1="9" x2="21" y2="9"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="canvasContent" class="canvas-content">
+                        <svg id="connectionsSvg" class="connections-layer" width="2000" height="2000"></svg>
+                        <div id="blocksContainer" class="blocks-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right sidebar - Properties -->
+            <div class="sidebar properties-panel">
+                <h2>Workflow Properties</h2>
+                <div class="property-group">
+                    <label>Name</label>
+                    <input type="text" id="workflowName" placeholder="My Workflow">
+                </div>
+                <div class="property-group">
+                    <label>Description</label>
+                    <textarea id="workflowDescription" placeholder="Describe your workflow..."></textarea>
+                </div>
+                
+                <h2>Variables</h2>
+                <div id="variablesSection" class="variables-section">
+                    <button id="addVariableBtn" class="btn btn-sm">+ Add Variable</button>
+                    <div id="variablesList" class="variables-list"></div>
+                </div>
+
+                <h2>Step Properties</h2>
+                <div id="stepProperties" class="step-properties">
+                    <p class="empty-state">Select a step to edit properties</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden file input for loading -->
+        <input type="file" id="fileInput" accept=".json" style="display: none;">
+    </div>
+
+    <script src="workflow-designer.js"></script>
+</body>
+</html>

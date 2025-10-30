@@ -1,0 +1,63 @@
+{
+  "name": "Test Delay Block",
+  "description": "Test workflow delays and timing",
+  "blocks": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Start",
+      "config": {
+        "inputs": {
+          "delaySeconds": {
+            "type": "number",
+            "required": false,
+            "default": 2
+          }
+        }
+      },
+      "onSuccess": "log-start"
+    },
+    {
+      "id": "log-start",
+      "type": "log",
+      "name": "Log Start Time",
+      "config": {
+        "level": "info",
+        "message": "Starting delay test at {{$timestamp}}"
+      },
+      "onSuccess": "delay"
+    },
+    {
+      "id": "delay",
+      "type": "delay",
+      "name": "Wait",
+      "config": {
+        "seconds": "{{delaySeconds}}"
+      },
+      "onSuccess": "log-end"
+    },
+    {
+      "id": "log-end",
+      "type": "log",
+      "name": "Log End Time",
+      "config": {
+        "level": "info",
+        "message": "Completed delay at {{$timestamp}}"
+      },
+      "onSuccess": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End",
+      "config": {
+        "outputs": {
+          "delayedFor": {
+            "type": "number",
+            "value": "{{delaySeconds}}"
+          }
+        }
+      }
+    }
+  ]
+}

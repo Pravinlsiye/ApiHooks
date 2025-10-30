@@ -85,3 +85,7 @@ artifacts/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Generated documentation
+docs/
+SiyeFlow.CLI/docs/
