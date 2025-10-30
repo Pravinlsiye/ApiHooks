@@ -40,6 +40,13 @@ This directory contains simple test workflows for validating individual block ty
 - Sequential execution flow
 - Time-based operations
 
+### visual-test.json
+**Purpose**: Test visual designer import functionality
+- Multiple block types (HTTP, condition, variable, log)
+- Branching logic with success/failure paths
+- Multiple end blocks for different outcomes
+- Demonstrates new block-based schema
+
 ## Running Tests
 
 ### With API Definition (optional)

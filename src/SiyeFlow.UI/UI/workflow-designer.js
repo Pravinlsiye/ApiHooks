@@ -427,8 +427,17 @@ function addEndpointToCanvas(endpoint, x = 400, y = 250) {
             <button class="block-tab active" data-tab="input" onclick="switchTab('${stepId}', 'input')">Input</button>
             <button class="block-tab" data-tab="output" onclick="switchTab('${stepId}', 'output')">Output</button>
         </div>
-        <div class="connection-port port-in" data-block="${stepId}" data-port="input"></div>
-        <div class="connection-port port-out" data-block="${stepId}" data-port="output"></div>
+        <div class="connection-ports">
+            <div class="connection-port port-in input" data-block="${stepId}" data-port="input"></div>
+            <div class="connection-ports-out">
+                <div class="connection-port port-out output success" data-block="${stepId}" data-port="success">
+                    <span class="port-label">✓</span>
+                </div>
+                <div class="connection-port port-out output failure" data-block="${stepId}" data-port="failure">
+                    <span class="port-label">✗</span>
+                </div>
+            </div>
+        </div>
     `;
     
     document.getElementById('blocksContainer').appendChild(block);
@@ -514,29 +523,28 @@ function setupBlockEvents(block, stepId) {
     });
     
     // Connection ports
-    const outPort = block.querySelector('.connection-port.port-out');
-    const inPort = block.querySelector('.connection-port.port-in');
+    const ports = block.querySelectorAll('.connection-port');
     
-    if (outPort) {
-        outPort.addEventListener('pointerdown', (e) => {
+    ports.forEach(port => {
+        port.addEventListener('pointerdown', (e) => {
             e.stopPropagation();
             e.preventDefault();
-            const portType = outPort.getAttribute('data-port');
-            console.log('Output port clicked:', stepId, 'Port:', portType);
-            startConnection(stepId, portType);
-        });
-    }
-    
-    if (inPort) {
-        inPort.addEventListener('pointerdown', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            console.log('Input port clicked:', stepId, 'Connecting:', connecting);
-            if (connecting && connectionStart) {
-                completeConnection(stepId, 'input');
+            
+            const portType = port.getAttribute('data-port');
+            
+            if (port.classList.contains('input')) {
+                // Input port - complete connection
+                console.log('Input port clicked:', stepId, 'Connecting:', connecting);
+                if (connecting && connectionStart) {
+                    completeConnection(stepId, portType);
+                }
+            } else {
+                // Output port - start connection
+                console.log('Output port clicked:', stepId, 'Port:', portType);
+                startConnection(stepId, portType);
             }
         });
-    }
+    });
 }
 
 // Select block
@@ -747,7 +755,16 @@ function drawConnections() {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         const d = `M ${x1} ${y1} C ${x1} ${y1 + 50}, ${x2} ${y2 - 50}, ${x2} ${y2}`;
         path.setAttribute('d', d);
-        path.setAttribute('class', 'connection-path');
+        
+        // Add classes based on connection type
+        let pathClass = 'connection-path';
+        if (conn.type === 'success' || conn.fromPort === 'success') {
+            pathClass += ' success-path';
+        } else if (conn.type === 'failure' || conn.fromPort === 'failure') {
+            pathClass += ' failure-path';
+        }
+        
+        path.setAttribute('class', pathClass);
         path.setAttribute('data-from', conn.from);
         path.setAttribute('data-to', conn.to);
         path.setAttribute('data-from-port', conn.fromPort || 'out');
@@ -859,7 +876,233 @@ function loadWorkflowData(data) {
     document.getElementById('workflowName').value = data.name || '';
     document.getElementById('workflowDescription').value = data.description || '';
     
-    // Recreate start/end blocks
+    // Detect schema version (V1 has 'steps', new schema has 'blocks')
+    if (data.blocks && Array.isArray(data.blocks)) {
+        // New block-based schema
+        loadBlockBasedWorkflow(data);
+    } else if (data.steps && Array.isArray(data.steps)) {
+        // Legacy V1 schema
+        loadLegacyWorkflow(data);
+    } else {
+        alert('Invalid workflow format. Expected either "blocks" or "steps" array.');
+    }
+    
+    drawConnections();
+}
+
+function loadBlockBasedWorkflow(data) {
+    // Initialize canvas with start/end blocks
+    initializeCanvas();
+    
+    // Keep track of block positions
+    let currentY = 150;
+    const blockSpacing = 120;
+    const blockMap = {};
+    
+    // Process each block
+    data.blocks.forEach((block, index) => {
+        let visualBlock = null;
+        const x = 400;
+        const y = currentY + (index * blockSpacing);
+        
+        switch (block.type) {
+            case 'start':
+                // Start block is already created by initializeCanvas
+                blockMap[block.id] = 'start';
+                // Update start block position if needed
+                const startBlock = document.getElementById('block-start');
+                if (startBlock && index === 0) {
+                    startBlock.style.top = y + 'px';
+                }
+                break;
+                
+            case 'end':
+                // End block is already created by initializeCanvas
+                blockMap[block.id] = 'end';
+                // Update end block position if needed
+                const endBlock = document.getElementById('block-end');
+                if (endBlock) {
+                    endBlock.style.top = (currentY + ((data.blocks.length - 1) * blockSpacing)) + 'px';
+                }
+                break;
+                
+            case 'http-request':
+                // Create HTTP request block
+                const endpoint = {
+                    method: block.config?.method || 'GET',
+                    path: block.config?.url || block.config?.path || '',
+                    summary: block.description || block.name || 'HTTP Request',
+                    operationId: block.id
+                };
+                // Store the current step number before it gets incremented
+                const currentStepNum = nextStepNumber;
+                addEndpointToCanvas(endpoint, x, y);
+                const httpBlockId = `step-${currentStepNum}`;
+                blockMap[block.id] = httpBlockId;
+                
+                // Update the block data with the original block info
+                const blockData = blocks.get(httpBlockId);
+                if (blockData) {
+                    blockData.data = { ...blockData.data, ...block };
+                }
+                
+                console.log('Created HTTP block:', block.id, '->', httpBlockId);
+                break;
+                
+            default:
+                // Create generic block for other types
+                createGenericBlock(block, x, y);
+                blockMap[block.id] = `block-${block.id}`;
+                break;
+        }
+    });
+    
+    // Create connections based on onSuccess/onFailure
+    console.log('Block map:', blockMap);
+    data.blocks.forEach(block => {
+        const fromId = blockMap[block.id];
+        if (!fromId) {
+            console.log('No fromId for block:', block.id);
+            return;
+        }
+        
+        // Handle onSuccess
+        if (block.onSuccess) {
+            const toId = blockMap[block.onSuccess];
+            if (toId) {
+                const connection = {
+                    from: fromId,
+                    to: toId,
+                    fromPort: block.type === 'start' ? 'output' : 'success',
+                    toPort: 'input',
+                    type: 'success'
+                };
+                connections.push(connection);
+                console.log('Created connection:', connection);
+            } else {
+                console.log('No toId for onSuccess:', block.onSuccess);
+            }
+        }
+        
+        // Handle onFailure
+        if (block.onFailure) {
+            const toId = blockMap[block.onFailure];
+            if (toId) {
+                const connection = {
+                    from: fromId,
+                    to: toId,
+                    fromPort: 'failure',
+                    toPort: 'input',
+                    type: 'failure'
+                };
+                connections.push(connection);
+                console.log('Created failure connection:', connection);
+            } else {
+                console.log('No toId for onFailure:', block.onFailure);
+            }
+        }
+    });
+}
+
+function createGenericBlock(block, x, y) {
+    const blockElement = document.createElement('div');
+    blockElement.className = 'workflow-block';
+    blockElement.id = `block-${block.id}`;
+    blockElement.style.left = `${x}px`;
+    blockElement.style.top = `${y}px`;
+    
+    // Choose icon based on block type
+    const icon = getBlockIcon(block.type);
+    const color = getBlockColor(block.type);
+    
+    blockElement.innerHTML = `
+        <div class="block-header" style="background: ${color}">
+            <span class="block-icon">${icon}</span>
+            <span class="block-title">${block.name || block.type}</span>
+        </div>
+        <div class="block-content">
+            <div class="block-type">${block.type}</div>
+            ${block.description ? `<div class="block-summary">${block.description}</div>` : ''}
+        </div>
+        <div class="connection-ports">
+            <div class="connection-port input" data-block-id="block-${block.id}" data-port="input"></div>
+            ${block.type !== 'end' ? `
+                <div class="connection-port output success" data-block-id="block-${block.id}" data-port="success"></div>
+                ${hasFailurePort(block.type) ? `
+                    <div class="connection-port output failure" data-block-id="block-${block.id}" data-port="failure"></div>
+                ` : ''}
+            ` : ''}
+        </div>
+    `;
+    
+    document.getElementById('blocksContainer').appendChild(blockElement);
+    makeBlockDraggable(blockElement);
+    
+    // Store block data
+    blocks.set(`block-${block.id}`, {
+        element: blockElement,
+        data: block
+    });
+    
+    // Add connection port event handlers
+    const ports = blockElement.querySelectorAll('.connection-port');
+    ports.forEach(port => {
+        port.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            const blockId = port.getAttribute('data-block-id');
+            const portType = port.getAttribute('data-port');
+            
+            if (port.classList.contains('input')) {
+                // Input port - complete connection
+                if (connecting && connectionStart) {
+                    completeConnection(blockId, portType);
+                }
+            } else {
+                // Output port - start connection
+                startConnection(blockId, portType);
+            }
+        });
+    });
+}
+
+function getBlockIcon(type) {
+    const icons = {
+        'variable': '📝',
+        'log': '📋',
+        'delay': '⏱️',
+        'condition': '❓',
+        'loop': '🔁',
+        'evaluate': '🧮',
+        'try-catch': '🛡️',
+        'collect': '📦',
+        'workflow': '📂'
+    };
+    return icons[type] || '📦';
+}
+
+function getBlockColor(type) {
+    const colors = {
+        'variable': '#9b59b6',
+        'log': '#95a5a6',
+        'delay': '#f39c12',
+        'condition': '#e74c3c',
+        'loop': '#3498db',
+        'evaluate': '#16a085',
+        'try-catch': '#e67e22',
+        'collect': '#8e44ad',
+        'workflow': '#2c3e50'
+    };
+    return colors[type] || '#7f8c8d';
+}
+
+function hasFailurePort(type) {
+    return ['http-request', 'evaluate', 'condition', 'try-catch'].includes(type);
+}
+
+function loadLegacyWorkflow(data) {
+    // Existing V1 loading logic
     initializeCanvas();
     
     // Load variables
@@ -1001,8 +1244,6 @@ function loadWorkflowData(data) {
             }
         }
     });
-    
-    drawConnections();
 }
 
 // Variable management
