@@ -1,0 +1,19 @@
+{
+  "name": "siye-flow-designer",
+  "version": "1.0.0",
+  "description": "SiyeFlow Workflow Designer - TypeScript Implementation",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "type:generate": "cd ../SiyeFlow.Core.TypeGen && dotnet run -- \"../siye-flow-designer/src/models/workflow-models.ts\""
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0"
+  },
+  "type": "module"
+}

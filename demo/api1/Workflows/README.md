@@ -33,6 +33,13 @@ This directory contains simple test workflows for validating individual block ty
 - Success/failure branching
 - Error handling with multiple end blocks
 
+### test-http-post-jsonplaceholder.json
+**Purpose**: Test HTTP POST with public API
+- Uses JSONPlaceholder API (no local server needed)
+- Creates a new post resource
+- Extracts created resource data
+- Demonstrates real POST operation
+
 ### test-delay-block.json
 **Purpose**: Test timing and flow control
 - Configurable delay duration
@@ -40,12 +47,30 @@ This directory contains simple test workflows for validating individual block ty
 - Sequential execution flow
 - Time-based operations
 
+### test-http-jsonpath.json
+**Purpose**: Test HTTP request with JSONPath extraction (local API)
+- Multiple JSONPath expressions
+- Array extraction and slicing
+- Variable storage and usage
+- Complex output mapping
+
+### test-http-jsonpath-posts.json
+**Purpose**: Test HTTP request with JSONPath extraction (public API)
+- Uses JSONPlaceholder API (no local server needed)
+- JSONPath array operations
+- Multiple data extractions from single response
+- Demonstrates real-world API usage
+
 ### visual-test.json
 **Purpose**: Test visual designer import functionality
 - Multiple block types (HTTP, condition, variable, log)
 - Branching logic with success/failure paths
 - Multiple end blocks for different outcomes
 - Demonstrates new block-based schema
+
+## Test Results
+
+See [TEST_RESULTS.md](./TEST_RESULTS.md) for detailed test execution results and status of each workflow.
 
 ## Running Tests
 

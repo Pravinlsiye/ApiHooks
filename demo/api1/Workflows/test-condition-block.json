@@ -1,0 +1,128 @@
+{
+  "name": "Test Condition Block",
+  "description": "Tests conditional branching logic",
+  "version": "1.0",
+  "blocks": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Start",
+      "config": {
+        "inputs": {
+          "userAge": {
+            "type": "number",
+            "required": true,
+            "default": 25
+          },
+          "userName": {
+            "type": "string",
+            "required": true,
+            "default": "John"
+          },
+          "isVip": {
+            "type": "boolean",
+            "required": false,
+            "default": false
+          }
+        }
+      },
+      "onSuccess": "set-threshold"
+    },
+    {
+      "id": "set-threshold",
+      "type": "variable",
+      "name": "Set Age Threshold",
+      "config": {
+        "operation": "set",
+        "variables": {
+          "ageThreshold": 18,
+          "vipThreshold": 65
+        }
+      },
+      "onSuccess": "check-age"
+    },
+    {
+      "id": "check-age",
+      "type": "condition",
+      "name": "Check If Adult",
+      "config": {
+        "expression": "inputs.userAge >= {{ageThreshold}}",
+        "onTrue": "check-vip",
+        "onFalse": "minor-message"
+      },
+      "inputs": {
+        "userAge": "{{userAge}}"
+      }
+    },
+    {
+      "id": "check-vip",
+      "type": "condition",
+      "name": "Check VIP Status",
+      "config": {
+        "expression": "inputs.isVip == true || inputs.age >= {{vipThreshold}}",
+        "onTrue": "vip-message",
+        "onFalse": "regular-message"
+      },
+      "inputs": {
+        "isVip": "{{isVip}}",
+        "age": "{{userAge}}"
+      }
+    },
+    {
+      "id": "minor-message",
+      "type": "variable",
+      "name": "Set Minor Message",
+      "config": {
+        "operation": "set",
+        "variables": {
+          "message": "Sorry {{userName}}, you must be {{ageThreshold}} or older to access this service.",
+          "accessLevel": "denied"
+        }
+      },
+      "onSuccess": "end"
+    },
+    {
+      "id": "regular-message",
+      "type": "variable",
+      "name": "Set Regular Message",
+      "config": {
+        "operation": "set",
+        "variables": {
+          "message": "Welcome {{userName}}! You have regular access.",
+          "accessLevel": "regular"
+        }
+      },
+      "onSuccess": "end"
+    },
+    {
+      "id": "vip-message",
+      "type": "variable",
+      "name": "Set VIP Message",
+      "config": {
+        "operation": "set",
+        "variables": {
+          "message": "Welcome {{userName}}! You have VIP access.",
+          "accessLevel": "vip"
+        }
+      },
+      "onSuccess": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End",
+      "config": {
+        "outputs": {
+          "finalMessage": {
+            "type": "string",
+            "value": "{{message}}"
+          },
+          "accessLevel": {
+            "type": "string",
+            "value": "{{accessLevel}}"
+          }
+        }
+      }
+    }
+  ]
+}

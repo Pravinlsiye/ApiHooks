@@ -29,8 +29,7 @@
         }
       },
       "outputs": {
-        "projects": "$",
-        "count": "$.length"
+        "projects": "$"
       },
       "onSuccess": "end"
     },
@@ -40,9 +39,9 @@
       "name": "End",
       "config": {
         "outputs": {
-          "totalProjects": {
-            "type": "number",
-            "value": "{{count}}"
+          "projects": {
+            "type": "array",
+            "value": "{{projects}}"
           }
         }
       }

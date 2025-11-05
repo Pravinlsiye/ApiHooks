@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\cli\SiyeFlow.CLI\SiyeFlow.CLI.csproj" />
+    <ProjectReference Include="..\SiyeFlow.Core\SiyeFlow.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

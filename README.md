@@ -8,10 +8,16 @@ A comprehensive solution for executing and visualizing API workflows based on Op
 Execute API workflows from the command line with powerful features like variable management, conditional logic, and detailed logging.
 
 ```bash
-dotnet run -- --api openapi.json --flow workflow.json
+cd src/SiyeFlow.CLI
+dotnet run -- execute --workflow workflow.json [--api openapi.json]
 ```
 
-[Learn more →](cli/README.md)
+Features:
+- Execute workflows with or without OpenAPI definitions
+- Variable management (set/get/delete)
+- Conditional branching logic
+- HTTP requests with JSONPath extraction
+- Detailed execution logging
 
 ### 2. **SiyeFlow.UI** - Visual Workflow Designer Middleware
 Add a visual workflow designer to any ASP.NET Core API with just two lines of code! Like Swagger, but for creating workflows.
@@ -43,11 +49,16 @@ app.UseSiyeFlow();
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/siyeOps.git
-cd siyeOps/cli/SiyeFlow.CLI
+git clone https://github.com/yourusername/SiyeFlow.git
+cd SiyeFlow/src/SiyeFlow.CLI
 
-# Run a sample workflow
-dotnet run -- --api samples/openapi.json --flow samples/flow.json
+# Run a test workflow (with local API)
+cd ../../demo/api1 && dotnet run  # Start API first
+cd ../../src/SiyeFlow.CLI
+dotnet run -- execute --workflow ../../demo/api1/Workflows/test-http-block.json
+
+# Or run without API definition
+dotnet run -- execute --workflow ../../demo/api1/Workflows/test-variable-block.json
 ```
 
 ### Option 2: Add to Your API (Like Swagger)
@@ -66,49 +77,77 @@ app.UseSiyeFlow();
 ## 🏗️ Project Structure
 
 ```
-siyeOps/
-├── cli/                      # Command-line interface
-│   └── SiyeFlow.CLI/        # Main CLI project
-├── src/                      # Source libraries
-│   └── SiyeFlow.UI/         # Embeddable UI middleware
+SiyeFlow/
+├── src/                      # All source code
+│   ├── SiyeFlow.CLI/        # Command-line workflow engine
+│   ├── SiyeFlow.Core/       # Shared models and interfaces
+│   └── SiyeFlow.UI/         # Embeddable UI designer
 ├── demo/                     # Demo projects
-│   └── api1/                # Sample API for testing
-└── examples/                 # Example implementations
-    └── ApiWithSiyeFlow/     # Example API with SiyeFlow UI
+│   └── api1/                # Sample API with test workflows
+│       └── Workflows/       # Test workflow files
+└── docs/                     # Documentation
+    ├── SCHEMA_DESIGN.md     # Block schema reference
+    └── PROGRESS.md          # Implementation status
 ```
 
 ## 📋 Workflow Definition Format
 
-Workflows are defined in JSON with a simple, intuitive structure:
+Workflows use a block-based JSON structure for maximum flexibility:
 
 ```json
 {
-  "name": "User Registration Flow",
-  "description": "Register a user and send welcome email",
-  "variables": {
-    "baseUrl": "https://api.example.com"
-  },
-  "steps": [
+  "name": "User Registration Workflow",
+  "description": "Register user and handle verification",
+  "version": "1.0",
+  "blocks": [
     {
-      "id": "register",
-      "name": "Register User",
-      "operationId": "registerUser",
-      "body": {
-        "email": "user@example.com",
-        "password": "secure123"
+      "id": "start",
+      "type": "start",
+      "name": "Start",
+      "config": {
+        "inputs": {
+          "email": { "type": "string", "required": true },
+          "password": { "type": "string", "required": true }
+        }
       },
-      "extractVariables": {
-        "userId": "$.id"
-      }
+      "onSuccess": "register-user"
     },
     {
-      "id": "welcome",
+      "id": "register-user",
+      "type": "http-request",
+      "name": "Register User",
+      "config": {
+        "method": "POST",
+        "url": "https://api.example.com/users",
+        "body": {
+          "email": "{{email}}",
+          "password": "{{password}}"
+        }
+      },
+      "outputs": {
+        "userId": "$.id",
+        "status": "$.status"
+      },
+      "onSuccess": "send-email"
+    },
+    {
+      "id": "send-email",
+      "type": "http-request",
       "name": "Send Welcome Email",
-      "operationId": "sendEmail",
-      "body": {
-        "userId": "{{userId}}",
-        "template": "welcome"
-      }
+      "config": {
+        "method": "POST",
+        "url": "https://api.example.com/emails",
+        "body": {
+          "userId": "{{userId}}",
+          "template": "welcome"
+        }
+      },
+      "onSuccess": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "name": "End"
     }
   ]
 }
