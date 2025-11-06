@@ -28,6 +28,9 @@ namespace SiyeFlow.CLI
             var inputsOption = new Option<string?>(
                 new[] { "--inputs", "-i" },
                 "Input parameters as JSON string or file path");
+            var profileOption = new Option<string?>(
+                new[] { "--profile", "-p" },
+                "Profile to use from Start block configuration");
             var dryRunOption = new Option<bool>(
                 new[] { "--dry-run", "-d" },
                 getDefaultValue: () => false,
@@ -44,15 +47,16 @@ namespace SiyeFlow.CLI
             executeCommand.Add(workflowOption);
             executeCommand.Add(apiOption);
             executeCommand.Add(inputsOption);
+            executeCommand.Add(profileOption);
             executeCommand.Add(dryRunOption);
             executeCommand.Add(outputOption);
             executeCommand.Add(verboseOption);
 
-            executeCommand.SetHandler(async (workflow, api, inputs, dryRun, output, verbose) =>
+            executeCommand.SetHandler(async (workflow, api, inputs, profile, dryRun, output, verbose) =>
             {
-                await ExecuteWorkflow(workflow, api, inputs, dryRun, output, verbose);
+                await ExecuteWorkflow(workflow, api, inputs, profile, dryRun, output, verbose);
             },
-            workflowOption, apiOption, inputsOption, dryRunOption, outputOption, verboseOption);
+            workflowOption, apiOption, inputsOption, profileOption, dryRunOption, outputOption, verboseOption);
 
             // Validate command
             var validateCommand = new Command("validate", "Validate a workflow");
@@ -104,6 +108,7 @@ namespace SiyeFlow.CLI
             string workflowPath, 
             string? apiPath, 
             string? inputs, 
+            string? profile,
             bool dryRun, 
             string? output,
             bool verbose)
@@ -126,6 +131,14 @@ namespace SiyeFlow.CLI
 
                 // Parse inputs if provided
                 var inputDict = ParseInputs(inputs);
+                
+                // Add profile selection to inputs if specified
+                if (!string.IsNullOrEmpty(profile))
+                {
+                    inputDict = inputDict ?? new Dictionary<string, object>();
+                    inputDict["$selectedProfile"] = profile;
+                    console.Info($"Using profile: {profile}");
+                }
 
                 // Execute workflow
                 var result = await executor.ExecuteFromPathAsync(

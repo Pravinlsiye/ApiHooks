@@ -1,0 +1,209 @@
+{
+  "name": "Test Port-Based Connections",
+  "description": "Demonstrates port-based data flow connections",
+  "version": "1.0",
+  "blocks": [
+    {
+      "id": "start1",
+      "type": "start",
+      "name": "Start",
+      "config": {
+        "inputs": {
+          "apiUrl": {
+            "type": "string",
+            "value": "http://localhost:5216",
+            "required": true,
+            "description": "API endpoint URL"
+          },
+          "userId": {
+            "type": "string",
+            "value": "123",
+            "description": "User ID"
+          },
+          "timeout": {
+            "type": "number",
+            "value": 5000,
+            "description": "Request timeout"
+          }
+        }
+      },
+      "outputPorts": [
+        {
+          "name": "apiUrl",
+          "type": "string",
+          "multiple": true
+        },
+        {
+          "name": "userId",
+          "type": "string",
+          "multiple": true
+        },
+        {
+          "name": "timeout",
+          "type": "number",
+          "multiple": true
+        }
+      ],
+      "connections": [
+        {
+          "fromBlock": "start1",
+          "fromPort": "apiUrl",
+          "toBlock": "http1",
+          "toPort": "url"
+        },
+        {
+          "fromBlock": "start1",
+          "fromPort": "userId",
+          "toBlock": "http1",
+          "toPort": "userId"
+        },
+        {
+          "fromBlock": "start1",
+          "fromPort": "apiUrl",
+          "toBlock": "http2",
+          "toPort": "url"
+        }
+      ]
+    },
+    {
+      "id": "http1",
+      "type": "http-request",
+      "name": "Get User",
+      "config": {
+        "method": "GET",
+        "url": "{{url}}/api/users/{{userId}}"
+      },
+      "inputPorts": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "response",
+          "type": "object",
+          "multiple": true
+        },
+        {
+          "name": "status",
+          "type": "number",
+          "multiple": false
+        }
+      ],
+      "connections": [
+        {
+          "fromBlock": "http1",
+          "fromPort": "response",
+          "toBlock": "variable1",
+          "toPort": "userData"
+        }
+      ]
+    },
+    {
+      "id": "http2",
+      "type": "http-request",
+      "name": "Get Posts",
+      "config": {
+        "method": "GET",
+        "url": "{{url}}/api/posts"
+      },
+      "inputPorts": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "response",
+          "type": "array",
+          "multiple": true
+        },
+        {
+          "name": "count",
+          "type": "number"
+        }
+      ]
+    },
+    {
+      "id": "variable1",
+      "type": "variable",
+      "name": "Process User Data",
+      "config": {
+        "operation": "set",
+        "variables": {
+          "userName": "{{userData.name}}",
+          "userEmail": "{{userData.email}}"
+        }
+      },
+      "inputPorts": [
+        {
+          "name": "userData",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "userName",
+          "type": "string"
+        },
+        {
+          "name": "userEmail",
+          "type": "string"
+        }
+      ],
+      "connections": [
+        {
+          "fromBlock": "variable1",
+          "fromPort": "userName",
+          "toBlock": "end1",
+          "toPort": "userName"
+        },
+        {
+          "fromBlock": "variable1",
+          "fromPort": "userEmail",
+          "toBlock": "end1",
+          "toPort": "userEmail"
+        }
+      ],
+      "onSuccess": "end1"
+    },
+    {
+      "id": "end1",
+      "type": "end",
+      "name": "Complete",
+      "description": "Workflow completion",
+      "config": {
+        "outputs": {
+          "userName": {
+            "type": "string",
+            "value": "{{userName}}"
+          },
+          "userEmail": {
+            "type": "string",
+            "value": "{{userEmail}}"
+          }
+        }
+      },
+      "inputPorts": [
+        {
+          "name": "userName",
+          "type": "string"
+        },
+        {
+          "name": "userEmail",
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}

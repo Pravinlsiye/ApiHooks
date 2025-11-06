@@ -1,191 +1,198 @@
-var f = Object.defineProperty;
-var w = (r, o, t) => o in r ? f(r, o, { enumerable: !0, configurable: !0, writable: !0, value: t }) : r[o] = t;
-var n = (r, o, t) => w(r, typeof o != "symbol" ? o + "" : o, t);
-var a = /* @__PURE__ */ ((r) => (r.Start = "start", r.End = "end", r.HttpRequest = "http-request", r.Evaluate = "evaluate", r.Condition = "condition", r.Loop = "loop", r.Delay = "delay", r.Variable = "variable", r.Log = "log", r.Collect = "collect", r.TryCatch = "try-catch", r.Workflow = "workflow", r))(a || {});
-class p {
+var L = Object.defineProperty;
+var A = (i, o, t) => o in i ? L(i, o, { enumerable: !0, configurable: !0, writable: !0, value: t }) : i[o] = t;
+var r = (i, o, t) => A(i, typeof o != "symbol" ? o + "" : o, t);
+var l = /* @__PURE__ */ ((i) => (i.Start = "start", i.End = "end", i.HttpRequest = "http-request", i.Evaluate = "evaluate", i.Condition = "condition", i.Loop = "loop", i.Delay = "delay", i.Variable = "variable", i.Log = "log", i.Collect = "collect", i.TryCatch = "try-catch", i.Workflow = "workflow", i))(l || {});
+class h {
   constructor() {
-    n(this, "id", "");
-    n(this, "name", "");
-    n(this, "description");
-    n(this, "inputs");
-    n(this, "outputs");
-    n(this, "onSuccess");
-    n(this, "onFailure");
-    n(this, "onComplete");
-  }
-}
-class m {
-  constructor() {
-    n(this, "inputs");
-  }
-}
-class b extends p {
-  constructor() {
-    super(...arguments);
-    n(this, "type", "start");
-    n(this, "config", new m());
-  }
-}
-class B {
-  constructor() {
-    n(this, "outputs");
-  }
-}
-class C extends p {
-  constructor() {
-    super(...arguments);
-    n(this, "type", "end");
-    n(this, "config", new B());
-  }
-}
-class E {
-  constructor() {
-    n(this, "method", "");
-    n(this, "url", "");
-    n(this, "headers");
-    n(this, "body");
-    n(this, "timeout");
-    n(this, "retries");
-    n(this, "successCodes");
-  }
-}
-class x extends p {
-  constructor() {
-    super(...arguments);
-    n(this, "type", "http-request");
-    n(this, "config", new E());
-  }
-}
-class S {
-  constructor() {
-    n(this, "operation", "");
-    n(this, "variables");
-  }
-}
-class $ extends p {
-  constructor() {
-    super(...arguments);
-    n(this, "type", "variable");
-    n(this, "config", new S());
-  }
-}
-class D {
-  constructor() {
-    n(this, "expression", "");
-    n(this, "onTrue", "");
-    n(this, "onFalse", "");
-  }
-}
-class L extends p {
-  constructor() {
-    super(...arguments);
-    n(this, "type", "condition");
-    n(this, "config", new D());
-  }
-}
-class P {
-  constructor() {
-    n(this, "milliseconds", 0);
-  }
-}
-class M extends p {
-  constructor() {
-    super(...arguments);
-    n(this, "type", "delay");
-    n(this, "config", new P());
+    r(this, "id", "");
+    r(this, "name", "");
+    r(this, "description");
+    r(this, "inputs");
+    r(this, "outputs");
+    r(this, "onSuccess");
+    r(this, "onFailure");
+    r(this, "onComplete");
+    r(this, "inputPorts");
+    r(this, "outputPorts");
+    r(this, "connections");
   }
 }
 class T {
   constructor() {
-    n(this, "message", "");
-    n(this, "level", "");
+    r(this, "inputs");
+    r(this, "profiles");
+    r(this, "selectedProfile", "");
+    r(this, "overrides");
   }
 }
-class W extends p {
+class M extends h {
   constructor() {
     super(...arguments);
-    n(this, "type", "log");
-    n(this, "config", new T());
+    r(this, "type", "start");
+    r(this, "config", new T());
   }
 }
-class I {
+class W {
   constructor() {
-    n(this, "language", "");
-    n(this, "expression", "");
-    n(this, "data", "");
+    r(this, "outputs");
   }
 }
-class J extends p {
+class O extends h {
   constructor() {
     super(...arguments);
-    n(this, "type", "evaluate");
-    n(this, "config", new I());
+    r(this, "type", "end");
+    r(this, "config", new W());
   }
 }
-class O {
+class N {
   constructor() {
-    n(this, "items", "");
-    n(this, "itemVariable", "");
-    n(this, "indexVariable", "");
-    n(this, "loopBlock", "");
-    n(this, "maxIterations");
+    r(this, "method", "");
+    r(this, "url", "");
+    r(this, "headers");
+    r(this, "body");
+    r(this, "timeout");
+    r(this, "retries");
+    r(this, "successCodes");
   }
 }
-class _ extends p {
-  constructor() {
-    super(...arguments);
-    n(this, "type", "loop");
-    n(this, "config", new O());
-  }
-}
-class F {
-  constructor() {
-    n(this, "fromLoop", "");
-    n(this, "collectExpression", "");
-    n(this, "outputVariable", "");
-  }
-}
-class z extends p {
+class F extends h {
   constructor() {
     super(...arguments);
-    n(this, "type", "collect");
-    n(this, "config", new F());
+    r(this, "type", "http-request");
+    r(this, "config", new N());
   }
 }
-class A {
+class q {
   constructor() {
-    n(this, "tryBlock", "");
-    n(this, "catchBlock", "");
-    n(this, "finallyBlock", "");
-    n(this, "retries");
-    n(this, "retryDelay");
+    r(this, "operation", "");
+    r(this, "variables");
   }
 }
-class X extends p {
+class H extends h {
   constructor() {
     super(...arguments);
-    n(this, "type", "try-catch");
-    n(this, "config", new A());
+    r(this, "type", "variable");
+    r(this, "config", new q());
   }
 }
-class H {
+class R {
   constructor() {
-    n(this, "workflowId", "");
-    n(this, "inputs");
-    n(this, "outputMapping");
+    r(this, "expression", "");
+    r(this, "onTrue", "");
+    r(this, "onFalse", "");
   }
 }
-class G extends p {
+class j extends h {
   constructor() {
     super(...arguments);
-    n(this, "type", "workflow");
-    n(this, "config", new H());
+    r(this, "type", "condition");
+    r(this, "config", new R());
   }
 }
-class v {
+class V {
   constructor() {
-    n(this, "workflow");
-    n(this, "blocks");
+    r(this, "milliseconds", 0);
+    r(this, "message", "");
+  }
+}
+class U extends h {
+  constructor() {
+    super(...arguments);
+    r(this, "type", "delay");
+    r(this, "config", new V());
+  }
+}
+class J {
+  constructor() {
+    r(this, "message", "");
+    r(this, "level", "");
+  }
+}
+class _ extends h {
+  constructor() {
+    super(...arguments);
+    r(this, "type", "log");
+    r(this, "config", new J());
+  }
+}
+class z {
+  constructor() {
+    r(this, "language", "");
+    r(this, "expression", "");
+    r(this, "data", "");
+  }
+}
+class it extends h {
+  constructor() {
+    super(...arguments);
+    r(this, "type", "evaluate");
+    r(this, "config", new z());
+  }
+}
+class X {
+  constructor() {
+    r(this, "items", "");
+    r(this, "itemVariable", "");
+    r(this, "indexVariable", "");
+    r(this, "loopBlock", "");
+    r(this, "maxIterations");
+  }
+}
+class at extends h {
+  constructor() {
+    super(...arguments);
+    r(this, "type", "loop");
+    r(this, "config", new X());
+  }
+}
+class Y {
+  constructor() {
+    r(this, "fromLoop", "");
+    r(this, "collectExpression", "");
+    r(this, "outputVariable", "");
+  }
+}
+class lt extends h {
+  constructor() {
+    super(...arguments);
+    r(this, "type", "collect");
+    r(this, "config", new Y());
+  }
+}
+class G {
+  constructor() {
+    r(this, "tryBlock", "");
+    r(this, "catchBlock", "");
+    r(this, "finallyBlock", "");
+    r(this, "retries");
+    r(this, "retryDelay");
+  }
+}
+class ct extends h {
+  constructor() {
+    super(...arguments);
+    r(this, "type", "try-catch");
+    r(this, "config", new G());
+  }
+}
+class K {
+  constructor() {
+    r(this, "workflowId", "");
+    r(this, "inputs");
+    r(this, "outputMapping");
+  }
+}
+class pt extends h {
+  constructor() {
+    super(...arguments);
+    r(this, "type", "workflow");
+    r(this, "config", new K());
+  }
+}
+class E {
+  constructor() {
+    r(this, "workflow");
+    r(this, "blocks");
     this.workflow = {
       name: "New Workflow",
       description: "",
@@ -227,7 +234,7 @@ class v {
    */
   removeBlock(o) {
     var e, s;
-    const t = (e = this.workflow.blocks) == null ? void 0 : e.findIndex((i) => i.id === o);
+    const t = (e = this.workflow.blocks) == null ? void 0 : e.findIndex((n) => n.id === o);
     t !== void 0 && t >= 0 && ((s = this.workflow.blocks) == null || s.splice(t, 1), this.blocks.delete(o));
   }
   /**
@@ -253,10 +260,10 @@ class v {
    * Validate the workflow
    */
   validate() {
-    var i, l, c;
-    const o = [], t = [], e = (i = this.workflow.blocks) == null ? void 0 : i.some((d) => d.type === a.Start), s = (l = this.workflow.blocks) == null ? void 0 : l.some((d) => d.type === a.End);
-    return e || o.push("Workflow must have a Start block"), s || o.push("Workflow must have an End block"), (c = this.workflow.blocks) == null || c.forEach((d) => {
-      d.type !== a.End && !d.onSuccess && !d.onFailure && !d.onComplete && t.push(`Block '${d.name || d.id}' has no outgoing connections`);
+    var n, a, p;
+    const o = [], t = [], e = (n = this.workflow.blocks) == null ? void 0 : n.some((c) => c.type === l.Start), s = (a = this.workflow.blocks) == null ? void 0 : a.some((c) => c.type === l.End);
+    return e || o.push("Workflow must have a Start block"), s || o.push("Workflow must have an End block"), (p = this.workflow.blocks) == null || p.forEach((c) => {
+      c.type !== l.End && !c.onSuccess && !c.onFailure && !c.onComplete && t.push(`Block '${c.name || c.id}' has no outgoing connections`);
     }), {
       isValid: o.length === 0,
       errors: o,
@@ -268,20 +275,20 @@ class v {
    */
   createBlock(o) {
     switch (o) {
-      case a.Start:
-        return new b();
-      case a.End:
-        return new C();
-      case a.HttpRequest:
-        return new x();
-      case a.Variable:
-        return new $();
-      case a.Condition:
-        return new L();
-      case a.Delay:
+      case l.Start:
         return new M();
-      case a.Log:
-        return new W();
+      case l.End:
+        return new O();
+      case l.HttpRequest:
+        return new F();
+      case l.Variable:
+        return new H();
+      case l.Condition:
+        return new j();
+      case l.Delay:
+        return new U();
+      case l.Log:
+        return new _();
       default:
         throw new Error(`Unknown block type: ${o}`);
     }
@@ -327,12 +334,12 @@ class v {
     const t = o.split("-").map(
       (e, s) => e.charAt(0).toUpperCase() + e.slice(1)
     ).join("");
-    return a[t] || a.Start;
+    return l[t] || l.Start;
   }
 }
-class g {
+class C {
   constructor() {
-    n(this, "events", /* @__PURE__ */ new Map());
+    r(this, "events", /* @__PURE__ */ new Map());
   }
   on(o, t) {
     this.events.has(o) || this.events.set(o, []), this.events.get(o).push(t);
@@ -349,9 +356,9 @@ class g {
     e && e.forEach((s) => s(...t));
   }
 }
-const q = [
+const Q = [
   {
-    type: a.Start,
+    type: l.Start,
     name: "Start",
     icon: "🟢",
     category: "Control",
@@ -359,7 +366,7 @@ const q = [
     color: "#4CAF50"
   },
   {
-    type: a.End,
+    type: l.End,
     name: "End",
     icon: "🔴",
     category: "Control",
@@ -367,7 +374,7 @@ const q = [
     color: "#f44336"
   },
   {
-    type: a.HttpRequest,
+    type: l.HttpRequest,
     name: "HTTP Request",
     icon: "🌐",
     category: "Action",
@@ -375,7 +382,7 @@ const q = [
     color: "#2196F3"
   },
   {
-    type: a.Variable,
+    type: l.Variable,
     name: "Variable",
     icon: "📦",
     category: "Data",
@@ -383,7 +390,7 @@ const q = [
     color: "#FF9800"
   },
   {
-    type: a.Condition,
+    type: l.Condition,
     name: "Condition",
     icon: "❓",
     category: "Control",
@@ -391,7 +398,7 @@ const q = [
     color: "#9C27B0"
   },
   {
-    type: a.Delay,
+    type: l.Delay,
     name: "Delay",
     icon: "⏰",
     category: "Action",
@@ -399,7 +406,7 @@ const q = [
     color: "#00BCD4"
   },
   {
-    type: a.Log,
+    type: l.Log,
     name: "Log",
     icon: "📝",
     category: "Debug",
@@ -407,7 +414,7 @@ const q = [
     color: "#607D8B"
   },
   {
-    type: a.Evaluate,
+    type: l.Evaluate,
     name: "Evaluate",
     icon: "🧮",
     category: "Data",
@@ -415,7 +422,7 @@ const q = [
     color: "#795548"
   },
   {
-    type: a.Loop,
+    type: l.Loop,
     name: "Loop",
     icon: "🔄",
     category: "Control",
@@ -423,7 +430,7 @@ const q = [
     color: "#E91E63"
   },
   {
-    type: a.TryCatch,
+    type: l.TryCatch,
     name: "Try/Catch",
     icon: "⚠️",
     category: "Control",
@@ -431,20 +438,329 @@ const q = [
     color: "#FFC107"
   }
 ];
-class N extends g {
+class S {
+  constructor(o, t) {
+    r(this, "block");
+    r(this, "blockData");
+    this.block = o, this.blockData = t;
+  }
+  /**
+   * Get block description
+   */
+  getDescription() {
+    var o;
+    return ((o = this.blockData) == null ? void 0 : o.description) || "";
+  }
+  /**
+   * Render custom content (override in subclasses)
+   */
+  renderCustomContent() {
+    return "";
+  }
+  /**
+   * Update block ports (override in subclasses)
+   */
+  updatePorts() {
+  }
+  /**
+   * Render a single port
+   */
+  renderPort(o, t) {
+    return t === "input" ? `
+                <div class="port-row port-input" 
+                     data-block="${this.block.id}" 
+                     data-port="${o.name}"
+                     data-port-type="${t}"
+                     data-value-type="${o.type}">
+                    <span class="port-tab"></span>
+                    <span class="port-name">${o.name}</span>
+                </div>
+            ` : `
+                <div class="port-row port-output" 
+                     data-block="${this.block.id}" 
+                     data-port="${o.name}"
+                     data-port-type="${t}"
+                     data-value-type="${o.type}">
+                    <span class="port-name">${o.name}</span>
+                    <span class="port-tab"></span>
+                </div>
+            `;
+  }
+  /**
+   * Render input ports
+   */
+  renderInputPorts() {
+    return !this.block.inputPorts || this.block.inputPorts.length === 0 ? "" : this.block.inputPorts.map((o) => this.renderPort(o, "input")).join("");
+  }
+  /**
+   * Render output ports
+   */
+  renderOutputPorts() {
+    return !this.block.outputPorts || this.block.outputPorts.length === 0 ? "" : this.block.outputPorts.map((o) => this.renderPort(o, "output")).join("");
+  }
+  /**
+   * Render the complete block
+   */
+  render() {
+    var e;
+    const o = ((e = this.blockData) == null ? void 0 : e.name) || this.block.id, t = this.getDescription();
+    return `
+            <div class="block-header">
+                <span class="block-icon">${this.getIcon()}</span>
+                <div class="block-info">
+                    <span class="block-name">${o}</span>
+                    <span class="block-type">${this.block.type}</span>
+                </div>
+            </div>
+            ${t ? `<div class="block-description">${t}</div>` : ""}
+            ${this.renderCustomContent()}
+            <div class="block-ports-area">
+                ${this.renderInputPorts()}
+                ${this.renderOutputPorts()}
+            </div>
+        `;
+  }
+}
+class Z extends S {
+  constructor(o, t) {
+    super(o, t);
+  }
+  getIcon() {
+    return "🟢";
+  }
+  getColor() {
+    return "#4CAF50";
+  }
+  getDescription() {
+    var o;
+    return ((o = this.blockData) == null ? void 0 : o.description) || "Workflow entry point";
+  }
+  /**
+   * Update ports based on profile configuration
+   */
+  updatePorts() {
+    const o = this.blockData;
+    if (!o || !o.config) return;
+    const t = this.getEffectiveInputs(o), e = o.config.profiles && o.config.profiles.length > 0;
+    this.block.inputPorts = [], this.block.outputPorts = [];
+    let s = e ? 40 : 0;
+    Object.keys(t).forEach((n) => {
+      const a = t[n];
+      this.block.inputPorts.push({
+        name: n,
+        type: a.type || "any",
+        position: { x: 0, y: s },
+        connected: !1
+      }), this.block.outputPorts.push({
+        name: n,
+        type: a.type || "any",
+        position: { x: this.block.width, y: s },
+        connected: !1
+      }), s += 32;
+    });
+  }
+  /**
+   * Override port rendering for Start block - combine input/output in single row
+   */
+  renderInputPorts() {
+    return "";
+  }
+  renderOutputPorts() {
+    return "";
+  }
+  /**
+   * Render combined ports for Start block
+   */
+  renderPorts() {
+    return !this.block.inputPorts || this.block.inputPorts.length === 0 ? "" : this.block.inputPorts.map((o, t) => {
+      const e = this.block.outputPorts[t], s = this.getTypeIcon(o.type);
+      return `
+                <div class="port-dual-row">
+                    <div class="port-input-tab" 
+                         data-block="${this.block.id}" 
+                         data-port="${o.name}"
+                         data-port-type="input"
+                         data-value-type="${o.type}">
+                        <span class="port-tab"></span>
+                    </div>
+                    <div class="port-center">
+                        <span class="port-name">${o.name}</span>
+                        <span class="port-type">${s}</span>
+                    </div>
+                    <div class="port-output-tab" 
+                         data-block="${this.block.id}" 
+                         data-port="${e.name}"
+                         data-port-type="output"
+                         data-value-type="${e.type}">
+                        <span class="port-tab"></span>
+                    </div>
+                </div>
+            `;
+    }).join("");
+  }
+  /**
+   * Get type icon for display
+   */
+  getTypeIcon(o) {
+    return {
+      string: "Aa",
+      number: "#",
+      boolean: "0/1",
+      object: "{}",
+      array: "[]",
+      any: "*"
+    }[o] || "Aa";
+  }
+  /**
+   * Get effective inputs from profile configuration
+   */
+  getEffectiveInputs(o) {
+    const t = o.config;
+    return t.profiles && t.profiles.length > 0 ? (t.profiles.find((s) => s.name === t.selectedProfile) || t.profiles.find((s) => s.default) || t.profiles[0]).inputs || {} : t.inputs || {};
+  }
+  /**
+   * Render profile selector
+   */
+  renderCustomContent() {
+    var s;
+    const o = this.blockData;
+    if (!o || !o.config) return "";
+    const t = o.config.profiles;
+    if (!t || t.length === 0) return "";
+    const e = o.config.selectedProfile || ((s = t.find((n) => n.default)) == null ? void 0 : s.name) || t[0].name;
+    return `
+            <div class="profile-selector">
+                <select class="profile-dropdown" data-block="${this.block.id}">
+                    ${t.map((n) => `
+                        <option value="${n.name}" ${n.name === e ? "selected" : ""}>
+                            ${n.name}
+                        </option>
+                    `).join("")}
+                </select>
+            </div>
+        `;
+  }
+  /**
+   * Override render to use combined ports
+   */
+  render() {
+    var e;
+    const o = ((e = this.blockData) == null ? void 0 : e.name) || this.block.id, t = this.getDescription();
+    return `
+            <div class="block-header">
+                <span class="block-icon">${this.getIcon()}</span>
+                <div class="block-info">
+                    <span class="block-name">${o}</span>
+                    <span class="block-type">${this.block.type}</span>
+                </div>
+            </div>
+            ${t ? `<div class="block-description">${t}</div>` : ""}
+            ${this.renderCustomContent()}
+            <div class="block-ports-area">
+                ${this.renderPorts()}
+            </div>
+        `;
+  }
+}
+class x extends S {
+  constructor(o, t) {
+    super(o, t);
+  }
+  getIcon() {
+    return {
+      end: "🔴",
+      "http-request": "🌐",
+      variable: "📦",
+      condition: "❓",
+      delay: "⏰",
+      log: "📝",
+      evaluate: "🧮",
+      loop: "🔄",
+      "try-catch": "⚠️"
+    }[this.block.type] || "📄";
+  }
+  getColor() {
+    return {
+      end: "#f44336",
+      "http-request": "#2196F3",
+      variable: "#FF9800",
+      condition: "#9C27B0",
+      delay: "#00BCD4",
+      log: "#607D8B",
+      evaluate: "#795548",
+      loop: "#E91E63",
+      "try-catch": "#FFC107"
+    }[this.block.type] || "#666";
+  }
+  getDescription() {
+    if (!this.blockData) return "";
+    const o = this.blockData.config;
+    switch (this.blockData.type) {
+      case l.HttpRequest:
+        return o != null && o.url ? `${o.method || "GET"} ${o.url}` : "";
+      case l.Variable:
+        const t = o != null && o.variables ? Object.keys(o.variables).length : 0;
+        return o != null && o.operation ? `${o.operation} ${t} variable(s)` : "";
+      case l.Condition:
+        return (o == null ? void 0 : o.expression) || "";
+      case l.Delay:
+        return o != null && o.milliseconds ? `${o.milliseconds}ms` : "";
+      case l.Log:
+        return o != null && o.message ? o.message.substring(0, 50) : "";
+      case l.End:
+        return "Workflow exit point";
+      default:
+        return this.blockData.description || "";
+    }
+  }
+  /**
+   * Update ports from block definition
+   */
+  updatePorts() {
+    if (!this.blockData) return;
+    const o = this.blockData;
+    o.outputPorts && (this.block.outputPorts = o.outputPorts.map((t, e) => ({
+      name: t.name,
+      type: t.type,
+      position: { x: this.block.width, y: e * 32 },
+      connected: !1
+    }))), o.inputPorts && (this.block.inputPorts = o.inputPorts.map((t, e) => ({
+      name: t.name,
+      type: t.type,
+      position: { x: 0, y: e * 32 },
+      connected: !1
+    })));
+  }
+}
+class tt {
+  /**
+   * Create appropriate renderer for block type
+   */
+  static createRenderer(o, t) {
+    if (!t)
+      return new x(o, t);
+    switch (t.type) {
+      case l.Start:
+        return new Z(o, t);
+      default:
+        return new x(o, t);
+    }
+  }
+}
+class et extends C {
   constructor(t) {
     super();
-    n(this, "container");
-    n(this, "svg");
-    n(this, "blocks", /* @__PURE__ */ new Map());
-    n(this, "connections", /* @__PURE__ */ new Map());
-    n(this, "blockDataMap", /* @__PURE__ */ new Map());
-    n(this, "isDragging", !1);
-    n(this, "draggedBlockId", null);
-    n(this, "dragOffset", { x: 0, y: 0 });
-    n(this, "isConnecting", !1);
-    n(this, "connectionStart", null);
-    n(this, "mousePosition", { x: 0, y: 0 });
+    r(this, "container");
+    r(this, "svg");
+    r(this, "blocks", /* @__PURE__ */ new Map());
+    r(this, "connections", /* @__PURE__ */ new Map());
+    r(this, "blockDataMap", /* @__PURE__ */ new Map());
+    r(this, "isDragging", !1);
+    r(this, "draggedBlockId", null);
+    r(this, "dragOffset", { x: 0, y: 0 });
+    r(this, "isConnecting", !1);
+    r(this, "connectionStart", null);
+    r(this, "mousePosition", { x: 0, y: 0 });
     const e = document.getElementById(t);
     if (!e)
       throw new Error(`Container element '${t}' not found`);
@@ -458,8 +774,8 @@ class N extends g {
             <div class="canvas-wrapper" style="position: relative; width: 100%; height: 100%; overflow: auto;">
                 <svg class="connections-svg" style="position: absolute; top: 0; left: 0; width: 2000px; height: 2000px; pointer-events: none;">
                     <defs>
-                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#30363d" />
+                        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff" />
                         </marker>
                     </defs>
                 </svg>
@@ -495,25 +811,36 @@ class N extends g {
    * Create a block DOM element
    */
   createBlockElement(t) {
-    const e = this.getBlockInfo(t.type), s = document.createElement("div");
-    s.className = `workflow-block block-type-${t.type} ${t.selected ? "selected" : ""}`, s.id = `block-${t.id}`, s.style.left = `${t.position.x}px`, s.style.top = `${t.position.y}px`, s.style.width = `${t.width}px`, s.style.minHeight = `${t.height}px`, s.style.borderColor = e.color;
-    const i = this.getBlockData(t.id), l = (i == null ? void 0 : i.name) || t.id, c = this.getBlockDescription(i);
-    return s.innerHTML = `
-            <div class="block-header">
-                <span class="block-icon">${e.icon}</span>
-                <div class="block-info">
-                    <span class="block-name">${l}</span>
-                    <span class="block-type">${t.type}</span>
-                </div>
-            </div>
-            ${c ? `<div class="block-description">${c}</div>` : ""}
-            <div class="block-ports">
-                <div class="port port-in" data-block="${t.id}" data-type="in"></div>
-                <div class="port port-out" data-block="${t.id}" data-type="out"></div>
-            </div>
-        `, s.addEventListener("mousedown", (u) => this.onBlockMouseDown(u, t.id)), s.addEventListener("click", (u) => this.onBlockClick(u, t.id)), s.querySelectorAll(".port").forEach((u) => {
-      u.addEventListener("mousedown", (h) => this.onPortMouseDown(h));
-    }), s;
+    const e = document.createElement("div");
+    e.className = `workflow-block block-type-${t.type} ${t.selected ? "selected" : ""}`, e.id = `block-${t.id}`, e.style.left = `${t.position.x}px`, e.style.top = `${t.position.y}px`, e.style.width = `${t.width}px`, e.style.minHeight = `${t.height}px`;
+    const s = this.getBlockData(t.id), n = tt.createRenderer(t, s);
+    n.updatePorts();
+    const a = this.getBlockColor(t.type);
+    e.style.borderColor = a, e.innerHTML = n.render(), e.addEventListener("mousedown", (d) => this.onBlockMouseDown(d, t.id)), e.addEventListener("click", (d) => this.onBlockClick(d, t.id)), e.querySelectorAll(".port-input-tab, .port-output-tab, .port-row").forEach((d) => {
+      d.addEventListener("mousedown", (u) => this.onPortMouseDown(u));
+    });
+    const c = e.querySelector(".profile-dropdown");
+    return c && c.addEventListener("change", (d) => {
+      const k = d.target.value;
+      this.emit("profileChange", { blockId: t.id, profile: k });
+    }), e;
+  }
+  /**
+   * Get block color
+   */
+  getBlockColor(t) {
+    return {
+      start: "#4CAF50",
+      end: "#f44336",
+      "http-request": "#2196F3",
+      variable: "#FF9800",
+      condition: "#9C27B0",
+      delay: "#00BCD4",
+      log: "#607D8B",
+      evaluate: "#795548",
+      loop: "#E91E63",
+      "try-catch": "#FFC107"
+    }[t] || "#666";
   }
   /**
    * Render all connections
@@ -528,19 +855,32 @@ class N extends g {
     }
   }
   /**
-   * Create a connection path element
+   * Create a connection path element with delete button
    */
   createConnectionPath(t) {
-    const e = this.blocks.get(t.source), s = this.blocks.get(t.target);
+    var P, $;
+    const e = this.blocks.get(t.sourceBlockId), s = this.blocks.get(t.targetBlockId);
     if (!e || !s) return null;
-    const i = {
+    const n = (P = e.outputPorts) == null ? void 0 : P.find((B) => B.name === t.sourcePortName), a = ($ = s.inputPorts) == null ? void 0 : $.find((B) => B.name === t.targetPortName), p = 80, c = 80, d = n ? p + n.position.y + 16 : e.height / 2, u = a ? c + a.position.y + 16 : s.height / 2, k = {
       x: e.position.x + e.width,
-      y: e.position.y + e.height / 2
-    }, l = {
+      y: e.position.y + d
+    }, b = {
       x: s.position.x,
-      y: s.position.y + s.height / 2
-    }, c = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    return c.setAttribute("class", `connection connection-line ${t.type}`), c.setAttribute("d", this.getPathData(i, l)), c.setAttribute("marker-end", "url(#arrowhead)"), c;
+      y: s.position.y + u
+    }, m = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    m.setAttribute("class", "connection-group"), m.setAttribute("data-connection-id", t.id);
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    g.setAttribute("class", "connection connection-line"), g.setAttribute("d", this.getPathData(k, b)), g.setAttribute("stroke", "#58a6ff"), g.setAttribute("stroke-width", "2"), g.setAttribute("fill", "none"), g.setAttribute("marker-end", "url(#arrowhead)");
+    const D = (k.x + b.x) / 2, I = (k.y + b.y) / 2, f = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    f.setAttribute("class", "connection-delete-btn"), f.setAttribute("transform", `translate(${D}, ${I})`), f.style.cursor = "pointer";
+    const w = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    w.setAttribute("r", "10"), w.setAttribute("fill", "#da3633"), w.setAttribute("stroke", "#f85149"), w.setAttribute("stroke-width", "2");
+    const y = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    y.setAttribute("x1", "-4"), y.setAttribute("y1", "-4"), y.setAttribute("x2", "4"), y.setAttribute("y2", "4"), y.setAttribute("stroke", "white"), y.setAttribute("stroke-width", "2");
+    const v = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    return v.setAttribute("x1", "4"), v.setAttribute("y1", "-4"), v.setAttribute("x2", "-4"), v.setAttribute("y2", "4"), v.setAttribute("stroke", "white"), v.setAttribute("stroke-width", "2"), f.appendChild(w), f.appendChild(y), f.appendChild(v), f.addEventListener("click", (B) => {
+      B.stopPropagation(), this.emit("connectionDelete", { connectionId: t.id });
+    }), m.appendChild(g), m.appendChild(f), m;
   }
   /**
    * Create temporary connection path while dragging
@@ -554,57 +894,14 @@ class N extends g {
    * Get SVG path data for a curved connection
    */
   getPathData(t, e) {
-    const s = (t.x + e.x) / 2;
-    return `M ${t.x} ${t.y} C ${s} ${t.y}, ${s} ${e.y}, ${e.x} ${e.y}`;
-  }
-  /**
-   * Get block info from type
-   */
-  getBlockInfo(t) {
-    return {
-      start: { icon: "🟢", color: "#4CAF50" },
-      end: { icon: "🔴", color: "#f44336" },
-      "http-request": { icon: "🌐", color: "#2196F3" },
-      variable: { icon: "📦", color: "#FF9800" },
-      condition: { icon: "❓", color: "#9C27B0" },
-      delay: { icon: "⏰", color: "#00BCD4" },
-      log: { icon: "📝", color: "#607D8B" },
-      evaluate: { icon: "🧮", color: "#795548" },
-      loop: { icon: "🔄", color: "#E91E63" },
-      "try-catch": { icon: "⚠️", color: "#FFC107" }
-    }[t] || { icon: "📄", color: "#666" };
+    const s = Math.abs(e.x - t.x), n = Math.min(s / 2, 100), a = t.x + n, p = e.x - n;
+    return `M ${t.x} ${t.y} C ${a} ${t.y}, ${p} ${e.y}, ${e.x} ${e.y}`;
   }
   /**
    * Get block data by ID
    */
   getBlockData(t) {
     return this.blockDataMap.get(t);
-  }
-  /**
-   * Get block description based on configuration
-   */
-  getBlockDescription(t) {
-    if (!t) return "";
-    const e = t.config;
-    switch (t.type) {
-      case "http-request":
-        return e != null && e.url ? `${e.method || "GET"} ${e.url}` : "";
-      case "variable":
-        const s = e != null && e.variables ? Object.keys(e.variables).length : 0;
-        return e != null && e.operation ? `${e.operation} ${s} variable(s)` : "";
-      case "condition":
-        return (e == null ? void 0 : e.expression) || "";
-      case "delay":
-        return e != null && e.milliseconds ? `${e.milliseconds}ms` : "";
-      case "log":
-        return e != null && e.message ? e.message.substring(0, 50) : "";
-      case "start":
-        return t.description || "Workflow entry point";
-      case "end":
-        return t.description || "Workflow exit point";
-      default:
-        return t.description || "";
-    }
   }
   // Event Handlers
   onDragOver(t) {
@@ -619,17 +916,19 @@ class N extends g {
     this.emit("drop", s);
   }
   onBlockMouseDown(t, e) {
-    if (t.target.classList.contains("port"))
+    const s = t.target;
+    if (s.classList.contains("port-row") || s.classList.contains("port-tab") || s.classList.contains("port-name"))
       return;
     t.preventDefault(), this.isDragging = !0, this.draggedBlockId = e;
-    const s = this.blocks.get(e);
-    s && (this.dragOffset = {
-      x: t.clientX - s.position.x,
-      y: t.clientY - s.position.y
+    const n = this.blocks.get(e);
+    n && (this.dragOffset = {
+      x: t.clientX - n.position.x,
+      y: t.clientY - n.position.y
     });
   }
   onBlockClick(t, e) {
-    t.target.classList.contains("port") || (t.stopPropagation(), this.emit("blockSelect", e));
+    const s = t.target;
+    s.classList.contains("port-row") || s.classList.contains("port-tab") || s.classList.contains("port-name") || (t.stopPropagation(), this.emit("blockSelect", e));
   }
   onCanvasClick(t) {
     t.target.classList.contains("canvas-wrapper") && this.emit("blockSelect", null);
@@ -653,13 +952,14 @@ class N extends g {
   }
   onMouseUp(t) {
     if (this.isDragging && (this.isDragging = !1, this.draggedBlockId = null), this.isConnecting) {
-      const e = t.target;
-      if (e.classList.contains("port") && e.dataset.type === "in") {
-        const s = e.dataset.block;
-        s && this.connectionStart && this.emit("connectionCreate", {
-          source: this.connectionStart.blockId,
-          target: s,
-          type: "success"
+      const s = t.target.closest(".port-input-tab, .port-row");
+      if (s && s.dataset.portType === "input") {
+        const n = s.dataset.block, a = s.dataset.port;
+        n && a && this.connectionStart && this.emit("connectionCreate", {
+          sourceBlockId: this.connectionStart.blockId,
+          sourcePortName: this.connectionStart.portName,
+          targetBlockId: n,
+          targetPortName: a
         });
       }
       this.isConnecting = !1, this.connectionStart = null, this.renderConnections();
@@ -667,27 +967,32 @@ class N extends g {
   }
   onPortMouseDown(t) {
     t.stopPropagation(), t.preventDefault();
-    const e = t.target;
-    if (e.dataset.type === "out") {
-      const s = e.dataset.block;
-      if (s) {
-        const i = this.blocks.get(s);
-        i && (this.isConnecting = !0, this.connectionStart = {
-          blockId: s,
-          position: {
-            x: i.position.x + i.width,
-            y: i.position.y + i.height / 2
-          }
-        });
+    const e = t.currentTarget;
+    if (e.dataset.portType === "output") {
+      const n = e.dataset.block, a = e.dataset.port;
+      if (n && a && this.blocks.get(n)) {
+        this.isConnecting = !0;
+        const d = (e.querySelector(".port-tab") || e).getBoundingClientRect(), u = this.container.querySelector(".canvas-wrapper");
+        if (u) {
+          const k = u.getBoundingClientRect();
+          this.connectionStart = {
+            blockId: n,
+            portName: a,
+            position: {
+              x: d.left - k.left + d.width / 2,
+              y: d.top - k.top + d.height / 2
+            }
+          };
+        }
       }
     }
   }
 }
-class V extends g {
+class ot extends C {
   constructor(t) {
     super();
-    n(this, "container");
-    n(this, "currentBlock", null);
+    r(this, "container");
+    r(this, "currentBlock", null);
     const e = document.getElementById(t);
     if (!e)
       throw new Error(`Container element '${t}' not found`);
@@ -757,7 +1062,26 @@ class V extends g {
     let t = "<h4>Configuration</h4>";
     const e = this.currentBlock.config;
     switch (this.currentBlock.type) {
-      case a.HttpRequest:
+      case l.Start:
+        t += `
+                    <div class="property-group">
+                        <label>Profiles</label>
+                        ${this.renderProfileSelector()}
+                    </div>
+                    
+                    <div class="property-group">
+                        <label>Profile Details</label>
+                        ${this.renderProfileDetails()}
+                    </div>
+                    
+                    <div class="property-group">
+                        <label>Overrides (JSON)</label>
+                        <textarea rows="3" data-property="config.overrides" 
+                                  data-type="json">${JSON.stringify((e == null ? void 0 : e.overrides) || {}, null, 2)}</textarea>
+                    </div>
+                `;
+        break;
+      case l.HttpRequest:
         t += `
                     <div class="property-group">
                         <label>URL</label>
@@ -789,7 +1113,7 @@ class V extends g {
                     </div>
                 `;
         break;
-      case a.Variable:
+      case l.Variable:
         t += `
                     <div class="property-group">
                         <label>Operation</label>
@@ -807,7 +1131,7 @@ class V extends g {
                     </div>
                 `;
         break;
-      case a.Condition:
+      case l.Condition:
         t += `
                     <div class="property-group">
                         <label>Expression</label>
@@ -828,7 +1152,7 @@ class V extends g {
                     </div>
                 `;
         break;
-      case a.Delay:
+      case l.Delay:
         t += `
                     <div class="property-group">
                         <label>Delay (milliseconds)</label>
@@ -837,7 +1161,7 @@ class V extends g {
                     </div>
                 `;
         break;
-      case a.Log:
+      case l.Log:
         t += `
                     <div class="property-group">
                         <label>Message</label>
@@ -855,7 +1179,7 @@ class V extends g {
                     </div>
                 `;
         break;
-      case a.End:
+      case l.End:
         t += `
                     <div class="property-group">
                         <label>Outputs (JSON)</label>
@@ -881,6 +1205,40 @@ class V extends g {
         `, t;
   }
   /**
+   * Render profile selector dropdown for Start block
+   */
+  renderProfileSelector() {
+    var a;
+    const t = (a = this.currentBlock) == null ? void 0 : a.config, e = (t == null ? void 0 : t.profiles) || [], s = (t == null ? void 0 : t.selectedProfile) || "";
+    if (e.length === 0)
+      return '<p class="no-profiles">No profiles defined. Add profiles in JSON view.</p>';
+    let n = '<select data-property="config.selectedProfile" class="profile-selector">';
+    return n += '<option value="">-- Select Profile --</option>', e.forEach((p) => {
+      const c = p.name === s ? "selected" : "", d = p.default ? " (default)" : "";
+      n += `<option value="${p.name}" ${c}>${p.name}${d}</option>`;
+    }), n += "</select>", n;
+  }
+  /**
+   * Render profile details for the selected profile
+   */
+  renderProfileDetails() {
+    var p;
+    const t = (p = this.currentBlock) == null ? void 0 : p.config, e = (t == null ? void 0 : t.profiles) || [], s = (t == null ? void 0 : t.selectedProfile) || "", n = e.find((c) => c.name === s);
+    if (!n)
+      return '<p class="no-profile-selected">Select a profile to view its inputs</p>';
+    let a = '<div class="profile-inputs">';
+    if (a += `<h5>${n.name}</h5>`, n.description && (a += `<p class="profile-description">${n.description}</p>`), n.inputs && Object.keys(n.inputs).length > 0) {
+      a += '<table class="profile-inputs-table">', a += "<thead><tr><th>Input</th><th>Type</th><th>Value</th><th>Required</th></tr></thead>", a += "<tbody>";
+      for (const [c, d] of Object.entries(n.inputs)) {
+        const u = d;
+        a += "<tr>", a += `<td>${c}</td>`, a += `<td>${u.type || "string"}</td>`, a += `<td><code>${u.value || u.default || ""}</code></td>`, a += `<td>${u.required ? "✓" : ""}</td>`, a += "</tr>";
+      }
+      a += "</tbody></table>";
+    } else
+      a += "<p>No inputs defined for this profile</p>";
+    return a += "</div>", a;
+  }
+  /**
    * Setup event handlers for property inputs
    */
   setupPropertyHandlers() {
@@ -895,26 +1253,30 @@ class V extends g {
     if (!this.currentBlock) return;
     const e = t.target, s = e.dataset.property;
     if (!s) return;
-    let i = e.value;
+    let n = e.value;
     if (e.dataset.type === "json")
       try {
-        i = JSON.parse(i);
+        n = JSON.parse(n);
       } catch {
-        console.warn("Invalid JSON:", i);
+        console.warn("Invalid JSON:", n);
         return;
       }
-    e.type === "number" && (i = parseInt(i, 10)), this.emit("propertyChange", {
+    if (s === "config.selectedProfile") {
+      this.currentBlock && this.currentBlock.config && (this.currentBlock.config.selectedProfile = n), this.emit("blockUpdated", this.currentBlock.id, { ...this.currentBlock }), this.renderProperties();
+      return;
+    }
+    e.type === "number" && (n = parseInt(n, 10)), this.emit("propertyChange", {
       blockId: this.currentBlock.id,
       property: s,
-      value: i
+      value: n
     });
   }
 }
-class j extends g {
+class st extends C {
   constructor(t) {
     super();
-    n(this, "container");
-    n(this, "templates", q);
+    r(this, "container");
+    r(this, "templates", Q);
     const e = document.getElementById(t);
     if (!e)
       throw new Error(`Container element '${t}' not found`);
@@ -938,25 +1300,25 @@ class j extends g {
     const t = this.container.querySelector(".block-categories");
     if (!t) return;
     const e = /* @__PURE__ */ new Map();
-    this.templates.forEach((i) => {
-      e.has(i.category) || e.set(i.category, []), e.get(i.category).push(i);
+    this.templates.forEach((n) => {
+      e.has(n.category) || e.set(n.category, []), e.get(n.category).push(n);
     });
     let s = "";
-    e.forEach((i, l) => {
+    e.forEach((n, a) => {
       s += `
                 <div class="category">
-                    <h4 class="category-title">${l}</h4>
+                    <h4 class="category-title">${a}</h4>
                     <div class="category-blocks">
-            `, i.forEach((c) => {
+            `, n.forEach((p) => {
         s += `
                     <div class="block-template" 
                          draggable="true" 
-                         data-block-type="${c.type}"
-                         style="border-color: ${c.color}">
-                        <span class="icon">${c.icon}</span>
+                         data-block-type="${p.type}"
+                         style="border-color: ${p.color}">
+                        <span class="icon">${p.icon}</span>
                         <div class="block-info">
-                            <span class="name">${c.name}</span>
-                            <span class="description">${c.description}</span>
+                            <span class="name">${p.name}</span>
+                            <span class="description">${p.description}</span>
                         </div>
                     </div>
                 `;
@@ -978,8 +1340,8 @@ class j extends g {
    * Handle drag start
    */
   onDragStart(t) {
-    var i;
-    const e = t.target, s = (i = e.closest(".block-template")) == null ? void 0 : i.getAttribute("data-block-type");
+    var n;
+    const e = t.target, s = (n = e.closest(".block-template")) == null ? void 0 : n.getAttribute("data-block-type");
     s && t.dataTransfer && (t.dataTransfer.effectAllowed = "copy", t.dataTransfer.setData("text/plain", s), e.classList.add("dragging"), this.emit("blockDragStart", s));
   }
   /**
@@ -993,10 +1355,10 @@ class j extends g {
    */
   filterBlocks(t) {
     const e = t.toLowerCase();
-    this.container.querySelectorAll(".block-template").forEach((i) => {
-      var u, h, k, y;
-      const l = i, c = ((h = (u = l.querySelector(".name")) == null ? void 0 : u.textContent) == null ? void 0 : h.toLowerCase()) || "", d = ((y = (k = l.querySelector(".description")) == null ? void 0 : k.textContent) == null ? void 0 : y.toLowerCase()) || "";
-      c.includes(e) || d.includes(e) ? l.style.display = "flex" : l.style.display = "none";
+    this.container.querySelectorAll(".block-template").forEach((n) => {
+      var d, u, k, b;
+      const a = n, p = ((u = (d = a.querySelector(".name")) == null ? void 0 : d.textContent) == null ? void 0 : u.toLowerCase()) || "", c = ((b = (k = a.querySelector(".description")) == null ? void 0 : k.textContent) == null ? void 0 : b.toLowerCase()) || "";
+      p.includes(e) || c.includes(e) ? a.style.display = "flex" : a.style.display = "none";
     });
   }
   /**
@@ -1010,25 +1372,25 @@ class j extends g {
             <input type="text" class="search-input" placeholder="Search blocks...">
         `;
     const s = t.querySelector("h3");
-    s && s.nextSibling && t.insertBefore(e, s.nextSibling), e.querySelector(".search-input").addEventListener("input", (l) => {
-      this.filterBlocks(l.target.value);
+    s && s.nextSibling && t.insertBefore(e, s.nextSibling), e.querySelector(".search-input").addEventListener("input", (a) => {
+      this.filterBlocks(a.target.value);
     });
   }
 }
-class U {
+class nt {
   constructor(o) {
-    n(this, "container");
-    n(this, "engine");
-    n(this, "canvas");
-    n(this, "propertyPanel");
-    n(this, "blockPalette");
-    n(this, "visualBlocks");
-    n(this, "visualConnections");
-    n(this, "selectedBlockId", null);
+    r(this, "container");
+    r(this, "engine");
+    r(this, "canvas");
+    r(this, "propertyPanel");
+    r(this, "blockPalette");
+    r(this, "visualBlocks");
+    r(this, "visualConnections");
+    r(this, "selectedBlockId", null);
     const t = document.getElementById(o);
     if (!t)
       throw new Error(`Container element '${o}' not found`);
-    this.container = t, this.engine = new v(), this.visualBlocks = /* @__PURE__ */ new Map(), this.visualConnections = /* @__PURE__ */ new Map(), this.setupUI(), this.initializeDefaultWorkflow();
+    this.container = t, this.engine = new E(), this.visualBlocks = /* @__PURE__ */ new Map(), this.visualConnections = /* @__PURE__ */ new Map(), this.setupUI(), this.initializeDefaultWorkflow();
   }
   /**
    * Get the currently selected block ID
@@ -1057,35 +1419,39 @@ class U {
                     <div id="property-panel" class="property-panel"></div>
                 </div>
             </div>
-        `, this.blockPalette = new j("block-palette"), this.canvas = new N("canvas-container"), this.propertyPanel = new V("property-panel"), this.setupEventHandlers();
+        `, this.blockPalette = new st("block-palette"), this.canvas = new et("canvas-container"), this.propertyPanel = new ot("property-panel"), this.setupEventHandlers();
   }
   /**
    * Setup event handlers
    */
   setupEventHandlers() {
     var o, t, e, s;
-    (o = document.getElementById("import-btn")) == null || o.addEventListener("click", () => this.importWorkflow()), (t = document.getElementById("export-btn")) == null || t.addEventListener("click", () => this.exportWorkflow()), (e = document.getElementById("validate-btn")) == null || e.addEventListener("click", () => this.validateWorkflow()), (s = document.getElementById("clear-btn")) == null || s.addEventListener("click", () => this.clearWorkflow()), this.blockPalette.on("blockDragStart", (i) => {
-      window.__draggedBlockType = i;
-    }), this.canvas.on("drop", (i) => {
-      const l = window.__draggedBlockType;
-      l && (this.addBlock(l, i), delete window.__draggedBlockType);
-    }), this.canvas.on("blockSelect", (i) => {
-      this.selectBlock(i);
-    }), this.canvas.on("blockMove", (i) => {
-      this.moveBlock(i.blockId, i.position);
-    }), this.canvas.on("connectionCreate", (i) => {
-      this.createConnection(i.source, i.target, i.type);
-    }), this.propertyPanel.on("propertyChange", (i) => {
-      this.updateBlockProperty(i.blockId, i.property, i.value);
+    (o = document.getElementById("import-btn")) == null || o.addEventListener("click", () => this.importWorkflow()), (t = document.getElementById("export-btn")) == null || t.addEventListener("click", () => this.exportWorkflow()), (e = document.getElementById("validate-btn")) == null || e.addEventListener("click", () => this.validateWorkflow()), (s = document.getElementById("clear-btn")) == null || s.addEventListener("click", () => this.clearWorkflow()), this.blockPalette.on("blockDragStart", (n) => {
+      window.__draggedBlockType = n;
+    }), this.canvas.on("drop", (n) => {
+      const a = window.__draggedBlockType;
+      a && (this.addBlock(a, n), delete window.__draggedBlockType);
+    }), this.canvas.on("blockSelect", (n) => {
+      this.selectBlock(n);
+    }), this.canvas.on("blockMove", (n) => {
+      this.moveBlock(n.blockId, n.position);
+    }), this.canvas.on("connectionCreate", (n) => {
+      this.onConnectionCreated(n.sourceBlockId, n.targetBlockId, n.sourcePortName, n.targetPortName);
+    }), this.canvas.on("profileChange", (n) => {
+      this.onProfileChange(n.blockId, n.profile);
+    }), this.canvas.on("connectionDelete", (n) => {
+      this.onConnectionDeleted(n.connectionId);
+    }), this.propertyPanel.on("propertyChange", (n) => {
+      this.updateBlockProperty(n.blockId, n.property, n.value);
     });
   }
   /**
    * Initialize with a default workflow
    */
   initializeDefaultWorkflow() {
-    const o = this.engine.createBlock(a.Start);
+    const o = this.engine.createBlock(l.Start);
     o.name = "Start", this.engine.addBlock(o), this.addVisualBlock(o, { x: 100, y: 200 });
-    const t = this.engine.createBlock(a.End);
+    const t = this.engine.createBlock(l.End);
     t.name = "End", this.engine.addBlock(t), this.addVisualBlock(t, { x: 500, y: 200 }), this.renderWorkflow();
   }
   /**
@@ -1134,18 +1500,51 @@ class U {
   /**
    * Create a connection between blocks
    */
-  createConnection(o, t, e) {
-    const s = this.engine.getBlock(o);
-    if (s) {
-      e === "success" ? s.onSuccess = t : e === "failure" ? s.onFailure = t : s.onComplete = t;
-      const i = `${o}-${t}-${e}`, l = {
-        id: i,
-        source: o,
-        target: t,
-        type: e
+  onConnectionCreated(o, t, e, s) {
+    const n = this.engine.getBlock(o);
+    if (n) {
+      n.connections || (n.connections = []), n.connections = n.connections.filter(
+        (c) => !(c.fromBlock === o && c.fromPort === e)
+      ), n.connections.push({
+        fromBlock: o,
+        fromPort: e,
+        toBlock: t,
+        toPort: s
+      });
+      const a = `${o}-${e}-${t}-${s}`, p = {
+        id: a,
+        sourceBlockId: o,
+        sourcePortName: e,
+        targetBlockId: t,
+        targetPortName: s,
+        path: ""
       };
-      this.visualConnections.set(i, l), this.renderWorkflow();
+      this.visualConnections.set(a, p), this.renderWorkflow();
     }
+  }
+  /**
+   * Handle profile change for Start blocks
+   */
+  onProfileChange(o, t) {
+    const e = this.engine.getBlock(o);
+    if (e && e.type === l.Start) {
+      const s = e;
+      s.config && (s.config.selectedProfile = t, this.renderWorkflow(), this.selectedBlockId === o && this.selectBlock(o));
+    }
+  }
+  /**
+   * Handle connection deletion
+   */
+  onConnectionDeleted(o) {
+    this.visualConnections.delete(o);
+    const t = Array.from(this.visualConnections.values()).find((e) => e.id === o);
+    if (t) {
+      const e = this.engine.getBlock(t.sourceBlockId);
+      e && e.connections && (e.connections = e.connections.filter(
+        (s) => !(s.fromBlock === t.sourceBlockId && s.fromPort === t.sourcePortName)
+      ));
+    }
+    this.renderWorkflow();
   }
   /**
    * Update a block property
@@ -1154,8 +1553,8 @@ class U {
     const s = this.engine.getBlock(o);
     if (s) {
       if (t.startsWith("config.")) {
-        const i = t.substring(7);
-        s.config[i] = e;
+        const n = t.substring(7);
+        s.config[n] = e;
       } else
         s[t] = e;
       this.renderWorkflow();
@@ -1170,11 +1569,11 @@ class U {
       var s;
       const e = (s = t.target.files) == null ? void 0 : s[0];
       if (e) {
-        const i = await e.text();
+        const n = await e.text();
         try {
-          this.engine.loadWorkflow(i), this.visualBlocks.clear(), this.visualConnections.clear(), this.positionBlocks(), this.createVisualConnections(), this.renderWorkflow(), alert("Workflow imported successfully");
-        } catch (l) {
-          alert(`Failed to import workflow: ${l}`);
+          this.engine.loadWorkflow(n), this.visualBlocks.clear(), this.visualConnections.clear(), this.positionBlocks(), this.createVisualConnections(), this.renderWorkflow(), alert("Workflow imported successfully");
+        } catch (a) {
+          alert(`Failed to import workflow: ${a}`);
         }
       }
     }, o.click();
@@ -1210,7 +1609,7 @@ ${o.warnings.join(`
    * Clear the workflow
    */
   clearWorkflow() {
-    confirm("Are you sure you want to clear the workflow?") && (this.engine = new v(), this.visualBlocks.clear(), this.visualConnections.clear(), this.selectedBlockId = null, this.initializeDefaultWorkflow());
+    confirm("Are you sure you want to clear the workflow?") && (this.engine = new E(), this.visualBlocks.clear(), this.visualConnections.clear(), this.selectedBlockId = null, this.initializeDefaultWorkflow());
   }
   /**
    * Render the workflow
@@ -1227,8 +1626,8 @@ ${o.warnings.join(`
   positionBlocks() {
     const o = this.engine.getBlocks(), t = 150;
     let e = 100, s = 100;
-    o.forEach((i) => {
-      this.addVisualBlock(i, { x: e, y: s }), e += t, e > 800 && (e = 100, s += t);
+    o.forEach((n) => {
+      this.addVisualBlock(n, { x: e, y: s }), e += t, e > 800 && (e = 100, s += t);
     });
   }
   /**
@@ -1236,32 +1635,53 @@ ${o.warnings.join(`
    */
   createVisualConnections() {
     this.engine.getBlocks().forEach((t) => {
-      if (t.onSuccess) {
-        const e = `${t.id}-${t.onSuccess}-success`;
-        this.visualConnections.set(e, {
-          id: e,
-          source: t.id,
-          target: t.onSuccess,
-          type: "success"
+      if (t.connections && t.connections.length > 0)
+        t.connections.forEach((e) => {
+          const s = `${e.fromBlock}-${e.fromPort}-${e.toBlock}-${e.toPort}`;
+          this.visualConnections.set(s, {
+            id: s,
+            sourceBlockId: e.fromBlock,
+            sourcePortName: e.fromPort,
+            targetBlockId: e.toBlock,
+            targetPortName: e.toPort,
+            path: ""
+            // Path will be calculated by renderer
+          });
         });
-      }
-      if (t.onFailure) {
-        const e = `${t.id}-${t.onFailure}-failure`;
-        this.visualConnections.set(e, {
-          id: e,
-          source: t.id,
-          target: t.onFailure,
-          type: "failure"
-        });
-      }
-      if (t.onComplete) {
-        const e = `${t.id}-${t.onComplete}-complete`;
-        this.visualConnections.set(e, {
-          id: e,
-          source: t.id,
-          target: t.onComplete,
-          type: "complete"
-        });
+      else {
+        if (t.onSuccess) {
+          const e = `${t.id}-${t.onSuccess}-success`;
+          this.visualConnections.set(e, {
+            id: e,
+            sourceBlockId: t.id,
+            sourcePortName: "onSuccess",
+            targetBlockId: t.onSuccess,
+            targetPortName: "in",
+            path: ""
+          });
+        }
+        if (t.onFailure) {
+          const e = `${t.id}-${t.onFailure}-failure`;
+          this.visualConnections.set(e, {
+            id: e,
+            sourceBlockId: t.id,
+            sourcePortName: "onFailure",
+            targetBlockId: t.onFailure,
+            targetPortName: "in",
+            path: ""
+          });
+        }
+        if (t.onComplete) {
+          const e = `${t.id}-${t.onComplete}-complete`;
+          this.visualConnections.set(e, {
+            id: e,
+            sourceBlockId: t.id,
+            sourcePortName: "onComplete",
+            targetBlockId: t.onComplete,
+            targetPortName: "in",
+            path: ""
+          });
+        }
       }
     });
   }
@@ -1276,39 +1696,39 @@ ${o.warnings.join(`
 typeof document < "u" && document.addEventListener("DOMContentLoaded", () => {
   if (document.getElementById("designer-container"))
     try {
-      const o = new U("designer-container");
+      const o = new nt("designer-container");
       console.log("SiyeFlow Designer initialized"), window.siyeFlowDesigner = o;
     } catch (o) {
       console.error("Failed to initialize SiyeFlow Designer:", o);
     }
 });
 export {
-  a as BlockType,
-  z as CollectBlock,
-  F as CollectConfig,
-  L as ConditionBlock,
-  D as ConditionConfig,
-  M as DelayBlock,
-  P as DelayConfig,
-  C as EndBlock,
-  B as EndConfig,
-  J as EvaluateBlock,
-  I as EvaluateConfig,
-  x as HttpRequestBlock,
-  E as HttpRequestConfig,
-  W as LogBlock,
-  T as LogConfig,
-  _ as LoopBlock,
-  O as LoopConfig,
-  b as StartBlock,
-  m as StartConfig,
-  G as SubWorkflowBlock,
-  H as SubWorkflowConfig,
-  X as TryCatchBlock,
-  A as TryCatchConfig,
-  $ as VariableBlock,
-  S as VariableConfig,
-  p as WorkflowBlock,
-  U as WorkflowDesigner,
-  v as WorkflowEngine
+  l as BlockType,
+  lt as CollectBlock,
+  Y as CollectConfig,
+  j as ConditionBlock,
+  R as ConditionConfig,
+  U as DelayBlock,
+  V as DelayConfig,
+  O as EndBlock,
+  W as EndConfig,
+  it as EvaluateBlock,
+  z as EvaluateConfig,
+  F as HttpRequestBlock,
+  N as HttpRequestConfig,
+  _ as LogBlock,
+  J as LogConfig,
+  at as LoopBlock,
+  X as LoopConfig,
+  M as StartBlock,
+  T as StartConfig,
+  pt as SubWorkflowBlock,
+  K as SubWorkflowConfig,
+  ct as TryCatchBlock,
+  G as TryCatchConfig,
+  H as VariableBlock,
+  q as VariableConfig,
+  h as WorkflowBlock,
+  nt as WorkflowDesigner,
+  E as WorkflowEngine
 };

@@ -41,6 +41,9 @@ namespace SiyeFlow.Core.TypeGen
             GenerateInterface<WorkflowDefinition>(sb);
             GenerateInterface<InputDefinition>(sb);
             GenerateInterface<OutputDefinition>(sb);
+            GenerateInterface<InputProfile>(sb);
+            GenerateInterface<PortDefinition>(sb);
+            GenerateInterface<PortConnection>(sb);
             
             // Generate abstract WorkflowBlock
             sb.AppendLine("export abstract class WorkflowBlock {");
@@ -53,6 +56,9 @@ namespace SiyeFlow.Core.TypeGen
             sb.AppendLine("    onSuccess?: string;");
             sb.AppendLine("    onFailure?: string;");
             sb.AppendLine("    onComplete?: string;");
+            sb.AppendLine("    inputPorts?: PortDefinition[];");
+            sb.AppendLine("    outputPorts?: PortDefinition[];");
+            sb.AppendLine("    connections?: PortConnection[];");
             sb.AppendLine("}");
             sb.AppendLine();
             

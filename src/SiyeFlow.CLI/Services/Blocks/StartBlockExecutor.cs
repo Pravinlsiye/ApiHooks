@@ -3,6 +3,7 @@ using SiyeFlow.CLI.Interfaces;
 using SiyeFlow.Core.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,58 +37,17 @@ namespace SiyeFlow.CLI.Services.Blocks
             
             // Process workflow inputs
             var outputs = new Dictionary<string, object>();
+            var effectiveInputs = GetEffectiveInputs(startBlock.Config, inputs, context);
             
-            if (startBlock.Config?.Inputs != null)
+            foreach (var (inputName, value) in effectiveInputs)
             {
-                foreach (var inputDef in startBlock.Config.Inputs)
-                {
-                    var inputName = inputDef.Key;
-                    var inputConfig = inputDef.Value;
-                    object? value = null;
-
-                    // Check if value provided in context
-                    if (context.Variables.ContainsKey($"inputs.{inputName}"))
-                    {
-                        value = context.Variables[$"inputs.{inputName}"];
-                    }
-                    // Check if value provided in inputs parameter
-                    else if (inputs != null && inputs.ContainsKey(inputName))
-                    {
-                        value = inputs[inputName];
-                    }
-                    // Use default value if available
-                    else if (inputConfig.Default != null)
-                    {
-                        value = inputConfig.Default;
-                    }
-                    // Check if required
-                    else if (inputConfig.Required)
-                    {
-                        throw new InvalidOperationException(
-                            $"Required input '{inputName}' not provided");
-                    }
-
-                    // Validate type (basic validation)
-                    if (value != null)
-                    {
-                        if (!ValidateType(value, inputConfig.Type))
-                        {
-                            _console.Warning($"Input '{inputName}' type mismatch. Expected: {inputConfig.Type}");
-                        }
-                    }
-
-                    // Store in outputs and variables
-                    if (value != null)
-                    {
-                        outputs[inputName] = value;
-                        _variableStore.SetVariable(inputName, value);
-                        _variableStore.SetVariable($"inputs.{inputName}", value); // Also store with prefix for backward compatibility
-                        context.Variables[inputName] = value;
-                        context.Variables[$"inputs.{inputName}"] = value;
-                        
-                        _console.Debug($"Input '{inputName}': {value}");
-                    }
-                }
+                outputs[inputName] = value;
+                _variableStore.SetVariable(inputName, value);
+                _variableStore.SetVariable($"inputs.{inputName}", value); // Also store with prefix for backward compatibility
+                context.Variables[inputName] = value;
+                context.Variables[$"inputs.{inputName}"] = value;
+                
+                _console.Debug($"Input '{inputName}': {value}");
             }
 
             // Add system variables
@@ -102,6 +62,149 @@ namespace SiyeFlow.CLI.Services.Blocks
             result.Outputs = outputs;
             
             _console.Success($"Initialized workflow with {outputs.Count} inputs");
+            
+            return result;
+        }
+
+        private Dictionary<string, object> GetEffectiveInputs(
+            StartConfig? config, 
+            Dictionary<string, object>? runtimeInputs,
+            Interfaces.ExecutionContext context)
+        {
+            var result = new Dictionary<string, object>();
+            var selectedInputDefinitions = new Dictionary<string, InputDefinition>();
+            
+            if (config == null) return result;
+            
+            // 1. Get inputs from selected profile
+            if (config.Profiles != null && config.Profiles.Any())
+            {
+                InputProfile? selectedProfile = null;
+                string? profileName = config.SelectedProfile;
+                
+                // Check if profile is specified in runtime inputs
+                if (runtimeInputs?.ContainsKey("$selectedProfile") == true)
+                {
+                    profileName = runtimeInputs["$selectedProfile"]?.ToString();
+                }
+                // Also check in context variables
+                else if (context.Variables.ContainsKey("inputs.$selectedProfile"))
+                {
+                    profileName = context.Variables["inputs.$selectedProfile"]?.ToString();
+                }
+                
+                // Try to find the selected profile
+                if (!string.IsNullOrEmpty(profileName))
+                {
+                    selectedProfile = config.Profiles.FirstOrDefault(p => p.Name == profileName);
+                    if (selectedProfile != null)
+                    {
+                        _console.Info($"Using profile: {selectedProfile.Name}");
+                    }
+                    else
+                    {
+                        _console.Warning($"Profile '{profileName}' not found");
+                    }
+                }
+                
+                // If no profile selected or not found, use default
+                if (selectedProfile == null)
+                {
+                    selectedProfile = config.Profiles.FirstOrDefault(p => p.Default);
+                    if (selectedProfile != null)
+                    {
+                        _console.Info($"Using default profile: {selectedProfile.Name}");
+                    }
+                }
+                
+                // If still no profile, use the first one
+                if (selectedProfile == null && config.Profiles.Any())
+                {
+                    selectedProfile = config.Profiles.First();
+                    _console.Info($"Using first available profile: {selectedProfile.Name}");
+                }
+                
+                // Copy profile inputs
+                if (selectedProfile != null)
+                {
+                    foreach (var (key, input) in selectedProfile.Inputs)
+                    {
+                        selectedInputDefinitions[key] = input;
+                        if (input.Value != null)
+                        {
+                            result[key] = input.Value;
+                        }
+                        else if (input.Default != null)
+                        {
+                            result[key] = input.Default;
+                        }
+                    }
+                }
+            }
+            
+            // 2. Apply legacy inputs if no profiles
+            if (!selectedInputDefinitions.Any() && config.Inputs != null)
+            {
+                selectedInputDefinitions = config.Inputs;
+                foreach (var (key, input) in config.Inputs)
+                {
+                    if (input.Default != null)
+                    {
+                        result[key] = input.Default;
+                    }
+                }
+            }
+            
+            // 3. Apply overrides from config
+            if (config.Overrides != null)
+            {
+                foreach (var (key, value) in config.Overrides)
+                {
+                    result[key] = value;
+                    _console.Debug($"Applied override: {key} = {value}");
+                }
+            }
+            
+            // 4. Apply runtime inputs (highest priority)
+            if (runtimeInputs != null)
+            {
+                foreach (var (key, value) in runtimeInputs)
+                {
+                    result[key] = value;
+                    _console.Debug($"Applied runtime input: {key} = {value}");
+                }
+            }
+            
+            // 5. Check context variables for any additional inputs
+            foreach (var (key, inputDef) in selectedInputDefinitions)
+            {
+                if (!result.ContainsKey(key))
+                {
+                    // Check if value provided in context
+                    if (context.Variables.ContainsKey($"inputs.{key}"))
+                    {
+                        result[key] = context.Variables[$"inputs.{key}"];
+                    }
+                    else if (context.Variables.ContainsKey(key))
+                    {
+                        result[key] = context.Variables[key];
+                    }
+                }
+            }
+            
+            // 6. Validate required inputs and type
+            foreach (var (key, inputDef) in selectedInputDefinitions)
+            {
+                if (inputDef.Required && !result.ContainsKey(key))
+                {
+                    throw new InvalidOperationException($"Required input '{key}' not provided");
+                }
+                
+                if (result.ContainsKey(key) && !ValidateType(result[key], inputDef.Type))
+                {
+                    _console.Warning($"Input '{key}' type mismatch. Expected: {inputDef.Type}");
+                }
+            }
             
             return result;
         }

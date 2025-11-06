@@ -76,10 +76,9 @@ export class WorkflowEngine {
      * Remove a block from the workflow
      */
     public removeBlock(blockId: string): void {
-        const index = this.workflow.blocks?.findIndex(b => b.id === blockId);
-        if (index !== undefined && index >= 0) {
-            this.workflow.blocks?.splice(index, 1);
-            this.blocks.delete(blockId);
+        this.blocks.delete(blockId);
+        if (this.workflow.blocks) {
+            this.workflow.blocks = this.workflow.blocks.filter(b => b.id !== blockId);
         }
     }
     
@@ -146,7 +145,24 @@ export class WorkflowEngine {
     public createBlock(type: BlockType): AnyWorkflowBlock {
         switch (type) {
             case BlockType.Start:
-                return new StartBlock();
+                const startBlock = new StartBlock();
+                // Ensure Start blocks always have at least one profile
+                if (!startBlock.config.profiles || startBlock.config.profiles.length === 0) {
+                    startBlock.config.profiles = [{
+                        name: 'Default',
+                        description: 'Default configuration',
+                        default: true,
+                        inputs: {
+                            value1: {
+                                type: 'string',
+                                value: '',
+                                description: 'Input value 1'
+                            }
+                        }
+                    }];
+                    startBlock.config.selectedProfile = 'Default';
+                }
+                return startBlock;
             case BlockType.End:
                 return new EndBlock();
             case BlockType.HttpRequest:

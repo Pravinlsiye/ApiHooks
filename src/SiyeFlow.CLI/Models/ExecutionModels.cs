@@ -16,6 +16,17 @@ namespace SiyeFlow.CLI.Interfaces
         public List<string> ExecutionPath { get; set; } = new();
         public bool DryRun { get; set; }
         
+        /// <summary>
+        /// Stores output values by block ID and port name
+        /// BlockOutputs[blockId][portName] = value
+        /// </summary>
+        public Dictionary<string, Dictionary<string, object>> BlockOutputs { get; set; } = new();
+        
+        /// <summary>
+        /// Workflow input values for Start block
+        /// </summary>
+        public Dictionary<string, object> WorkflowInputs { get; set; } = new();
+        
         // For loops
         public int? LoopIndex { get; set; }
         public object? LoopItem { get; set; }

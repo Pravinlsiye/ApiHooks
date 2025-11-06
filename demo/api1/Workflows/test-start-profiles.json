@@ -1,0 +1,179 @@
+{
+  "name": "Test Start Block with Profiles",
+  "description": "Demonstrates the new profile feature in Start blocks with port-based connections",
+  "version": "1.0",
+  "blocks": [
+    {
+      "id": "start1",
+      "type": "start",
+      "name": "Start with Profiles",
+      "description": "Start block with profile support",
+      "config": {
+        "profiles": [
+          {
+            "name": "Development",
+            "description": "Development environment settings",
+            "default": true,
+            "inputs": {
+              "apiUrl": {
+                "type": "string",
+                "value": "http://localhost:5216",
+                "required": true,
+                "description": "API endpoint URL"
+              },
+              "timeout": {
+                "type": "number",
+                "value": 5000,
+                "description": "Request timeout in milliseconds"
+              },
+              "debug": {
+                "type": "boolean",
+                "value": true,
+                "description": "Enable debug logging"
+              }
+            }
+          },
+          {
+            "name": "Production",
+            "description": "Production environment settings",
+            "inputs": {
+              "apiUrl": {
+                "type": "string",
+                "value": "https://api.production.com",
+                "required": true,
+                "description": "API endpoint URL"
+              },
+              "timeout": {
+                "type": "number",
+                "value": 30000,
+                "description": "Request timeout in milliseconds"
+              },
+              "debug": {
+                "type": "boolean",
+                "value": false,
+                "description": "Enable debug logging"
+              }
+            }
+          },
+          {
+            "name": "Testing",
+            "description": "Test environment settings",
+            "inputs": {
+              "apiUrl": {
+                "type": "string",
+                "value": "https://test.api.com",
+                "required": true
+              },
+              "timeout": {
+                "type": "number",
+                "value": 10000
+              }
+            }
+          }
+        ],
+        "overrides": {
+          "timeout": 3000
+        }
+      },
+      "connections": [
+        {
+          "fromBlock": "start1",
+          "fromPort": "apiUrl",
+          "toBlock": "http1",
+          "toPort": "url"
+        }
+      ],
+      "onSuccess": "http1"
+    },
+    {
+      "id": "http1",
+      "type": "http-request",
+      "name": "Call API",
+      "description": "Fetch users from API",
+      "config": {
+        "method": "GET",
+        "url": "{{url}}/api/users"
+      },
+      "inputPorts": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true,
+          "description": "API base URL"
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "response",
+          "type": "array",
+          "description": "API response"
+        }
+      ],
+      "outputs": {
+        "users": "$"
+      },
+      "connections": [
+        {
+          "fromBlock": "http1",
+          "fromPort": "response",
+          "toBlock": "log1",
+          "toPort": "data"
+        }
+      ],
+      "onSuccess": "log1"
+    },
+    {
+      "id": "log1",
+      "type": "log",
+      "name": "Log Results",
+      "description": "Display results",
+      "config": {
+        "message": "API Response: {{data}}",
+        "level": "info"
+      },
+      "inputPorts": [
+        {
+          "name": "data",
+          "type": "any",
+          "description": "Data to log"
+        }
+      ],
+      "connections": [
+        {
+          "fromBlock": "log1",
+          "fromPort": "complete",
+          "toBlock": "end1",
+          "toPort": "in"
+        }
+      ],
+      "onSuccess": "end1"
+    },
+    {
+      "id": "end1",
+      "type": "end",
+      "name": "End",
+      "description": "Workflow completion",
+      "inputPorts": [
+        {
+          "name": "in",
+          "type": "any",
+          "multiple": true
+        }
+      ],
+      "config": {
+        "outputs": {
+          "apiUrl": {
+            "type": "string",
+            "value": "{{url}}",
+            "description": "The final API URL used"
+          },
+          "result": {
+            "type": "array",
+            "value": "{{users}}",
+            "description": "Users retrieved"
+          }
+        }
+      }
+    }
+  ]
+}

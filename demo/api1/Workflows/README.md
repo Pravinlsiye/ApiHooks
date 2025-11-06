@@ -1,108 +1,177 @@
-# SiyeFlow Block Test Workflows
+# SiyeFlow Test Workflows - Port-Based Schema
 
-This directory contains simple test workflows for validating individual block types in the SiyeFlow block-based schema.
+**All workflows in this directory use the latest port-based connection schema.**
 
-## Files
+## Current Workflows (6 files)
 
-### api-local.json
-**Purpose**: Minimal OpenAPI specification for local testing (optional)
-- Basic endpoints for projects API
-- Can be used with `--api` parameter
-- Not required for direct HTTP mode
+### 🌟 Full Feature Demonstrations
 
-## Test Workflows
+**1. test-start-block-ports.json** ⭐ RECOMMENDED
+- Complete demonstration of all features
+- Profile system (Development/Production)
+- Full port definitions on all blocks
+- Port-based connections
+- Multiple block types (Start, HTTP, Log, End)
+- Shows one-to-many connections
+- **Use for**: Full feature showcase
 
-### test-http-block.json
-**Purpose**: Test basic HTTP request functionality
-- Tests GET request with URL parameters
-- Variable replacement in URLs
-- Response extraction using JSONPath
-- Headers configuration
+**2. test-port-connections.json**
+- Pure port-based architecture
+- Demonstrates connection patterns
+- Type-specific ports
+- **Use for**: Architecture reference
 
-### test-start-end-blocks.json  
-**Purpose**: Test workflow inputs and outputs
-- Multiple input types (string, number, boolean)
-- Default values for inputs
-- Complex output structures
-- Variable processing between blocks
+### 📋 Profile System Tests
 
-### test-http-post.json
-**Purpose**: Test resource creation with POST
-- JSON request body
-- Content-Type headers
-- Success/failure branching
-- Error handling with multiple end blocks
+**3. test-start-profiles.json**
+- Multiple profiles (Development/Production/Testing)
+- Profile selection and override system
+- Port-based connections
+- HTTP Request and Log blocks
+- **Use for**: Profile feature testing
 
-### test-http-post-jsonplaceholder.json
-**Purpose**: Test HTTP POST with public API
-- Uses JSONPlaceholder API (no local server needed)
-- Creates a new post resource
-- Extracts created resource data
-- Demonstrates real POST operation
+**4. test-profiles-real-api.json**
+- External API (JSONPlaceholder)
+- No local server needed
+- Profile-based configuration
+- **Use for**: Real API testing
 
-### test-delay-block.json
-**Purpose**: Test timing and flow control
-- Configurable delay duration
-- Log blocks for debugging
-- Sequential execution flow
-- Time-based operations
+### 📚 Educational Examples
 
-### test-http-jsonpath.json
-**Purpose**: Test HTTP request with JSONPath extraction (local API)
-- Multiple JSONPath expressions
-- Array extraction and slicing
-- Variable storage and usage
-- Complex output mapping
+**5. test-start-end-blocks.json**
+- Basic workflow structure
+- Start → Variable → End
+- Simple port connections
+- **Use for**: Learning basics
 
-### test-http-jsonpath-posts.json
-**Purpose**: Test HTTP request with JSONPath extraction (public API)
-- Uses JSONPlaceholder API (no local server needed)
-- JSONPath array operations
-- Multiple data extractions from single response
-- Demonstrates real-world API usage
+**6. api-local.json**
+- OpenAPI specification reference
+- Optional for local API testing
+- **Use for**: API documentation
 
-### visual-test.json
-**Purpose**: Test visual designer import functionality
-- Multiple block types (HTTP, condition, variable, log)
-- Branching logic with success/failure paths
-- Multiple end blocks for different outcomes
-- Demonstrates new block-based schema
+## Schema Features
 
-## Test Results
+All workflows include:
+- ✅ **Profile Support** (Start blocks)
+- ✅ **Input Port Definitions** (inputPorts array)
+- ✅ **Output Port Definitions** (outputPorts array)
+- ✅ **Port-Based Connections** (connections array)
+- ✅ **Legacy onSuccess** (for current CLI compatibility)
 
-See [TEST_RESULTS.md](./TEST_RESULTS.md) for detailed test execution results and status of each workflow.
+## Running in Designer
 
-## Running Tests
-
-### With API Definition (optional)
 ```bash
-dotnet run -- execute --api openapi-local.json --workflow test-http-block.json
+cd src/siye-flow-designer
+npm run dev
 ```
 
-### Without API Definition (direct HTTP mode)
+Then:
+1. Open http://localhost:3000
+2. Click **Import**
+3. Select any workflow file
+4. See port-based visualization
+
+**Features You'll See:**
+- Profile dropdown (Start blocks)
+- Blue port tabs on blocks
+- Smooth connection curves
+- Type indicators (Aa, #, 0/1, etc.)
+- Connection deletion (double-click input tab)
+
+## Running in CLI
+
 ```bash
-dotnet run -- execute --workflow test-http-block.json --inputs '{"apiUrl": "http://localhost:5216"}'
+cd src/SiyeFlow.CLI
+
+# Basic execution
+dotnet run -- execute -w ../../demo/api1/Workflows/test-start-profiles.json
+
+# With profile selection
+dotnet run -- execute -w ../../demo/api1/Workflows/test-start-profiles.json --profile Production
+
+# With value overrides
+dotnet run -- execute -w ../../demo/api1/Workflows/test-start-profiles.json -p Development -i '{"timeout": 1000}'
 ```
 
-## Block Types Covered
+**Note**: Current CLI uses `onSuccess/onFailure` for execution. Port-based execution coming in next milestone.
 
-- ✅ **start** - Workflow initialization with inputs
-- ✅ **end** - Workflow completion with outputs  
-- ✅ **http-request** - GET/POST/PUT/DELETE operations
-- ⏳ **delay** - Wait operations (stub)
-- ⏳ **log** - Logging messages (stub)
-- ⏳ **variable** - Variable assignment (stub)
-- ⏳ **condition** - Conditional branching (stub)
-- ⏳ **loop** - Iteration over arrays (stub)
-- ⏳ **evaluate** - JSONPath/TypeScript evaluation (stub)
-- ⏳ **try-catch** - Error handling (stub)
-- ⏳ **collect** - Result aggregation (stub)
-- ⏳ **workflow** - Sub-workflow execution (stub)
+## Port-Based Schema Example
 
-Legend: ✅ Implemented | ⏳ Stub implementation
+```json
+{
+  "blocks": [
+    {
+      "id": "start1",
+      "type": "start",
+      "config": {
+        "profiles": [
+          {
+            "name": "Development",
+            "inputs": {
+              "apiUrl": { "type": "string", "value": "..." }
+            }
+          }
+        ]
+      },
+      "connections": [
+        {
+          "fromBlock": "start1",
+          "fromPort": "apiUrl",
+          "toBlock": "http1",
+          "toPort": "url"
+        }
+      ],
+      "onSuccess": "http1"
+    },
+    {
+      "id": "http1",
+      "type": "http-request",
+      "inputPorts": [
+        { "name": "url", "type": "string", "required": true }
+      ],
+      "outputPorts": [
+        { "name": "response", "type": "object" }
+      ],
+      "connections": [...]
+    }
+  ]
+}
+```
 
-## Notes
+## Block Types with Ports
 
-- All test workflows are kept minimal to focus on specific functionality
-- Old complex examples have been moved to `old-examples/` directory
-- These tests are designed for CLI development and validation
+- ✅ **start** - Dual ports (input/output for each profile value)
+- ✅ **http-request** - Input ports for config, output for response
+- ✅ **variable** - Input/output ports for values
+- ✅ **log** - Input ports for data
+- ✅ **end** - Input ports for final values
+
+## Architecture
+
+**C# Models** (Single Source of Truth)
+- Profile system
+- PortDefinition class
+- PortConnection class
+
+**TypeScript** (Auto-Generated)
+- Generated from C# via TypeGen
+- Synchronized types
+
+**Designer** (DOM-Based Positioning)
+- Uses actual rendered tab positions
+- Works with any block layout
+- Scalable and flexible
+
+## Migration Notes
+
+**What Changed:**
+- ❌ Removed 3 legacy workflows
+- ✅ Updated 3 key workflows
+- ✅ All remaining workflows use port schema
+- ✅ Backward compatible (onSuccess kept)
+
+**Benefits:**
+- Unified schema across designer and CLI
+- Clear data flow visualization
+- Type-safe connections
+- Future-proof architecture

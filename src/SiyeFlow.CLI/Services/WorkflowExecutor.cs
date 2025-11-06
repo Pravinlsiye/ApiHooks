@@ -80,8 +80,14 @@ namespace SiyeFlow.CLI.Services
                 var validation = await ValidateAsync(workflow, apiDocument);
                 if (!validation.IsValid)
                 {
+                    var errorMessages = validation.Errors.Select(e => e.Message);
+                    var blockErrors = validation.BlockErrors.SelectMany(kvp => 
+                        kvp.Value.Select(err => $"Block '{kvp.Key}': {err}"));
+                    
+                    var allErrors = string.Join(", ", errorMessages.Concat(blockErrors));
+                    
                     throw new InvalidOperationException(
-                        $"Workflow validation failed: {string.Join(", ", validation.Errors.Select(e => e.Message))}");
+                        $"Workflow validation failed: {allErrors}");
                 }
 
                 // Find start block
@@ -334,7 +340,11 @@ namespace SiyeFlow.CLI.Services
             // Load workflow
             var workflowJson = await File.ReadAllTextAsync(workflowPath, cancellationToken);
             var workflow = JsonConvert.DeserializeObject<WorkflowDefinition>(workflowJson, 
-                new JsonSerializerSettings { Converters = { new WorkflowBlockConverter() } });
+                new JsonSerializerSettings 
+                { 
+                    Converters = { new WorkflowBlockConverter() },
+                    MissingMemberHandling = MissingMemberHandling.Ignore
+                });
             
             if (workflow == null)
             {

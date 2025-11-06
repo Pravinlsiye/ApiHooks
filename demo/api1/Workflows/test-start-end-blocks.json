@@ -1,37 +1,63 @@
 {
   "name": "Test Start/End Blocks",
-  "description": "Test workflow inputs and outputs",
+  "description": "Test workflow inputs and outputs with port-based connections",
   "blocks": [
     {
       "id": "start",
       "type": "start",
       "name": "Start with Inputs",
+      "description": "Workflow entry with inputs",
       "config": {
         "inputs": {
           "userName": {
             "type": "string",
             "required": true,
-            "default": "TestUser"
+            "default": "TestUser",
+            "description": "User name"
           },
           "maxItems": {
             "type": "number",
             "required": false,
-            "default": 10
+            "default": 10,
+            "description": "Maximum items"
           },
           "includeDetails": {
             "type": "boolean",
             "required": false,
-            "default": true
+            "default": true,
+            "description": "Include details flag"
           }
         }
       },
+      "connections": [
+        {
+          "fromBlock": "start",
+          "fromPort": "userName",
+          "toBlock": "process",
+          "toPort": "userName"
+        },
+        {
+          "fromBlock": "start",
+          "fromPort": "maxItems",
+          "toBlock": "process",
+          "toPort": "maxItems"
+        },
+        {
+          "fromBlock": "start",
+          "fromPort": "includeDetails",
+          "toBlock": "process",
+          "toPort": "includeDetails"
+        }
+      ],
       "onSuccess": "process"
     },
     {
       "id": "process",
       "type": "variable",
       "name": "Process Variables",
+      "description": "Transform input values",
       "config": {
+        "operation": "set",
         "variables": {
           "greeting": "Hello, {{userName}}!",
           "timestamp": "$now()",
@@ -41,12 +67,62 @@
           }
         }
       },
+      "inputPorts": [
+        {
+          "name": "userName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "maxItems",
+          "type": "number"
+        },
+        {
+          "name": "includeDetails",
+          "type": "boolean"
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "greeting",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "string"
+        },
+        {
+          "name": "config",
+          "type": "object"
+        }
+      ],
+      "connections": [
+        {
+          "fromBlock": "process",
+          "fromPort": "greeting",
+          "toBlock": "end",
+          "toPort": "greeting"
+        },
+        {
+          "fromBlock": "process",
+          "fromPort": "timestamp",
+          "toBlock": "end",
+          "toPort": "timestamp"
+        },
+        {
+          "fromBlock": "process",
+          "fromPort": "config",
+          "toBlock": "end",
+          "toPort": "config"
+        }
+      ],
       "onSuccess": "end"
     },
     {
       "id": "end",
       "type": "end",
       "name": "End with Outputs",
+      "description": "Workflow completion",
       "config": {
         "outputs": {
           "message": {
@@ -62,7 +138,21 @@
             "value": "{{config}}"
           }
         }
-      }
+      },
+      "inputPorts": [
+        {
+          "name": "greeting",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "string"
+        },
+        {
+          "name": "config",
+          "type": "object"
+        }
+      ]
     }
   ]
 }

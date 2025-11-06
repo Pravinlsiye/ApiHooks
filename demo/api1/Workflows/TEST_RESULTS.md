@@ -2,136 +2,196 @@
 
 ## Summary
 
-Testing all workflows in the `demo/api1/Workflows` folder with the current implementation that now includes:
+Testing workflows with the latest SiyeFlow implementation featuring:
+- **Profile System** ✅ Multiple environment configurations
+- **Port-Based Connections** ✅ Data-flow visual programming
 - **Start** and **End** blocks ✅
-- **HTTP Request** block ✅ 
-- **Variable** block ✅ (NEW)
-- **Condition** block ✅ (NEW)
-- **Delay** block ⏳ (Stub only - shows warning)
-- **Log** block ⏳ (Stub only - shows warning)
+- **HTTP Request** block ✅ WITH PORTS
+- **Variable** block ✅
+- **Condition** block ✅
+- **Log** block ✅ WITH PORTS
+- **Delay** block ⏳ (Stub)
 
-**Update**: All 11 workflows now execute successfully! With Variable and Condition blocks implemented, workflows that previously had partial success now work fully.
+**Latest Update**: Profile support and port-based connection system fully implemented!
 
 ## Test Results Summary
 
 | Status | Count | Description |
 |--------|-------|-------------|
-| ✅ PASSED | 11 | All workflows execute successfully |
-| ⚠️ PARTIAL | 0 | None |
-| ❌ FAILED | 0 | None |
+| ✅ PASSED | 9 | All current workflows execute successfully |
+| 🆕 NEW | 4 | Port-based and profile system tests |
+| 🗑️ REMOVED | 6 | Outdated tests removed |
 
-## Detailed Test Results
+## Latest Test Workflows
 
-### ✅ Core Block Tests
+### 🌟 Featured: Port-Based Connection System
 
-#### 1. test-start-end-blocks.json
+#### test-start-block-ports.json
 - **Status**: ✅ PASSED
-- **Description**: Tests Start/End blocks with inputs/outputs and Variable block
-- **Key Features**: Input processing, variable transformation, output generation
-- **Note**: Object values in variables don't process nested variable substitution
+- **Description**: Comprehensive demonstration of port-based connections
+- **Features**:
+  - Start block with 2 profiles (Development/Production)
+  - 3 inputs per profile: apiUrl, userId, timeout
+  - Input ports for override (left side tabs)
+  - Output ports for distribution (right side tabs)
+  - HTTP Request block with input/output ports
+  - Log blocks with input ports
+  - End block with input port
+  - Multiple connections from single output port
+  - Type indicators (Aa for string, # for number)
+- **Demonstrated Connections**:
+  - apiUrl → HTTP block + Log block (one-to-many)
+  - userId → HTTP block
+  - timeout → Log block
+  - response → Log block
 
-#### 2. test-variable-block.json
+#### test-port-connections.json
 - **Status**: ✅ PASSED
-- **Description**: Tests all Variable block operations (set, get, delete)
-- **Key Features**: Variable storage, retrieval, deletion, and variable substitution in strings
+- **Description**: Pure port-based connection architecture
+- **Features**:
+  - Input/output port definitions
+  - Type-specific connections
+  - One-to-many connection pattern
+  - Clean data flow visualization
 
-#### 3. test-condition-block.json
+### 📋 Profile System Tests
+
+#### test-start-profiles.json
 - **Status**: ✅ PASSED
-- **Description**: Tests conditional branching with complex logic
-- **Key Features**: Expression evaluation, branching (onTrue/onFalse), multiple condition paths
-- **Test Scenarios**: Age check, VIP status check, different user paths
+- **Description**: Start block with multiple environment profiles
+- **Features**:
+  - 3 profiles: Development, Production, Testing
+  - Default profile support
+  - Profile selection via CLI `--profile` option
+  - Value override system
+  - HTTP Request integration
+  - Log and Condition blocks
+- **CLI Usage**:
+  ```bash
+  # Use default profile (Development)
+  dotnet run -- execute -w test-start-profiles.json
+  
+  # Select Production profile
+  dotnet run -- execute -w test-start-profiles.json --profile Production
+  
+  # Override values
+  dotnet run -- execute -w test-start-profiles.json -p Development -i '{"timeout": 1000}'
+  ```
 
-### ✅ HTTP Tests (Local API)
-
-#### 4. test-http-block.json
+#### test-profiles-real-api.json
 - **Status**: ✅ PASSED
-- **Description**: Basic HTTP GET test
-- **Endpoint**: http://localhost:5216/projects
-- **Key Features**: Simple HTTP request without JSONPath
+- **Description**: Profile feature with real JSONPlaceholder API
+- **Features**:
+  - 2 profiles: JSONPlaceholder, Local
+  - No local server required
+  - Real external API calls
+  - Dynamic configuration switching
 
-#### 5. test-http-jsonpath.json
+### ✅ Legacy Tests (Maintained for Compatibility)
+
+#### test-start-end-blocks.json
 - **Status**: ✅ PASSED
-- **Description**: HTTP GET with JSONPath extraction
-- **Endpoint**: http://localhost:5216/projects
-- **Key Features**: Multiple JSONPath expressions, data extraction
+- **Description**: Basic Start/End block functionality
+- **Features**: Input processing, variable transformation, output generation
 
-#### 6. test-http-post.json
+#### http-connection-test.json
+- **Status**: ✅ PASSED  
+- **Description**: Multiple connected HTTP requests
+- **Connection Style**: Legacy (onSuccess/onFailure)
+
+#### visual-test.json
 - **Status**: ✅ PASSED
-- **Description**: HTTP POST to create a project
-- **Endpoint**: http://localhost:5216/projects
-- **Key Features**: POST request, request body, response extraction
+- **Description**: Complex workflow with multiple block types
+- **Features**: Branching logic, multiple block types
+- **Connection Style**: Legacy
 
-#### 7. http-connection-test.json
-- **Status**: ✅ PASSED
-- **Description**: Multiple connected HTTP calls
-- **Key Features**: Sequential HTTP requests, workflow flow control
+#### test-delay-block.json
+- **Status**: ✅ PASSED (with stub warnings)
+- **Description**: Delay and log block testing
+- **Note**: Log and Delay blocks show stub warnings but execute
 
-### ✅ HTTP Tests (Public APIs)
+#### api-local.json
+- **Status**: ✅ REFERENCE FILE
+- **Description**: OpenAPI specification for local testing
+- **Note**: Optional, not required for direct HTTP mode
 
-#### 8. test-http-jsonpath-posts.json
-- **Status**: ✅ PASSED
-- **Description**: HTTP GET with JSONPath using JSONPlaceholder API
-- **Endpoint**: https://jsonplaceholder.typicode.com/posts
-- **Key Features**: External API, complex JSONPath expressions
+## Removed Tests
 
-#### 9. test-http-post-jsonplaceholder.json
-- **Status**: ✅ PASSED
-- **Description**: HTTP POST to JSONPlaceholder API
-- **Endpoint**: https://jsonplaceholder.typicode.com/posts
-- **Key Features**: External API POST, no local dependencies
+The following outdated tests have been removed:
+- ❌ test-http-block.json (replaced by port-based tests)
+- ❌ test-http-post.json (replaced by port-based tests)
+- ❌ test-http-jsonpath.json (replaced by port-based tests)
+- ❌ test-http-jsonpath-posts.json (replaced by port-based tests)
+- ❌ test-http-post-jsonplaceholder.json (replaced by port-based tests)
+- ❌ test-variable-block.json (replaced by port-based tests)
+- ❌ test-condition-block.json (replaced by port-based tests)
 
-### ✅ Complex Workflows
+## Running Tests
 
-#### 10. visual-test.json
-- **Status**: ✅ PASSED (with warnings)
-- **Description**: Complex workflow combining multiple block types
-- **Key Features**: HTTP calls, conditions, variables, logs (stubbed)
-- **Note**: Shows warnings for unimplemented Log blocks but continues execution
-
-#### 11. test-delay-block.json
-- **Status**: ✅ PASSED (with warnings)
-- **Description**: Tests delay and timing functionality
-- **Key Features**: Delay block (stubbed), Log blocks (stubbed)
-- **Note**: Executes successfully but doesn't actually delay
-
-## Known Limitations
-
-1. **Variable Block**: Object values don't process nested variable substitutions
-2. **Delay Block**: Not implemented - shows warning but doesn't block execution
-3. **Log Block**: Not implemented - shows warning but doesn't block execution
-
-## Running All Tests
-
-### Quick Test Script
-```powershell
-# Run from src/SiyeFlow.CLI directory
-# (Test script has been removed - use manual testing below)
-```
-
-### Manual Testing
+### Profile-Based Tests
 ```bash
-# Start Local API (if testing local workflows)
-cd demo/api1
-dotnet run
+cd src/SiyeFlow.CLI
 
-# Run individual tests from src/SiyeFlow.CLI
-dotnet run -- execute --workflow ../../demo/api1/Workflows/[workflow-name].json
+# Default profile
+dotnet run -- execute -w ../../demo/api1/Workflows/test-start-profiles.json
+
+# Specific profile
+dotnet run -- execute -w ../../demo/api1/Workflows/test-start-profiles.json --profile Production
+
+# Override values
+dotnet run -- execute -w ../../demo/api1/Workflows/test-start-profiles.json -p Development -i '{"timeout": 3000}'
 ```
+
+### Port-Based Connection Tests
+```bash
+# Comprehensive test (recommended)
+dotnet run -- execute -w ../../demo/api1/Workflows/test-start-block-ports.json
+
+# Architecture demo
+dotnet run -- execute -w ../../demo/api1/Workflows/test-port-connections.json
+```
+
+## TypeScript Designer Testing
+
+The workflows can be visualized in the TypeScript designer:
+
+1. Start the designer: `npm run dev` (in src/siye-flow-designer)
+2. Open http://localhost:3000
+3. Click **Import** button
+4. Select workflow file
+
+**Visual Features:**
+- Profile selector dropdown at top of Start blocks
+- Blue port tabs on block edges
+- Connection lines between specific ports
+- Delete buttons on connection hover
+- Type indicators (Aa, #, 0/1, etc.)
+
+## Block Types Coverage
+
+- ✅ **start** - WITH PROFILES & DUAL PORTS (input/output tabs in same row)
+- ✅ **end** - WITH INPUT PORT
+- ✅ **http-request** - WITH INPUT/OUTPUT PORTS
+- ✅ **variable** - WITH INPUT/OUTPUT PORTS
+- ✅ **condition** - WITH INPUT PORTS
+- ✅ **log** - WITH INPUT PORTS
+- ⏳ **delay** - Stub implementation
+- ⏳ **loop** - Stub implementation
+- ⏳ **evaluate** - Stub implementation
+- ⏳ **try-catch** - Stub implementation
+
+Legend: ✅ Implemented | ⏳ Stub
+
+## Architecture Notes
+
+**Single Source of Truth**: All block schemas defined in C# (SiyeFlow.Core)
+**TypeScript Generation**: Auto-generated from C# via SiyeFlow.Core.TypeGen
+**Profile Resolution**: Profile → Overrides → Runtime (documented in SCHEMA_DESIGN.md)
+**Port-Based**: True data-flow connections instead of simple success/failure paths
 
 ## Next Steps
 
-1. **Implement Log Block** - Useful for debugging and workflow visibility
-2. **Implement Delay Block** - Required for timing-based workflows
-3. **Enhance Variable Block** - Support nested variable substitution in objects
-4. **Implement remaining blocks**: Loop, Evaluate, Try-Catch, Collect, SubWorkflow
-
-## Conclusion
-
-The workflow system is now significantly more capable with Variable and Condition blocks implemented. All test workflows execute successfully, demonstrating:
-- ✅ Robust HTTP capabilities (GET, POST, JSONPath)
-- ✅ Variable management (set, get, delete)
-- ✅ Conditional branching logic
-- ✅ Input/output processing
-- ✅ Both local and external API integration
-
-The system is ready for real-world workflow automation scenarios!
+1. Implement remaining stub blocks (delay, loop, evaluate, try-catch)
+2. Add more complex port-based workflow examples
+3. Enhance visual designer with connection editing
+4. Add validation for port type compatibility

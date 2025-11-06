@@ -18,12 +18,36 @@ export interface VisualBlock {
     width: number;
     height: number;
     selected: boolean;
+    inputPorts?: VisualPort[];
+    outputPorts?: VisualPort[];
+}
+
+/**
+ * Visual representation of a port
+ */
+export interface VisualPort {
+    name: string;
+    type: string;
+    position: Position; // Relative to block
+    connected: boolean;
 }
 
 /**
  * Visual representation of a connection between blocks
  */
 export interface VisualConnection {
+    id: string;
+    sourceBlockId: string;
+    sourcePortName: string;
+    targetBlockId: string;
+    targetPortName: string;
+    path: string; // SVG path data
+}
+
+/**
+ * Legacy connection (for backward compatibility)
+ */
+export interface LegacyConnection {
     id: string;
     source: string;
     target: string;

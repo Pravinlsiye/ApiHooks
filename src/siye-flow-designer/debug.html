@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Renderer Debug</title>
+    <link rel="stylesheet" href="src/styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0d1117;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            color: #c9d1d9;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .debug-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        h1 {
+            color: #58a6ff;
+            margin: 0 0 20px 0;
+            flex-shrink: 0;
+        }
+        
+        #blocks-container {
+            flex: 1;
+            min-height: 300px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 20px;
+        }
+        
+        .block-wrapper {
+            display: inline-block;
+            margin: 0;
+        }
+        
+        .block-label {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #8b949e;
+            font-weight: 500;
+        }
+        
+        .test-output {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 250px;
+            overflow-y: auto;
+            background: #161b22;
+            border-top: 2px solid #30363d;
+            padding: 16px 20px;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
+        }
+        
+        .test-output h2 {
+            margin: 0 0 12px 0;
+            color: #58a6ff;
+            font-size: 16px;
+        }
+        
+        #debug-output {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .info-item {
+            padding: 6px 10px;
+            margin: 4px 0;
+            background: #0d1117;
+            border-radius: 4px;
+            border-left: 3px solid #30363d;
+        }
+        
+        .info-item.success {
+            color: #3fb950;
+            border-left-color: #3fb950;
+        }
+        
+        .info-item.error {
+            color: #f85149;
+            border-left-color: #f85149;
+        }
+        
+        .info-item.info {
+            color: #8b949e;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🔧 Block Renderer Debug Tool</h1>
+        
+        <div id="blocks-container"></div>
+        <div class="test-output">
+            <h2>Debug Output</h2>
+            <div id="debug-output">Initializing...</div>
+        </div>
+        
+    </div>
+    
+    <script type="module">
+        import { BlockRendererFactory } from './src/designer/renderers/BlockRendererFactory.ts';
+        import { BlockType } from './src/models/workflow-models.ts';
+        
+        const debugOutput = document.getElementById('debug-output');
+        const blocksContainer = document.getElementById('blocks-container');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `info-item ${type}`;
+            div.textContent = message;
+            debugOutput.appendChild(div);
+        }
+        
+        function clearLog() {
+            debugOutput.innerHTML = '';
+        }
+        
+        clearLog();
+        
+        // Test Start Block with Profiles
+        const testStartBlock = {
+            id: 'start1',
+            type: BlockType.Start,
+            name: 'Test Start Block',
+            description: 'Start block with profiles',
+            config: {
+                profiles: [
+                    {
+                        name: 'Development',
+                        description: 'Dev environment',
+                        default: true,
+                        inputs: {
+                            userName: { type: 'string', value: 'dev-user', description: 'User name' },
+                            maxItems: { type: 'number', value: 10, description: 'Max items' },
+                            includeDetails: { type: 'boolean', value: true, description: 'Include details' }
+                        }
+                    },
+                    {
+                        name: 'Production',
+                        description: 'Prod environment',
+                        inputs: {
+                            userName: { type: 'string', value: 'prod-user', description: 'User name' },
+                            maxItems: { type: 'number', value: 100, description: 'Max items' },
+                            includeDetails: { type: 'boolean', value: false, description: 'Include details' }
+                        }
+                    }
+                ],
+                selectedProfile: 'Development'
+            }
+        };
+        
+        const visualBlock = {
+            id: 'start1',
+            type: BlockType.Start,
+            position: { x: 0, y: 0 },
+            width: 280,
+            height: 200,
+            selected: false
+        };
+        
+        try {
+            log('Creating Start block renderer...', 'info');
+            const renderer = BlockRendererFactory.createRenderer(visualBlock, testStartBlock);
+            
+            log('Updating ports...', 'info');
+            renderer.updatePorts();
+            
+            log(`Input ports created: ${visualBlock.inputPorts?.length || 0}`, 'success');
+            if (visualBlock.inputPorts) {
+                visualBlock.inputPorts.forEach(port => {
+                    log(`  - ${port.name} (${port.type})`, 'info');
+                });
+            }
+            
+            log(`Output ports created: ${visualBlock.outputPorts?.length || 0}`, 'success');
+            if (visualBlock.outputPorts) {
+                visualBlock.outputPorts.forEach(port => {
+                    log(`  - ${port.name} (${port.type})`, 'info');
+                });
+            }
+            
+            log('Rendering block HTML...', 'info');
+            const html = renderer.render();
+            
+            // Create wrapper
+            const wrapper = document.createElement('div');
+            wrapper.className = 'block-wrapper';
+            
+            const label = document.createElement('div');
+            label.className = 'block-label';
+            label.textContent = 'Start Block with Profiles';
+            
+            const blockElement = document.createElement('div');
+            blockElement.className = `workflow-block block-type-${visualBlock.type}`;
+            blockElement.style.width = `${visualBlock.width}px`;
+            blockElement.innerHTML = html;
+            
+            wrapper.appendChild(label);
+            wrapper.appendChild(blockElement);
+            blocksContainer.appendChild(wrapper);
+            
+            log('✅ Block rendered successfully!', 'success');
+            
+            // Check if ports are actually rendered in the DOM
+            setTimeout(() => {
+                const dualRows = blockElement.querySelectorAll('.port-dual-row');
+                log(`Dual port rows found: ${dualRows.length}`, dualRows.length > 0 ? 'success' : 'error');
+                
+                const inputTabs = blockElement.querySelectorAll('.port-input-tab');
+                const outputTabs = blockElement.querySelectorAll('.port-output-tab');
+                log(`Input tabs: ${inputTabs.length}`, inputTabs.length > 0 ? 'success' : 'error');
+                log(`Output tabs: ${outputTabs.length}`, outputTabs.length > 0 ? 'success' : 'error');
+                
+                // Check port tabs
+                const portTabs = blockElement.querySelectorAll('.port-tab');
+                log(`Port tabs found: ${portTabs.length}`, portTabs.length > 0 ? 'success' : 'error');
+                
+                // Check port names and types
+                const portNames = blockElement.querySelectorAll('.port-name');
+                const portTypes = blockElement.querySelectorAll('.port-type');
+                log(`Port names: ${portNames.length}`, 'info');
+                log(`Port type indicators: ${portTypes.length}`, 'info');
+                
+                // Log each port details
+                dualRows.forEach((row, idx) => {
+                    const name = row.querySelector('.port-name')?.textContent;
+                    const type = row.querySelector('.port-type')?.textContent;
+                    log(`  Row ${idx + 1}: ${name} (${type})`, 'info');
+                });
+            }, 100);
+            
+        } catch (error) {
+            log(`❌ Error: ${error.message}`, 'error');
+            console.error(error);
+        }
+    </script>
+</body>
+</html>
+

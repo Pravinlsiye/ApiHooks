@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SiyeFlow.Core.Models
 {
@@ -57,6 +58,55 @@ namespace SiyeFlow.Core.Models
 
         [JsonProperty("onComplete")]
         public string? OnComplete { get; set; }
+
+        // New properties for port-based connections
+        [JsonProperty("inputPorts")]
+        public List<PortDefinition>? InputPorts { get; set; }
+
+        [JsonProperty("outputPorts")]
+        public List<PortDefinition>? OutputPorts { get; set; }
+
+        [JsonProperty("connections")]
+        public List<PortConnection>? Connections { get; set; }
+    }
+
+    /// <summary>
+    /// Port definition for block inputs/outputs
+    /// </summary>
+    public class PortDefinition
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonProperty("type")]
+        public string Type { get; set; } = "any";
+
+        [JsonProperty("description")]
+        public string? Description { get; set; }
+
+        [JsonProperty("required")]
+        public bool Required { get; set; }
+
+        [JsonProperty("multiple")]
+        public bool Multiple { get; set; } // Allow multiple connections to this port
+    }
+
+    /// <summary>
+    /// Connection between block ports
+    /// </summary>
+    public class PortConnection
+    {
+        [JsonProperty("fromBlock")]
+        public string FromBlock { get; set; } = string.Empty;
+
+        [JsonProperty("fromPort")]
+        public string FromPort { get; set; } = string.Empty;
+
+        [JsonProperty("toBlock")]
+        public string ToBlock { get; set; } = string.Empty;
+
+        [JsonProperty("toPort")]
+        public string ToPort { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -134,12 +184,69 @@ namespace SiyeFlow.Core.Models
 
         [JsonProperty("config")]
         public StartConfig Config { get; set; } = new();
+
+        public StartBlock()
+        {
+            // Start blocks typically don't have input ports
+            InputPorts = new List<PortDefinition>();
+            // Output ports will be dynamically generated based on inputs
+            OutputPorts = new List<PortDefinition>();
+        }
+
+        /// <summary>
+        /// Updates output ports based on configured inputs
+        /// </summary>
+        public void UpdateOutputPorts()
+        {
+            OutputPorts = new List<PortDefinition>();
+
+            // Get effective inputs from profiles or direct inputs
+            var effectiveInputs = GetEffectiveInputs();
+
+            foreach (var input in effectiveInputs)
+            {
+                OutputPorts.Add(new PortDefinition
+                {
+                    Name = input.Key,
+                    Type = input.Value.Type,
+                    Description = input.Value.Description,
+                    Multiple = true // Start block outputs can connect to multiple blocks
+                });
+            }
+        }
+
+        private Dictionary<string, InputDefinition> GetEffectiveInputs()
+        {
+            var result = new Dictionary<string, InputDefinition>();
+
+            // If using profiles
+            if (Config.Profiles != null && Config.Profiles.Any())
+            {
+                var selectedProfile = Config.Profiles.FirstOrDefault(p => p.Name == Config.SelectedProfile)
+                    ?? Config.Profiles.FirstOrDefault(p => p.Default)
+                    ?? Config.Profiles.First();
+
+                return selectedProfile.Inputs;
+            }
+
+            // Otherwise use direct inputs
+            return Config.Inputs ?? result;
+        }
     }
 
     public class StartConfig
     {
         [JsonProperty("inputs")]
         public Dictionary<string, InputDefinition>? Inputs { get; set; }
+        
+        [JsonProperty("profiles")]
+        public List<InputProfile>? Profiles { get; set; }
+        
+        [JsonProperty("selectedProfile")]
+        public string? SelectedProfile { get; set; }
+        
+        [JsonProperty("overrides")]
+        public Dictionary<string, object>? Overrides { get; set; }
     }
 
     public class InputDefinition
@@ -155,6 +262,24 @@ namespace SiyeFlow.Core.Models
 
         [JsonProperty("default")]
         public object? Default { get; set; }
+        
+        [JsonProperty("value")]
+        public object? Value { get; set; }
+    }
+    
+    public class InputProfile
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; } = string.Empty;
+        
+        [JsonProperty("description")]
+        public string? Description { get; set; }
+        
+        [JsonProperty("default")]
+        public bool Default { get; set; }
+        
+        [JsonProperty("inputs")]
+        public Dictionary<string, InputDefinition> Inputs { get; set; } = new();
     }
 
     /// <summary>

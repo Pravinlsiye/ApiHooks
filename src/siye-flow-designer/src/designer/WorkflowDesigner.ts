@@ -1,5 +1,5 @@
 import { WorkflowEngine } from '../core/WorkflowEngine';
-import { BlockType, AnyWorkflowBlock } from '../models/workflow-models';
+import { BlockType, AnyWorkflowBlock, StartBlock } from '../models/workflow-models';
 import { VisualBlock, VisualConnection, Position } from './VisualModels';
 import { CanvasRenderer } from './CanvasRenderer';
 import { PropertyPanel } from './PropertyPanel';
@@ -108,8 +108,20 @@ export class WorkflowDesigner {
             this.moveBlock(data.blockId, data.position);
         });
         
-        this.canvas.on('connectionCreate', (data: { source: string, target: string, type: string }) => {
-            this.createConnection(data.source, data.target, data.type);
+        this.canvas.on('connectionCreate', (data: { sourceBlockId: string, sourcePortName: string, targetBlockId: string, targetPortName: string }) => {
+            this.onConnectionCreated(data.sourceBlockId, data.targetBlockId, data.sourcePortName, data.targetPortName);
+        });
+        
+        this.canvas.on('profileChange', (data: { blockId: string, profile: string }) => {
+            this.onProfileChange(data.blockId, data.profile);
+        });
+        
+        this.canvas.on('connectionDelete', (data: { connectionId: string }) => {
+            this.onConnectionDeleted(data.connectionId);
+        });
+        
+        this.canvas.on('blockDelete', (data: { blockId: string }) => {
+            this.onBlockDeleted(data.blockId);
         });
         
         // Property panel events
@@ -207,28 +219,114 @@ export class WorkflowDesigner {
     /**
      * Create a connection between blocks
      */
-    private createConnection(sourceId: string, targetId: string, type: string): void {
+    private onConnectionCreated(sourceId: string, targetId: string, sourcePortName: string, targetPortName: string): void {
         const sourceBlock = this.engine.getBlock(sourceId);
         if (sourceBlock) {
-            if (type === 'success') {
-                sourceBlock.onSuccess = targetId;
-            } else if (type === 'failure') {
-                sourceBlock.onFailure = targetId;
-            } else {
-                sourceBlock.onComplete = targetId;
+            if (!sourceBlock.connections) {
+                sourceBlock.connections = [];
             }
             
-            const connectionId = `${sourceId}-${targetId}-${type}`;
+            // Remove any existing connection from this source port
+            sourceBlock.connections = sourceBlock.connections.filter(
+                conn => !(conn.fromBlock === sourceId && conn.fromPort === sourcePortName)
+            );
+            
+            // Add new connection
+            sourceBlock.connections.push({
+                fromBlock: sourceId,
+                fromPort: sourcePortName,
+                toBlock: targetId,
+                toPort: targetPortName
+            });
+            
+            const connectionId = `${sourceId}-${sourcePortName}-${targetId}-${targetPortName}`;
             const connection: VisualConnection = {
                 id: connectionId,
-                source: sourceId,
-                target: targetId,
-                type
+                sourceBlockId: sourceId,
+                sourcePortName: sourcePortName,
+                targetBlockId: targetId,
+                targetPortName: targetPortName,
+                path: ''
             };
             
             this.visualConnections.set(connectionId, connection);
             this.renderWorkflow();
         }
+    }
+    
+    /**
+     * Handle profile change for Start blocks
+     */
+    private onProfileChange(blockId: string, profileName: string): void {
+        const block = this.engine.getBlock(blockId);
+        if (block && block.type === BlockType.Start) {
+            const startBlock = block as StartBlock;
+            if (startBlock.config) {
+                startBlock.config.selectedProfile = profileName;
+                
+                // Re-render the workflow to update ports
+                this.renderWorkflow();
+                
+                // If this is the selected block, update property panel
+                if (this.selectedBlockId === blockId) {
+                    this.selectBlock(blockId);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle connection deletion
+     */
+    private onConnectionDeleted(connectionId: string): void {
+        // Remove from visual connections
+        this.visualConnections.delete(connectionId);
+        
+        // Remove from block's connections array
+        const connection = Array.from(this.visualConnections.values()).find(c => c.id === connectionId);
+        if (connection) {
+            const sourceBlock = this.engine.getBlock(connection.sourceBlockId);
+            if (sourceBlock && sourceBlock.connections) {
+                sourceBlock.connections = sourceBlock.connections.filter(
+                    conn => !(conn.fromBlock === connection.sourceBlockId && conn.fromPort === connection.sourcePortName)
+                );
+            }
+        }
+        
+        // Re-render
+        this.renderWorkflow();
+    }
+    
+    /**
+     * Handle block deletion
+     */
+    private onBlockDeleted(blockId: string): void {
+        // Remove the block from engine
+        this.engine.removeBlock(blockId);
+        
+        // Remove visual block
+        this.visualBlocks.delete(blockId);
+        
+        // Remove all connections involving this block
+        const connectionsToDelete: string[] = [];
+        this.visualConnections.forEach((connection, id) => {
+            if (connection.sourceBlockId === blockId || connection.targetBlockId === blockId) {
+                connectionsToDelete.push(id);
+            }
+        });
+        
+        connectionsToDelete.forEach(id => {
+            this.visualConnections.delete(id);
+        });
+        
+        // Clear selection if this was the selected block
+        if (this.selectedBlockId === blockId) {
+            this.selectedBlockId = null;
+            this.propertyPanel.clear();
+        }
+        
+        // Re-render
+        this.renderWorkflow();
     }
     
     /**
@@ -363,34 +461,57 @@ export class WorkflowDesigner {
         const blocks = this.engine.getBlocks();
         
         blocks.forEach(block => {
-            if (block.onSuccess) {
-                const connectionId = `${block.id}-${block.onSuccess}-success`;
-                this.visualConnections.set(connectionId, {
-                    id: connectionId,
-                    source: block.id,
-                    target: block.onSuccess,
-                    type: 'success'
+            // Handle port-based connections
+            if (block.connections && block.connections.length > 0) {
+                block.connections.forEach(conn => {
+                    const connectionId = `${conn.fromBlock}-${conn.fromPort}-${conn.toBlock}-${conn.toPort}`;
+                    this.visualConnections.set(connectionId, {
+                        id: connectionId,
+                        sourceBlockId: conn.fromBlock,
+                        sourcePortName: conn.fromPort,
+                        targetBlockId: conn.toBlock,
+                        targetPortName: conn.toPort,
+                        path: '' // Path will be calculated by renderer
+                    });
                 });
             }
-            
-            if (block.onFailure) {
-                const connectionId = `${block.id}-${block.onFailure}-failure`;
-                this.visualConnections.set(connectionId, {
-                    id: connectionId,
-                    source: block.id,
-                    target: block.onFailure,
-                    type: 'failure'
-                });
-            }
-            
-            if (block.onComplete) {
-                const connectionId = `${block.id}-${block.onComplete}-complete`;
-                this.visualConnections.set(connectionId, {
-                    id: connectionId,
-                    source: block.id,
-                    target: block.onComplete,
-                    type: 'complete'
-                });
+            // Fall back to legacy connections
+            else {
+                if (block.onSuccess) {
+                    const connectionId = `${block.id}-${block.onSuccess}-success`;
+                    this.visualConnections.set(connectionId, {
+                        id: connectionId,
+                        sourceBlockId: block.id,
+                        sourcePortName: 'onSuccess',
+                        targetBlockId: block.onSuccess,
+                        targetPortName: 'in',
+                        path: ''
+                    });
+                }
+                
+                if (block.onFailure) {
+                    const connectionId = `${block.id}-${block.onFailure}-failure`;
+                    this.visualConnections.set(connectionId, {
+                        id: connectionId,
+                        sourceBlockId: block.id,
+                        sourcePortName: 'onFailure',
+                        targetBlockId: block.onFailure,
+                        targetPortName: 'in',
+                        path: ''
+                    });
+                }
+                
+                if (block.onComplete) {
+                    const connectionId = `${block.id}-${block.onComplete}-complete`;
+                    this.visualConnections.set(connectionId, {
+                        id: connectionId,
+                        sourceBlockId: block.id,
+                        sourcePortName: 'onComplete',
+                        targetBlockId: block.onComplete,
+                        targetPortName: 'in',
+                        path: ''
+                    });
+                }
             }
         });
     }

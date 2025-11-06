@@ -183,8 +183,13 @@ body {
     cursor: move;
     user-select: none;
     transition: all 0.2s;
-    min-width: 220px;
-    max-width: 300px;
+    min-width: 320px;
+    max-width: 450px;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    pointer-events: all;
+    z-index: 10;
 }
 
 .workflow-block:hover {
@@ -202,6 +207,7 @@ body {
     align-items: flex-start;
     padding: 0.75rem;
     border-bottom: 1px solid #30363d;
+    position: relative;
 }
 
 .block-icon {
@@ -234,6 +240,34 @@ body {
     letter-spacing: 0.05em;
 }
 
+.block-delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    padding: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #8b949e;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    opacity: 0;
+}
+
+.workflow-block:hover .block-delete-btn {
+    opacity: 1;
+}
+
+.block-delete-btn:hover {
+    background: #da3633;
+    color: white;
+}
+
 .block-description {
     padding: 0.5rem 0.75rem;
     font-size: 0.8rem;
@@ -248,6 +282,138 @@ body {
 .block-ports {
     position: relative;
     height: 40px;
+}
+
+/* Port-based layout */
+.block-ports-area {
+    padding: 12px 16px;
+    min-height: 100px;
+}
+
+/* Dual port row (for Start block - input and output in same row) */
+.port-dual-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    margin: 4px 0;
+    min-height: 32px;
+}
+
+.port-input-tab,
+.port-output-tab {
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 10;
+    position: relative;
+}
+
+.port-input-tab {
+    margin-left: -18px;
+}
+
+.port-output-tab {
+    margin-right: -18px;
+}
+
+.port-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+}
+
+.port-name {
+    font-size: 0.85rem;
+    color: #c9d1d9;
+    user-select: none;
+    line-height: 1.4;
+    font-weight: 500;
+}
+
+.port-type {
+    font-size: 0.7rem;
+    color: #8b949e;
+    font-family: 'Courier New', monospace;
+    background: #0d1117;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.port-tab {
+    display: block;
+    width: 14px;
+    height: 22px;
+    background: #58a6ff;
+    border-radius: 11px;
+    transition: all 0.2s;
+    border: 1px solid #79c0ff;
+}
+
+.port-input-tab .port-tab {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: none;
+}
+
+.port-output-tab .port-tab {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+}
+
+.port-dual-row:hover .port-tab {
+    background: #79c0ff;
+    box-shadow: 0 0 6px rgba(88, 166, 255, 0.5);
+}
+
+.port-input-tab:hover .port-tab {
+    background: #f85149;
+    box-shadow: 0 0 6px rgba(248, 81, 73, 0.5);
+}
+
+/* Standard port rows (for other blocks with separate input/output) */
+.port-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    margin: 4px 0;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 32px;
+}
+
+.port-row:hover .port-name {
+    color: #c9d1d9;
+}
+
+.port-input {
+    justify-content: flex-start;
+}
+
+.port-output {
+    justify-content: flex-end;
+}
+
+.port-row .port-tab {
+    width: 10px;
+    height: 18px;
+}
+
+.port-row.port-input .port-tab {
+    margin-left: -14px;
+    margin-right: 8px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.port-row.port-output .port-tab {
+    margin-right: -14px;
+    margin-left: 8px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
 }
 
 /* Block type specific styles */
@@ -315,30 +481,19 @@ body {
 
 /* Connections */
 .connection {
-    stroke: #30363d;
-    stroke-width: 2;
+    stroke-width: 2.5;
     fill: none;
+    pointer-events: none;
 }
 
-.connection.success {
-    stroke: #238636;
-}
-
-.connection.failure {
-    stroke: #da3633;
-}
-
-.connection.complete {
+.connection-line {
     stroke: #58a6ff;
 }
 
 .connection.temp-connection {
     stroke: #58a6ff;
-    opacity: 0.5;
-}
-
-#arrowhead polygon {
-    fill: #30363d;
+    opacity: 0.6;
+    stroke-dasharray: 8, 4;
 }
 
 /* Property panel */
@@ -409,4 +564,107 @@ body {
     color: #8b949e;
     font-style: italic;
     margin-top: 2rem;
+}
+
+/* Profile selector styles */
+.profile-selector {
+    width: 100%;
+}
+
+.no-profiles,
+.no-profile-selected {
+    color: #8b949e;
+    font-style: italic;
+    font-size: 0.875rem;
+    margin: 0.5rem 0;
+}
+
+.profile-inputs {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.profile-inputs h5 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    color: #58a6ff;
+}
+
+.profile-description {
+    font-size: 0.875rem;
+    color: #8b949e;
+    margin-bottom: 0.75rem;
+}
+
+.profile-inputs-table {
+    width: 100%;
+    font-size: 0.875rem;
+    border-collapse: collapse;
+}
+
+.profile-inputs-table thead {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.profile-inputs-table th,
+.profile-inputs-table td {
+    padding: 0.5rem;
+    text-align: left;
+    border: 1px solid #30363d;
+}
+
+.profile-inputs-table th {
+    font-weight: 600;
+    color: #8b949e;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.profile-inputs-table td {
+    color: #c9d1d9;
+}
+
+.profile-inputs-table code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.125rem 0.25rem;
+    border-radius: 3px;
+    font-size: 0.875rem;
+}
+
+/* Profile Selector for Start Block */
+.workflow-block .profile-selector {
+    padding: 8px 12px;
+    border-bottom: 1px solid #30363d;
+    background: rgba(48, 54, 61, 0.2);
+}
+
+.workflow-block .profile-dropdown {
+    width: 100%;
+    padding: 6px 10px;
+    background: #0d1117;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.workflow-block .profile-dropdown:hover {
+    border-color: #58a6ff;
+}
+
+.workflow-block .profile-dropdown:focus {
+    outline: none;
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+}
+
+.workflow-block .profile-dropdown option {
+    background: #0d1117;
+    color: #c9d1d9;
 }

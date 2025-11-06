@@ -105,6 +105,26 @@ export class PropertyPanel extends SimpleEventEmitter {
         const config = this.currentBlock.config as any;
         
         switch (this.currentBlock.type) {
+            case BlockType.Start:
+                html += `
+                    <div class="property-group">
+                        <label>Profiles</label>
+                        ${this.renderProfileSelector()}
+                    </div>
+                    
+                    <div class="property-group">
+                        <label>Profile Details</label>
+                        ${this.renderProfileDetails()}
+                    </div>
+                    
+                    <div class="property-group">
+                        <label>Overrides (JSON)</label>
+                        <textarea rows="3" data-property="config.overrides" 
+                                  data-type="json">${JSON.stringify(config?.overrides || {}, null, 2)}</textarea>
+                    </div>
+                `;
+                break;
+                
             case BlockType.HttpRequest:
                 html += `
                     <div class="property-group">
@@ -239,6 +259,76 @@ export class PropertyPanel extends SimpleEventEmitter {
     }
     
     /**
+     * Render profile selector dropdown for Start block
+     */
+    private renderProfileSelector(): string {
+        const config = (this.currentBlock as any)?.config;
+        const profiles = config?.profiles || [];
+        const selectedProfile = config?.selectedProfile || '';
+        
+        if (profiles.length === 0) {
+            return '<p class="no-profiles">No profiles defined. Add profiles in JSON view.</p>';
+        }
+        
+        let html = `<select data-property="config.selectedProfile" class="profile-selector">`;
+        html += `<option value="">-- Select Profile --</option>`;
+        
+        profiles.forEach((profile: any) => {
+            const selected = profile.name === selectedProfile ? 'selected' : '';
+            const defaultBadge = profile.default ? ' (default)' : '';
+            html += `<option value="${profile.name}" ${selected}>${profile.name}${defaultBadge}</option>`;
+        });
+        
+        html += `</select>`;
+        return html;
+    }
+    
+    /**
+     * Render profile details for the selected profile
+     */
+    private renderProfileDetails(): string {
+        const config = (this.currentBlock as any)?.config;
+        const profiles = config?.profiles || [];
+        const selectedProfileName = config?.selectedProfile || '';
+        
+        const selectedProfile = profiles.find((p: any) => p.name === selectedProfileName);
+        
+        if (!selectedProfile) {
+            return '<p class="no-profile-selected">Select a profile to view its inputs</p>';
+        }
+        
+        let html = '<div class="profile-inputs">';
+        html += `<h5>${selectedProfile.name}</h5>`;
+        
+        if (selectedProfile.description) {
+            html += `<p class="profile-description">${selectedProfile.description}</p>`;
+        }
+        
+        if (selectedProfile.inputs && Object.keys(selectedProfile.inputs).length > 0) {
+            html += '<table class="profile-inputs-table">';
+            html += '<thead><tr><th>Input</th><th>Type</th><th>Value</th><th>Required</th></tr></thead>';
+            html += '<tbody>';
+            
+            for (const [key, input] of Object.entries(selectedProfile.inputs)) {
+                const inputDef = input as any;
+                html += '<tr>';
+                html += `<td>${key}</td>`;
+                html += `<td>${inputDef.type || 'string'}</td>`;
+                html += `<td><code>${inputDef.value || inputDef.default || ''}</code></td>`;
+                html += `<td>${inputDef.required ? '✓' : ''}</td>`;
+                html += '</tr>';
+            }
+            
+            html += '</tbody></table>';
+        } else {
+            html += '<p>No inputs defined for this profile</p>';
+        }
+        
+        html += '</div>';
+        return html;
+    }
+    
+    /**
      * Setup event handlers for property inputs
      */
     private setupPropertyHandlers(): void {
@@ -275,6 +365,18 @@ export class PropertyPanel extends SimpleEventEmitter {
                 console.warn('Invalid JSON:', value);
                 return;
             }
+        }
+        
+        // Special handling for profile selection changes
+        if (property === 'config.selectedProfile') {
+            // Update the property directly
+            if (this.currentBlock && (this.currentBlock as any).config) {
+                (this.currentBlock as any).config.selectedProfile = value;
+            }
+            this.emit('blockUpdated', this.currentBlock.id, { ...this.currentBlock });
+            // Re-render to show updated profile details
+            this.renderProperties();
+            return;
         }
         
         // Parse number properties

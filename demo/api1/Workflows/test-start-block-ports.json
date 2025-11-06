@@ -1,0 +1,188 @@
+{
+  "name": "Test Start Block with Profiles and Ports",
+  "description": "Demonstrates the enhanced Start block with profile selector and input/output ports",
+  "version": "1.0",
+  "blocks": [
+    {
+      "id": "start1",
+      "type": "start",
+      "name": "API Configuration",
+      "description": "Start block with profiles and port-based connections",
+      "config": {
+        "profiles": [
+          {
+            "name": "Development",
+            "description": "Local development settings",
+            "default": true,
+            "inputs": {
+              "apiUrl": {
+                "type": "string",
+                "value": "http://localhost:5216",
+                "required": true,
+                "description": "API base URL"
+              },
+              "userId": {
+                "type": "string",
+                "value": "dev-user",
+                "required": true,
+                "description": "User ID for API calls"
+              },
+              "timeout": {
+                "type": "number",
+                "value": 5000,
+                "description": "Request timeout in milliseconds"
+              }
+            }
+          },
+          {
+            "name": "Production",
+            "description": "Production environment settings",
+            "inputs": {
+              "apiUrl": {
+                "type": "string",
+                "value": "https://api.example.com",
+                "required": true,
+                "description": "API base URL"
+              },
+              "userId": {
+                "type": "string",
+                "value": "prod-user",
+                "required": true,
+                "description": "User ID for API calls"
+              },
+              "timeout": {
+                "type": "number",
+                "value": 30000,
+                "description": "Request timeout in milliseconds"
+              }
+            }
+          }
+        ],
+        "selectedProfile": "Development"
+      },
+      "connections": [
+        {
+          "fromBlock": "start1",
+          "fromPort": "apiUrl",
+          "toBlock": "http1",
+          "toPort": "url"
+        },
+        {
+          "fromBlock": "start1",
+          "fromPort": "userId",
+          "toBlock": "http1",
+          "toPort": "userId"
+        },
+        {
+          "fromBlock": "start1",
+          "fromPort": "timeout",
+          "toBlock": "log1",
+          "toPort": "timeout"
+        },
+        {
+          "fromBlock": "start1",
+          "fromPort": "apiUrl",
+          "toBlock": "log1",
+          "toPort": "apiUrl"
+        }
+      ]
+    },
+    {
+      "id": "http1",
+      "type": "http-request",
+      "name": "Get User Data",
+      "description": "Fetch user information from API",
+      "config": {
+        "method": "GET",
+        "url": "{{url}}/api/users/{{userId}}",
+        "headers": {
+          "Accept": "application/json"
+        }
+      },
+      "inputPorts": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "response",
+          "type": "object"
+        }
+      ],
+      "outputs": {
+        "userData": "$"
+      },
+      "connections": [
+        {
+          "fromBlock": "http1",
+          "fromPort": "response",
+          "toBlock": "log2",
+          "toPort": "data"
+        }
+      ]
+    },
+    {
+      "id": "log1",
+      "type": "log",
+      "name": "Log Configuration",
+      "config": {
+        "message": "Using API: {{apiUrl}} with timeout: {{timeout}}ms"
+      },
+      "inputPorts": [
+        {
+          "name": "apiUrl",
+          "type": "string"
+        },
+        {
+          "name": "timeout",
+          "type": "number"
+        }
+      ]
+    },
+    {
+      "id": "log2",
+      "type": "log",
+      "name": "Log Response",
+      "config": {
+        "message": "User data received: {{data}}"
+      },
+      "inputPorts": [
+        {
+          "name": "data",
+          "type": "object"
+        }
+      ],
+      "connections": [
+        {
+          "fromBlock": "log2",
+          "fromPort": "complete",
+          "toBlock": "end1",
+          "toPort": "in"
+        }
+      ]
+    },
+    {
+      "id": "end1",
+      "type": "end",
+      "name": "Complete",
+      "inputPorts": [
+        {
+          "name": "in",
+          "type": "any",
+          "multiple": true
+        }
+      ],
+      "outputs": {
+        "result": "{{userData}}"
+      }
+    }
+  ]
+}
