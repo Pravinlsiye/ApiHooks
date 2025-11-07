@@ -82,8 +82,55 @@ body {
     font-size: 1.125rem;
 }
 
+/* Palette Tabs */
+.palette-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #30363d;
+}
+
+.palette-tab {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #8b949e;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: -2px;
+}
+
+.palette-tab:hover {
+    color: #c9d1d9;
+    background: rgba(48, 54, 61, 0.3);
+}
+
+.palette-tab.active {
+    color: #58a6ff;
+    border-bottom-color: #58a6ff;
+}
+
+.palette-tab-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
 .search-container {
     margin-bottom: 1rem;
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .search-input {
@@ -138,6 +185,164 @@ body {
 .block-template .icon {
     font-size: 1.5rem;
     margin-right: 0.75rem;
+}
+
+/* API Definition Divider */
+.api-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0;
+    margin: 8px 0;
+}
+
+.divider-line {
+    flex: 1;
+    height: 1px;
+    background: #30363d;
+}
+
+.divider-text {
+    color: #58a6ff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.btn-remove-api {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #da3633;
+    border: none;
+    color: white;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.btn-remove-api:hover {
+    background: #f85149;
+    transform: scale(1.1);
+}
+
+.btn-add-api {
+    margin-left: 8px;
+    padding: 6px 12px;
+    background: #238636;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+}
+
+.btn-add-api:hover {
+    background: #2ea043;
+}
+
+.btn-add-api svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* API Endpoint Blocks */
+.api-endpoint {
+    background: rgba(33, 150, 243, 0.05);
+}
+
+.api-endpoint:hover {
+    background: rgba(33, 150, 243, 0.1);
+}
+
+.method-badge {
+    min-width: 45px;
+    text-align: center;
+}
+
+/* API Sections */
+.api-section {
+    margin-bottom: 24px;
+}
+
+.api-section.locked .api-header {
+    background: rgba(88, 166, 255, 0.1);
+    border-color: rgba(88, 166, 255, 0.3);
+}
+
+.api-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px 6px 0 0;
+    margin-bottom: 8px;
+}
+
+.api-name {
+    flex: 1;
+    color: #58a6ff;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.lock-icon {
+    margin-left: 8px;
+    font-size: 0.85rem;
+}
+
+.api-version {
+    font-size: 0.75rem;
+    color: #8b949e;
+    background: #0d1117;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.api-endpoints {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.btn-load-api {
+    padding: 10px 20px;
+    background: #238636;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    margin: 0 auto;
+    display: block;
+    transition: background 0.2s;
+}
+
+.btn-load-api:hover {
+    background: #2ea043;
+}
+
+.add-more-apis {
+    text-align: center;
+    padding: 16px;
+    border-top: 1px solid #30363d;
+    margin-top: 16px;
 }
 
 .block-info {

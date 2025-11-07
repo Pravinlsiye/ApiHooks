@@ -28,5 +28,10 @@
   <ItemGroup>
     <EmbeddedResource Include="UI\**\*" />
   </ItemGroup>
+  
+  <Target Name="BuildDesigner" BeforeTargets="PreBuildEvent">
+    <Message Text="Building SiyeFlow Designer..." Importance="high" />
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(ProjectDir)build-designer.ps1&quot;" />
+  </Target>
 
 </Project>

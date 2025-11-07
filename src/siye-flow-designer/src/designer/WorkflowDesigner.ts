@@ -4,6 +4,8 @@ import { VisualBlock, VisualConnection, Position } from './VisualModels';
 import { CanvasRenderer } from './CanvasRenderer';
 import { PropertyPanel } from './PropertyPanel';
 import { BlockPalette } from './BlockPalette';
+import { ApiDefinitionLoader } from '../api/ApiDefinitionLoader';
+import { DesignerConfig, DEFAULT_CONFIG } from './DesignerConfig';
 
 /**
  * Main workflow designer class that manages the visual design experience
@@ -11,6 +13,7 @@ import { BlockPalette } from './BlockPalette';
  */
 export class WorkflowDesigner {
     private container: HTMLElement;
+    private config: DesignerConfig;
     private engine: WorkflowEngine;
     private canvas!: CanvasRenderer;
     private propertyPanel!: PropertyPanel;
@@ -27,19 +30,50 @@ export class WorkflowDesigner {
         return this.selectedBlockId;
     }
     
-    constructor(containerId: string) {
+    constructor(containerId: string, config?: DesignerConfig) {
         const element = document.getElementById(containerId);
         if (!element) {
             throw new Error(`Container element '${containerId}' not found`);
         }
         
         this.container = element;
+        this.config = config || DEFAULT_CONFIG;
         this.engine = new WorkflowEngine();
         this.visualBlocks = new Map();
         this.visualConnections = new Map();
         
         this.setupUI();
         this.initializeDefaultWorkflow();
+        
+        // Load host APIs if in embedded mode (async, doesn't block initialization)
+        this.loadHostApis();
+    }
+    
+    /**
+     * Load host APIs in embedded mode
+     */
+    private async loadHostApis(): Promise<void> {
+        if (this.config.mode !== 'embedded' || !this.config.hostApis || this.config.hostApis.length === 0) {
+            return;
+        }
+        
+        console.log(`[Embedded Mode] Loading ${this.config.hostApis.length} host API(s)...`);
+        
+        for (const hostApi of this.config.hostApis) {
+            try {
+                const api = await ApiDefinitionLoader.loadFromUrl(hostApi.swaggerUrl);
+                api.name = hostApi.name || api.name;
+                if (hostApi.version) {
+                    api.version = hostApi.version;
+                }
+                
+                // Add as locked (cannot be removed)
+                this.blockPalette.addApiDefinition(api, true);
+                console.log(`✓ Loaded host API: ${api.name} (${api.endpoints.length} endpoints)`);
+            } catch (error) {
+                console.error(`✗ Failed to load host API ${hostApi.name}:`, error);
+            }
+        }
     }
     
     /**
@@ -89,6 +123,10 @@ export class WorkflowDesigner {
         this.blockPalette.on('blockDragStart', (type: BlockType) => {
             // Store the block type being dragged
             (window as any).__draggedBlockType = type;
+        });
+        
+        this.blockPalette.on('loadApiDefinition', async (data: { url: string }) => {
+            await this.loadApiDefinition(data.url);
         });
         
         // Canvas events
@@ -417,6 +455,19 @@ export class WorkflowDesigner {
             this.visualConnections.clear();
             this.selectedBlockId = null;
             this.initializeDefaultWorkflow();
+        }
+    }
+    
+    /**
+     * Load API definition from URL
+     */
+    private async loadApiDefinition(url: string): Promise<void> {
+        try {
+            const api = await ApiDefinitionLoader.loadFromUrl(url);
+            this.blockPalette.addApiDefinition(api);
+            alert(`Loaded ${api.endpoints.length} endpoints from ${api.name}`);
+        } catch (error: any) {
+            alert(`Failed to load API definition:\n${error.message}`);
         }
     }
     
