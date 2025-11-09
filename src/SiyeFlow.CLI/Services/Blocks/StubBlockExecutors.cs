@@ -61,22 +61,6 @@ namespace SiyeFlow.CLI.Services.Blocks
         }
     }
 
-    public class EvaluateBlockExecutor : BlockExecutorBase
-    {
-        public EvaluateBlockExecutor(ILogger<EvaluateBlockExecutor> logger, IVariableStore variableStore, IConsoleWriter console) 
-            : base(logger, variableStore, console) { }
-        public override BlockType BlockType => BlockType.Evaluate;
-        protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
-        {
-            _console.Warning($"Evaluate block not yet implemented");
-            return Task.FromResult(new BlockExecutionResult { Success = true });
-        }
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
-        {
-            return Task.FromResult(new ValidationResult { IsValid = true });
-        }
-    }
-
     public class TryCatchBlockExecutor : BlockExecutorBase
     {
         public TryCatchBlockExecutor(ILogger<TryCatchBlockExecutor> logger, IVariableStore variableStore, IConsoleWriter console) 

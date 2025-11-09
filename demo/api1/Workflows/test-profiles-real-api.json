@@ -70,8 +70,7 @@
           "toBlock": "http1",
           "toPort": "resourcePath"
         }
-      ],
-      "onSuccess": "http1"
+      ]
     },
     {
       "id": "http1",
@@ -110,8 +109,7 @@
           "toBlock": "end1",
           "toPort": "data"
         }
-      ],
-      "onSuccess": "end1"
+      ]
     },
     {
       "id": "end1",

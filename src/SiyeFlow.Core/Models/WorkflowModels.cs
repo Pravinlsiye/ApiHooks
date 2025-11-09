@@ -50,16 +50,7 @@ namespace SiyeFlow.Core.Models
         [JsonProperty("outputs")]
         public Dictionary<string, string>? Outputs { get; set; }
 
-        [JsonProperty("onSuccess")]
-        public string? OnSuccess { get; set; }
-
-        [JsonProperty("onFailure")]
-        public string? OnFailure { get; set; }
-
-        [JsonProperty("onComplete")]
-        public string? OnComplete { get; set; }
-
-        // New properties for port-based connections
+        // Port-based connections
         [JsonProperty("inputPorts")]
         public List<PortDefinition>? InputPorts { get; set; }
 

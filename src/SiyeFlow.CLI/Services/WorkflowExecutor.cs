@@ -59,13 +59,10 @@ namespace SiyeFlow.CLI.Services
                 Variables = new Dictionary<string, object>()
             };
 
-            // Set initial inputs in context
+                // Set initial workflow inputs
             if (inputs != null)
             {
-                foreach (var input in inputs)
-                {
-                    context.Variables[$"inputs.{input.Key}"] = input.Value;
-                }
+                context.WorkflowInputs = new Dictionary<string, object>(inputs);
             }
 
             try
@@ -97,22 +94,24 @@ namespace SiyeFlow.CLI.Services
                     throw new InvalidOperationException("Workflow must have a Start block");
                 }
 
-                // Execute workflow
-                var currentBlockId = startBlock.Id;
+                // Execute workflow using port-based connections
+                var blocksToExecute = new Queue<string>();
+                blocksToExecute.Enqueue(startBlock.Id);
                 var executedBlocks = new HashSet<string>();
                 
-                while (!string.IsNullOrEmpty(currentBlockId))
+                while (blocksToExecute.Count > 0)
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
                         throw new OperationCanceledException();
                     }
 
-                    // Prevent infinite loops
+                    var currentBlockId = blocksToExecute.Dequeue();
+                    
+                    // Skip if already executed
                     if (executedBlocks.Contains(currentBlockId))
                     {
-                        _console.Warning($"Detected potential infinite loop at block {currentBlockId}");
-                        break;
+                        continue;
                     }
                     executedBlocks.Add(currentBlockId);
 
@@ -133,9 +132,29 @@ namespace SiyeFlow.CLI.Services
                     // Update context
                     context.ExecutionPath.Add(block.Id);
 
+                    // Prepare inputs from port connections
+                    var blockInputs = PrepareBlockInputs(block, workflow, context);
+                    
+                    // Store in context for block executor to use
+                    context.BlockInputs = blockInputs;
+
                     // Execute block
                     _logger.LogDebug("Executing block {BlockId} ({BlockType})", block.Id, block.Type);
                     var blockResult = await executor.ExecuteAsync(block, context, cancellationToken);
+
+                    // Store outputs by port
+                    if (blockResult.Outputs != null)
+                    {
+                        StoreBlockOutputs(block, blockResult.Outputs, context);
+                        
+                        // If this is an End block, capture outputs
+                        if (block.Type == BlockType.End)
+                        {
+                            result.Outputs = blockResult.Outputs;
+                            result.Success = blockResult.Success;
+                            break;
+                        }
+                    }
 
                     // Record execution
                     var record = new BlockExecutionRecord
@@ -146,36 +165,49 @@ namespace SiyeFlow.CLI.Services
                         Success = blockResult.Success,
                         StartedAt = DateTime.UtcNow.Subtract(blockResult.Duration),
                         CompletedAt = DateTime.UtcNow,
-                        Inputs = block.Inputs?.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value),
+                        Inputs = blockInputs,
                         Outputs = blockResult.Outputs,
                         Error = blockResult.Error
                     };
                     result.ExecutionPath.Add(record);
 
-                    // Process outputs
-                    if (blockResult.Outputs != null)
+                    // Check if block has failure outputs (e.g., from Evaluate block)
+                    // Even if Success=true, check for failure port outputs
+                    if (blockResult.Outputs != null && blockResult.Outputs.ContainsKey("failure"))
                     {
-                        foreach (var output in blockResult.Outputs)
+                        // Block produced failure output - check if there's a failure handler
+                        var hasFailureConnection = block.Connections?.Any(c => 
+                            c.FromPort == "failure" || c.FromPort == "error") ?? false;
+                        
+                        if (!hasFailureConnection)
                         {
-                            context.Variables[$"{block.Id}.{output.Key}"] = output.Value;
+                            // No failure handler - stop workflow
+                            result.Success = false;
+                            result.Error = blockResult.Error ?? blockResult.Outputs.GetValueOrDefault("errorMessage")?.ToString() ?? "Evaluation failed";
+                            break;
                         }
-
-                        // If this is an End block, capture outputs
-                        if (block.Type == BlockType.End)
+                        else
                         {
-                            result.Outputs = blockResult.Outputs;
+                            _console.Info($"Block {block.Id} has failure output but failure port connection exists - routing to error handler");
                         }
                     }
-
-                    // Determine next block
-                    currentBlockId = blockResult.NextBlockId;
-
-                    // If execution failed and no failure path, stop
-                    if (!blockResult.Success && string.IsNullOrEmpty(currentBlockId))
+                    // Check if block failed without failure port outputs (legacy failure)
+                    else if (!blockResult.Success)
                     {
+                        // Traditional failure - stop workflow
                         result.Success = false;
                         result.Error = blockResult.Error ?? "Workflow failed";
                         break;
+                    }
+
+                    // Queue next blocks from port connections
+                    var nextBlocks = GetConnectedBlocks(block, workflow, context);
+                    foreach (var nextBlockId in nextBlocks)
+                    {
+                        if (!executedBlocks.Contains(nextBlockId))
+                        {
+                            blocksToExecute.Enqueue(nextBlockId);
+                        }
                     }
                 }
 
@@ -362,71 +394,151 @@ namespace SiyeFlow.CLI.Services
             return await ExecuteAsync(workflow, apiDocument, inputs, dryRun, cancellationToken);
         }
 
+        /// <summary>
+        /// Prepares inputs for a block based on port connections
+        /// </summary>
+        private Dictionary<string, object> PrepareBlockInputs(
+            WorkflowBlock block,
+            WorkflowDefinition workflow,
+            Interfaces.ExecutionContext context)
+        {
+            var inputs = new Dictionary<string, object>();
+            
+            // Find all connections TO this block
+            var incomingConnections = workflow.Blocks
+                .SelectMany(b => b.Connections ?? new List<PortConnection>())
+                .Where(c => c.ToBlock == block.Id)
+                .ToList();
+            
+            foreach (var connection in incomingConnections)
+            {
+                // Get value from source block's output port
+                if (context.BlockOutputs.TryGetValue(connection.FromBlock, out var sourceOutputs))
+                {
+                    if (sourceOutputs.TryGetValue(connection.FromPort, out var value))
+                    {
+                        // Map to target block's input port
+                        inputs[connection.ToPort] = value;
+                    }
+                }
+            }
+            
+            return inputs;
+        }
+
+        /// <summary>
+        /// Stores block outputs by port name
+        /// </summary>
+        private void StoreBlockOutputs(
+            WorkflowBlock block,
+            Dictionary<string, object> outputs,
+            Interfaces.ExecutionContext context)
+        {
+            if (!context.BlockOutputs.ContainsKey(block.Id))
+            {
+                context.BlockOutputs[block.Id] = new Dictionary<string, object>();
+            }
+            
+            foreach (var output in outputs)
+            {
+                context.BlockOutputs[block.Id][output.Key] = output.Value;
+            }
+        }
+
+        /// <summary>
+        /// Gets blocks connected to this block via port connections
+        /// Only returns blocks connected to ports that have outputs
+        /// </summary>
+        private List<string> GetConnectedBlocks(
+            WorkflowBlock block,
+            WorkflowDefinition workflow,
+            Interfaces.ExecutionContext context)
+        {
+            var nextBlocks = new List<string>();
+            
+            // Get blocks this block connects to via ports
+            if (block.Connections != null)
+            {
+                // Get outputs for this block
+                var blockOutputs = context.BlockOutputs.TryGetValue(block.Id, out var outputs) 
+                    ? outputs 
+                    : new Dictionary<string, object>();
+                
+                // Only follow connections from ports that have outputs
+                foreach (var connection in block.Connections)
+                {
+                    if (blockOutputs.ContainsKey(connection.FromPort))
+                    {
+                        nextBlocks.Add(connection.ToBlock);
+                    }
+                }
+            }
+            
+            return nextBlocks.Distinct().ToList();
+        }
+
         private void ValidateBlockConnections(WorkflowBlock block, List<WorkflowBlock> allBlocks, WorkflowValidationResult result)
         {
             var validBlockIds = allBlocks.Select(b => b.Id).ToHashSet();
 
-            // Check onSuccess
-            if (!string.IsNullOrEmpty(block.OnSuccess) && !validBlockIds.Contains(block.OnSuccess))
+            // Validate port-based connections
+            if (block.Connections != null)
             {
-                result.IsValid = false;
-                result.Errors.Add(new ValidationError
+                foreach (var connection in block.Connections)
                 {
-                    Code = "INVALID_CONNECTION",
-                    Message = $"Block {block.Id} has invalid onSuccess reference: {block.OnSuccess}",
-                    BlockId = block.Id
-                });
-            }
-
-            // Check onFailure
-            if (!string.IsNullOrEmpty(block.OnFailure) && !validBlockIds.Contains(block.OnFailure))
-            {
-                result.IsValid = false;
-                result.Errors.Add(new ValidationError
-                {
-                    Code = "INVALID_CONNECTION",
-                    Message = $"Block {block.Id} has invalid onFailure reference: {block.OnFailure}",
-                    BlockId = block.Id
-                });
-            }
-
-            // Check onComplete
-            if (!string.IsNullOrEmpty(block.OnComplete) && !validBlockIds.Contains(block.OnComplete))
-            {
-                result.IsValid = false;
-                result.Errors.Add(new ValidationError
-                {
-                    Code = "INVALID_CONNECTION",
-                    Message = $"Block {block.Id} has invalid onComplete reference: {block.OnComplete}",
-                    BlockId = block.Id
-                });
-            }
-
-            // Check type-specific connections
-            if (block is ConditionBlock condBlock)
-            {
-                if (!string.IsNullOrEmpty(condBlock.Config.OnTrue) && 
-                    !validBlockIds.Contains(condBlock.Config.OnTrue))
-                {
-                    result.IsValid = false;
-                    result.Errors.Add(new ValidationError
+                    // Validate from block exists
+                    if (!validBlockIds.Contains(connection.FromBlock))
                     {
-                        Code = "INVALID_CONNECTION",
-                        Message = $"Condition block {block.Id} has invalid true branch: {condBlock.Config.OnTrue}",
-                        BlockId = block.Id
-                    });
-                }
+                        result.IsValid = false;
+                        result.Errors.Add(new ValidationError
+                        {
+                            Code = "INVALID_CONNECTION",
+                            Message = $"Block {block.Id} has connection from invalid block: {connection.FromBlock}",
+                            BlockId = block.Id
+                        });
+                    }
 
-                if (!string.IsNullOrEmpty(condBlock.Config.OnFalse) && 
-                    !validBlockIds.Contains(condBlock.Config.OnFalse))
-                {
-                    result.IsValid = false;
-                    result.Errors.Add(new ValidationError
+                    // Validate to block exists
+                    if (!validBlockIds.Contains(connection.ToBlock))
                     {
-                        Code = "INVALID_CONNECTION",
-                        Message = $"Condition block {block.Id} has invalid false branch: {condBlock.Config.OnFalse}",
-                        BlockId = block.Id
-                    });
+                        result.IsValid = false;
+                        result.Errors.Add(new ValidationError
+                        {
+                            Code = "INVALID_CONNECTION",
+                            Message = $"Block {block.Id} has connection to invalid block: {connection.ToBlock}",
+                            BlockId = block.Id
+                        });
+                    }
+
+                    // Validate from port exists on source block
+                    var fromBlock = allBlocks.FirstOrDefault(b => b.Id == connection.FromBlock);
+                    if (fromBlock != null && fromBlock.OutputPorts != null)
+                    {
+                        if (!fromBlock.OutputPorts.Any(p => p.Name == connection.FromPort))
+                        {
+                            result.Warnings.Add(new ValidationWarning
+                            {
+                                Code = "INVALID_PORT",
+                                Message = $"Connection from {connection.FromBlock}.{connection.FromPort} references non-existent output port",
+                                BlockId = block.Id
+                            });
+                        }
+                    }
+
+                    // Validate to port exists on target block
+                    var toBlock = allBlocks.FirstOrDefault(b => b.Id == connection.ToBlock);
+                    if (toBlock != null && toBlock.InputPorts != null)
+                    {
+                        if (!toBlock.InputPorts.Any(p => p.Name == connection.ToPort))
+                        {
+                            result.Warnings.Add(new ValidationWarning
+                            {
+                                Code = "INVALID_PORT",
+                                Message = $"Connection to {connection.ToBlock}.{connection.ToPort} references non-existent input port",
+                                BlockId = block.Id
+                            });
+                        }
+                    }
                 }
             }
         }

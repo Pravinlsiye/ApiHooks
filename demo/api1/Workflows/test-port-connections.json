@@ -15,11 +15,6 @@
             "required": true,
             "description": "API endpoint URL"
           },
-          "userId": {
-            "type": "string",
-            "value": "123",
-            "description": "User ID"
-          },
           "timeout": {
             "type": "number",
             "value": 5000,
@@ -34,11 +29,6 @@
           "multiple": true
         },
         {
-          "name": "userId",
-          "type": "string",
-          "multiple": true
-        },
-        {
           "name": "timeout",
           "type": "number",
           "multiple": true
@@ -48,14 +38,53 @@
         {
           "fromBlock": "start1",
           "fromPort": "apiUrl",
-          "toBlock": "http1",
+          "toBlock": "http0",
           "toPort": "url"
+        }
+      ]
+    },
+    {
+      "id": "http0",
+      "type": "http-request",
+      "name": "Get Projects List",
+      "config": {
+        "method": "GET",
+        "url": "{{url}}/api/projects"
+      },
+      "inputPorts": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "response",
+          "type": "array",
+          "description": "List of projects"
+        },
+        {
+          "name": "firstProjectId",
+          "type": "string",
+          "description": "ID of the first project"
+        }
+      ],
+      "outputs": {
+        "firstProjectId": "$[0].id"
+      },
+      "connections": [
+        {
+          "fromBlock": "http0",
+          "fromPort": "firstProjectId",
+          "toBlock": "http1",
+          "toPort": "projectId"
         },
         {
           "fromBlock": "start1",
-          "fromPort": "userId",
+          "fromPort": "apiUrl",
           "toBlock": "http1",
-          "toPort": "userId"
+          "toPort": "url"
         },
         {
           "fromBlock": "start1",
@@ -68,10 +97,10 @@
     {
       "id": "http1",
       "type": "http-request",
-      "name": "Get User",
+      "name": "Get Project",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/users/{{userId}}"
+        "url": "{{url}}/api/projects/{{projectId}}"
       },
       "inputPorts": [
         {
@@ -80,7 +109,7 @@
           "required": true
         },
         {
-          "name": "userId",
+          "name": "projectId",
           "type": "string",
           "required": true
         }
@@ -109,10 +138,10 @@
     {
       "id": "http2",
       "type": "http-request",
-      "name": "Get Posts",
+      "name": "Get All Projects",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/posts"
+        "url": "{{url}}/api/projects"
       },
       "inputPorts": [
         {
@@ -136,12 +165,12 @@
     {
       "id": "variable1",
       "type": "variable",
-      "name": "Process User Data",
+      "name": "Process Project Data",
       "config": {
         "operation": "set",
         "variables": {
-          "userName": "{{userData.name}}",
-          "userEmail": "{{userData.email}}"
+          "projectName": "{{userData.name}}",
+          "projectDescription": "{{userData.description}}"
         }
       },
       "inputPorts": [
@@ -153,29 +182,28 @@
       ],
       "outputPorts": [
         {
-          "name": "userName",
+          "name": "projectName",
           "type": "string"
         },
         {
-          "name": "userEmail",
+          "name": "projectDescription",
           "type": "string"
         }
       ],
       "connections": [
         {
           "fromBlock": "variable1",
-          "fromPort": "userName",
+          "fromPort": "projectName",
           "toBlock": "end1",
-          "toPort": "userName"
+          "toPort": "projectName"
         },
         {
           "fromBlock": "variable1",
-          "fromPort": "userEmail",
+          "fromPort": "projectDescription",
           "toBlock": "end1",
-          "toPort": "userEmail"
+          "toPort": "projectDescription"
         }
-      ],
-      "onSuccess": "end1"
+      ]
     },
     {
       "id": "end1",
@@ -184,23 +212,23 @@
       "description": "Workflow completion",
       "config": {
         "outputs": {
-          "userName": {
+          "projectName": {
             "type": "string",
-            "value": "{{userName}}"
+            "value": "{{projectName}}"
           },
-          "userEmail": {
+          "projectDescription": {
             "type": "string",
-            "value": "{{userEmail}}"
+            "value": "{{projectDescription}}"
           }
         }
       },
       "inputPorts": [
         {
-          "name": "userName",
+          "name": "projectName",
           "type": "string"
         },
         {
-          "name": "userEmail",
+          "name": "projectDescription",
           "type": "string"
         }
       ]

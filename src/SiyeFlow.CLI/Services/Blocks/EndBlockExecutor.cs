@@ -96,18 +96,10 @@ namespace SiyeFlow.CLI.Services.Blocks
             {
                 var endBlock = CastBlock<EndBlock>(block);
 
-                // End blocks should not have success/failure/complete connections
-                if (!string.IsNullOrEmpty(block.OnSuccess))
+                // End blocks should not have output connections
+                if (block.Connections != null && block.Connections.Any())
                 {
-                    result.Warnings.Add("End block should not have an onSuccess connection");
-                }
-                if (!string.IsNullOrEmpty(block.OnFailure))
-                {
-                    result.Warnings.Add("End block should not have an onFailure connection");
-                }
-                if (!string.IsNullOrEmpty(block.OnComplete))
-                {
-                    result.Warnings.Add("End block should not have an onComplete connection");
+                    result.Warnings.Add("End block should not have output connections");
                 }
 
                 // Validate output definitions

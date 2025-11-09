@@ -48,8 +48,7 @@
           "toBlock": "process",
           "toPort": "includeDetails"
         }
-      ],
-      "onSuccess": "process"
+      ]
     },
     {
       "id": "process",
@@ -115,8 +114,7 @@
           "toBlock": "end",
           "toPort": "config"
         }
-      ],
-      "onSuccess": "end"
+      ]
     },
     {
       "id": "end",

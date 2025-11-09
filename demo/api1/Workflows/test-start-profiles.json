@@ -82,8 +82,7 @@
           "toBlock": "http1",
           "toPort": "url"
         }
-      ],
-      "onSuccess": "http1"
+      ]
     },
     {
       "id": "http1",
@@ -92,7 +91,7 @@
       "description": "Fetch users from API",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/users"
+        "url": "{{url}}/api/projects"
       },
       "inputPorts": [
         {
@@ -119,8 +118,7 @@
           "toBlock": "log1",
           "toPort": "data"
         }
-      ],
-      "onSuccess": "log1"
+      ]
     },
     {
       "id": "log1",
@@ -145,8 +143,7 @@
           "toBlock": "end1",
           "toPort": "in"
         }
-      ],
-      "onSuccess": "end1"
+      ]
     },
     {
       "id": "end1",

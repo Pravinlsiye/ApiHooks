@@ -19,17 +19,17 @@ namespace SiyeFlow.CLI.Services
 
         public void Success(string message)
         {
-            WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ {message}", ConsoleColor.Green);
+            WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] {message}", ConsoleColor.Green);
         }
 
         public void Warning(string message)
         {
-            WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ {message}", ConsoleColor.Yellow);
+            WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] {message}", ConsoleColor.Yellow);
         }
 
         public void Error(string message)
         {
-            WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ {message}", ConsoleColor.Red);
+            WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] {message}", ConsoleColor.Red);
         }
 
         public void Debug(string message)
@@ -40,33 +40,33 @@ namespace SiyeFlow.CLI.Services
         public void BlockStart(WorkflowBlock block)
         {
             EmptyLine();
-            WriteLine($"┌─ Block: {block.Name ?? block.Id} [{block.Type}]", ConsoleColor.Cyan);
+            WriteLine($"> Block: {block.Name ?? block.Id} [{block.Type}]", ConsoleColor.Cyan);
             
             if (!string.IsNullOrEmpty(block.Name) && block.Name != block.Id)
             {
-                WriteLine($"│  ID: {block.Id}", ConsoleColor.Gray);
+                WriteLine($"  ID: {block.Id}", ConsoleColor.Gray);
             }
         }
 
         public void BlockResult(string blockId, BlockExecutionResult result)
         {
             var color = result.Success ? ConsoleColor.Green : ConsoleColor.Red;
-            var symbol = result.Success ? "✓" : "✗";
+            var symbol = result.Success ? "[OK]" : "[FAIL]";
             
-            WriteLine($"│  Result: {symbol}", color);
-            WriteLine($"│  Duration: {result.Duration.TotalMilliseconds:F0}ms", ConsoleColor.Gray);
+            WriteLine($"  Result: {symbol}", color);
+            WriteLine($"  Duration: {result.Duration.TotalMilliseconds:F0}ms", ConsoleColor.Gray);
             
             if (!string.IsNullOrEmpty(result.Error))
             {
-                WriteLine($"│  Error: {result.Error}", ConsoleColor.Red);
+                WriteLine($"  Error: {result.Error}", ConsoleColor.Red);
             }
             
             if (result.Outputs != null && result.Outputs.Count > 0)
             {
-                WriteLine($"│  Outputs: {result.Outputs.Count} variables", ConsoleColor.DarkGray);
+                WriteLine($"  Outputs: {result.Outputs.Count} variables", ConsoleColor.DarkGray);
             }
             
-            WriteLine($"└─ Next: {result.NextBlockId ?? "None"}", ConsoleColor.Cyan);
+            WriteLine($"< Next: {result.NextBlockId ?? "None"}", ConsoleColor.Cyan);
         }
 
         public void WorkflowSummary(WorkflowExecutionResult result)
@@ -129,7 +129,7 @@ namespace SiyeFlow.CLI.Services
 
         public void Separator()
         {
-            WriteLine(new string('─', 60), ConsoleColor.Gray);
+            WriteLine(new string('-', 60), ConsoleColor.Gray);
         }
 
         public void EmptyLine()
@@ -202,7 +202,7 @@ namespace SiyeFlow.CLI.Services
             var filled = (int)(barLength * percentage / 100);
             var empty = barLength - filled;
             
-            return new string('█', filled) + new string('░', empty);
+            return new string('#', filled) + new string('.', empty);
         }
     }
 }

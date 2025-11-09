@@ -52,18 +52,27 @@ namespace SiyeFlow.CLI.Services.Blocks
 
             _console.Info($"Condition result: {result}");
 
+            // Output to the appropriate port based on condition result
             var outputs = new Dictionary<string, object>
             {
-                ["result"] = result,
-                ["nextBlock"] = result ? conditionBlock.Config.OnTrue : conditionBlock.Config.OnFalse
+                ["result"] = result
             };
+            
+            // Output to "true" or "false" port based on condition
+            // The execution engine will follow connections from the port that has output
+            if (result)
+            {
+                outputs["true"] = true;
+            }
+            else
+            {
+                outputs["false"] = false;
+            }
 
-            // Override the normal flow - use OnTrue or OnFalse instead of OnSuccess
             var executionResult = new BlockExecutionResult 
             { 
                 Success = true,
-                Outputs = outputs,
-                NextBlockId = result ? conditionBlock.Config.OnTrue : conditionBlock.Config.OnFalse
+                Outputs = outputs
             };
 
             return Task.FromResult(executionResult);
@@ -80,14 +89,24 @@ namespace SiyeFlow.CLI.Services.Blocks
                 result.Errors.Add("Condition expression is required");
             }
 
-            if (string.IsNullOrWhiteSpace(conditionBlock.Config.OnTrue))
+            // Validate that condition block has connections from true/false ports
+            if (conditionBlock.Connections == null || !conditionBlock.Connections.Any())
             {
-                result.Warnings.Add("No onTrue branch specified");
+                result.Warnings.Add("Condition block has no output connections");
             }
-
-            if (string.IsNullOrWhiteSpace(conditionBlock.Config.OnFalse))
+            else
             {
-                result.Warnings.Add("No onFalse branch specified");
+                var hasTrueConnection = conditionBlock.Connections.Any(c => c.FromPort == "true");
+                var hasFalseConnection = conditionBlock.Connections.Any(c => c.FromPort == "false");
+                
+                if (!hasTrueConnection)
+                {
+                    result.Warnings.Add("No connection from 'true' port");
+                }
+                if (!hasFalseConnection)
+                {
+                    result.Warnings.Add("No connection from 'false' port");
+                }
             }
 
             return Task.FromResult(result);

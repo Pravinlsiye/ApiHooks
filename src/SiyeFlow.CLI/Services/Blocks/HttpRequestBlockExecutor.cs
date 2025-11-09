@@ -44,8 +44,51 @@ namespace SiyeFlow.CLI.Services.Blocks
             var httpBlock = CastBlock<HttpRequestBlock>(block);
             var config = httpBlock.Config;
             
-            // Replace variables in URL
-            var url = _variableStore.ReplaceVariables(config.Url);
+            // Use port-based input if available, otherwise fall back to config
+            string url;
+            if (inputs != null && inputs.TryGetValue("url", out var urlInput) && urlInput != null)
+            {
+                // Port input takes priority
+                var portUrl = urlInput.ToString() ?? string.Empty;
+                
+                // If config.Url has template variables like {{url}}, replace them
+                // This handles cases where config.Url is like "{{url}}/api/users"
+                // and the port provides just the base URL
+                if (config.Url.Contains("{{url}}"))
+                {
+                    url = config.Url.Replace("{{url}}", portUrl);
+                }
+                else
+                {
+                    // Port provides full URL
+                    url = portUrl;
+                }
+            }
+            else
+            {
+                // Use config URL
+                url = config.Url;
+            }
+            
+            // Replace all variables in URL (including {{userId}}, {{resourcePath}}, etc.)
+            url = _variableStore.ReplaceVariables(url);
+            
+            // Also replace variables from port inputs
+            if (inputs != null)
+            {
+                foreach (var input in inputs)
+                {
+                    if (input.Key != "url" && input.Value != null)
+                    {
+                        var placeholder = $"{{{{{input.Key}}}}}";
+                        if (url.Contains(placeholder))
+                        {
+                            url = url.Replace(placeholder, input.Value.ToString() ?? string.Empty);
+                        }
+                    }
+                }
+            }
+            
             _console.Debug($"Request URL: {url}");
 
             if (context.DryRun)

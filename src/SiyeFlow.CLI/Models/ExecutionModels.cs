@@ -27,6 +27,12 @@ namespace SiyeFlow.CLI.Interfaces
         /// </summary>
         public Dictionary<string, object> WorkflowInputs { get; set; } = new();
         
+        /// <summary>
+        /// Current block's input values from port connections
+        /// Keyed by port name
+        /// </summary>
+        public Dictionary<string, object> BlockInputs { get; set; } = new();
+        
         // For loops
         public int? LoopIndex { get; set; }
         public object? LoopItem { get; set; }

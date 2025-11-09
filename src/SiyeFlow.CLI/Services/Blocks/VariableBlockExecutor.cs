@@ -22,6 +22,16 @@ namespace SiyeFlow.CLI.Services.Blocks
             var operation = variableBlock.Config.Operation?.ToLower() ?? "set";
             var outputs = new Dictionary<string, object>();
 
+            // First, store port inputs in the variable store so they can be referenced
+            if (inputs != null)
+            {
+                foreach (var input in inputs)
+                {
+                    _variableStore.SetVariable(input.Key, input.Value);
+                    _console.Debug($"Stored port input '{input.Key}' in variable store");
+                }
+            }
+
             switch (operation)
             {
                 case "set":

@@ -21,11 +21,11 @@
                 "required": true,
                 "description": "API base URL"
               },
-              "userId": {
+              "projectId": {
                 "type": "string",
-                "value": "dev-user",
+                "value": "669f6214-c90e-485c-8cf3-b0b46d8f5e73",
                 "required": true,
-                "description": "User ID for API calls"
+                "description": "Project ID (GUID) for API calls"
               },
               "timeout": {
                 "type": "number",
@@ -44,11 +44,11 @@
                 "required": true,
                 "description": "API base URL"
               },
-              "userId": {
+              "projectId": {
                 "type": "string",
-                "value": "prod-user",
+                "value": "669f6214-c90e-485c-8cf3-b0b46d8f5e73",
                 "required": true,
-                "description": "User ID for API calls"
+                "description": "Project ID (GUID) for API calls"
               },
               "timeout": {
                 "type": "number",
@@ -69,9 +69,9 @@
         },
         {
           "fromBlock": "start1",
-          "fromPort": "userId",
+          "fromPort": "projectId",
           "toBlock": "http1",
-          "toPort": "userId"
+          "toPort": "projectId"
         },
         {
           "fromBlock": "start1",
@@ -94,7 +94,7 @@
       "description": "Fetch user information from API",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/users/{{userId}}",
+        "url": "{{url}}/api/projects/{{projectId}}",
         "headers": {
           "Accept": "application/json"
         }
@@ -106,7 +106,7 @@
           "required": true
         },
         {
-          "name": "userId",
+          "name": "projectId",
           "type": "string",
           "required": true
         }
