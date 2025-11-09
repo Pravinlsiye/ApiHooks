@@ -44,50 +44,29 @@ namespace SiyeFlow.CLI.Services.Blocks
             var httpBlock = CastBlock<HttpRequestBlock>(block);
             var config = httpBlock.Config;
             
-            // Use port-based input if available, otherwise fall back to config
-            string url;
-            if (inputs != null && inputs.TryGetValue("url", out var urlInput) && urlInput != null)
-            {
-                // Port input takes priority
-                var portUrl = urlInput.ToString() ?? string.Empty;
-                
-                // If config.Url has template variables like {{url}}, replace them
-                // This handles cases where config.Url is like "{{url}}/api/users"
-                // and the port provides just the base URL
-                if (config.Url.Contains("{{url}}"))
-                {
-                    url = config.Url.Replace("{{url}}", portUrl);
-                }
-                else
-                {
-                    // Port provides full URL
-                    url = portUrl;
-                }
-            }
-            else
-            {
-                // Use config URL
-                url = config.Url;
-            }
+            // Start with config URL
+            string url = config.Url;
             
-            // Replace all variables in URL (including {{userId}}, {{resourcePath}}, etc.)
-            url = _variableStore.ReplaceVariables(url);
-            
-            // Also replace variables from port inputs
+            // Replace variables from port inputs directly into URL template
             if (inputs != null)
             {
                 foreach (var input in inputs)
                 {
-                    if (input.Key != "url" && input.Value != null)
+                    if (input.Value != null)
                     {
                         var placeholder = $"{{{{{input.Key}}}}}";
                         if (url.Contains(placeholder))
                         {
                             url = url.Replace(placeholder, input.Value.ToString() ?? string.Empty);
                         }
+                        // Also store in variable store for potential use in body/headers
+                        _variableStore.SetVariable(input.Key, input.Value);
                     }
                 }
             }
+            
+            // Replace any remaining variables from variable store
+            url = _variableStore.ReplaceVariables(url);
             
             _console.Debug($"Request URL: {url}");
 
@@ -115,11 +94,34 @@ namespace SiyeFlow.CLI.Services.Blocks
             // Prepare request
             var request = new HttpRequestMessage(new HttpMethod(config.Method), url);
 
-            // Add headers
+            // Process headers from port inputs if available (inputs override config)
+            if (inputs != null)
+            {
+                foreach (var input in inputs)
+                {
+                    // Skip url input as it's handled separately
+                    if (input.Key == "url")
+                        continue;
+                    
+                    // Add headers from port inputs
+                    if (input.Value != null)
+                    {
+                        var headerValue = input.Value.ToString() ?? string.Empty;
+                        headerValue = _variableStore.ReplaceVariables(headerValue);
+                        request.Headers.TryAddWithoutValidation(input.Key, headerValue);
+                    }
+                }
+            }
+            
+            // Add headers from config (only if not already set by port inputs)
             if (config.Headers != null)
             {
                 foreach (var header in config.Headers)
                 {
+                    // Don't override if already set from port inputs
+                    if (inputs != null && inputs.ContainsKey(header.Key))
+                        continue;
+                        
                     var headerValue = _variableStore.ReplaceVariables(header.Value);
                     request.Headers.TryAddWithoutValidation(header.Key, headerValue);
                 }
@@ -152,15 +154,19 @@ namespace SiyeFlow.CLI.Services.Blocks
 
                     response = await httpClient.SendAsync(request, cancellationToken);
                     
-                    if (response.IsSuccessStatusCode)
-                        break;
-
+                    // Break on last attempt regardless of status
                     if (attempt == retryCount)
+                        break;
+                    
+                    // Check if status is considered success
+                    var requestSuccess = response.IsSuccessStatusCode;
+                    if (config.SuccessCodes != null && config.SuccessCodes.Count > 0)
                     {
-                        var errorContent = await response.Content.ReadAsStringAsync();
-                        throw new HttpRequestException(
-                            $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}: {errorContent}");
+                        requestSuccess = config.SuccessCodes.Contains((int)response.StatusCode);
                     }
+                    
+                    if (requestSuccess)
+                        break;
                 }
                 catch (HttpRequestException ex) when (attempt < retryCount)
                 {
@@ -176,9 +182,26 @@ namespace SiyeFlow.CLI.Services.Blocks
                 attempt++;
             }
 
+            // Handle failure after all retries
             if (response == null)
             {
-                throw lastException ?? new HttpRequestException("Request failed after all retries");
+                // Network/connection failure - output to fail port
+                var failOutputs = new Dictionary<string, object>
+                {
+                    ["fail"] = new
+                    {
+                        error = lastException?.Message ?? "Request failed after all retries",
+                        errorMessage = lastException?.Message ?? "Request failed after all retries"
+                    },
+                    ["error"] = lastException?.Message ?? "Request failed after all retries",
+                    ["errorMessage"] = lastException?.Message ?? "Request failed after all retries"
+                };
+                
+                return new BlockExecutionResult
+                {
+                    Success = true, // Always true to allow port-based routing
+                    Outputs = failOutputs
+                };
             }
 
             // Process response
@@ -198,15 +221,35 @@ namespace SiyeFlow.CLI.Services.Blocks
                 }
             }
 
+            // Determine if request was successful based on status code
+            var statusCode = (int)response.StatusCode;
+            bool isSuccess;
+            
+            // Check if custom evaluator is specified (TypeScript/JavaScript code)
+            if (!string.IsNullOrWhiteSpace(config.SuccessEvaluator))
+            {
+                isSuccess = await EvaluateSuccessAsync(config.SuccessEvaluator, config.EvaluatorLanguage, statusCode, responseData, response);
+            }
+            // Check custom success codes if specified
+            else if (config.SuccessCodes != null && config.SuccessCodes.Count > 0)
+            {
+                isSuccess = config.SuccessCodes.Contains(statusCode);
+            }
+            // Default: 2xx status codes are success
+            else
+            {
+                isSuccess = statusCode >= 200 && statusCode < 300;
+            }
+
             var outputs = new Dictionary<string, object>
             {
                 ["response"] = responseData ?? new { },
-                ["statusCode"] = (int)response.StatusCode,
-                ["headers"] = response.Headers.ToDictionary(h => h.Key, h => string.Join(", ", h.Value)),
-                ["success"] = response.IsSuccessStatusCode
+                ["status"] = statusCode,
+                ["statusCode"] = statusCode, // Keep for backward compatibility
+                ["headers"] = response.Headers.ToDictionary(h => h.Key, h => string.Join(", ", h.Value))
             };
 
-            // Extract variables if specified
+            // Extract variables if specified (JSONPath on response body)
             if (httpBlock.Outputs != null && responseData != null)
             {
                 var jsonPathResults = await _variableStore.EvaluateJsonPathAsync(
@@ -222,13 +265,187 @@ namespace SiyeFlow.CLI.Services.Blocks
                 }
             }
 
-            _console.Success($"HTTP {config.Method} completed with status {(int)response.StatusCode}");
+            // Output to success or fail port based on status
+            if (isSuccess)
+            {
+                // Success port gets the response data
+                outputs["success"] = responseData ?? new { };
+                _console.Success($"HTTP {config.Method} {url} completed with status {statusCode}");
+            }
+            else
+            {
+                // Fail port gets error details
+                outputs["fail"] = new
+                {
+                    statusCode = statusCode,
+                    statusText = response.ReasonPhrase,
+                    body = responseData,
+                    error = $"HTTP {statusCode} {response.ReasonPhrase}"
+                };
+                outputs["error"] = $"HTTP {statusCode} {response.ReasonPhrase}";
+                outputs["errorMessage"] = responseContent;
+                _console.Warning($"HTTP {config.Method} {url} failed with status {statusCode}");
+            }
 
+            // Always return Success=true to allow WorkflowExecutor to route via ports
             return new BlockExecutionResult
             {
-                Success = response.IsSuccessStatusCode,
+                Success = true,
                 Outputs = outputs
             };
+        }
+
+        /// <summary>
+        /// Evaluate success using custom TypeScript/JavaScript code
+        /// </summary>
+        private async Task<bool> EvaluateSuccessAsync(
+            string evaluatorCode, 
+            string? language, 
+            int statusCode, 
+            object? responseData,
+            HttpResponseMessage response)
+        {
+            try
+            {
+                // TODO: Implement actual JavaScript/TypeScript execution
+                // For now, we'll use a simple expression evaluator
+                
+                // Create evaluation context with available variables
+                var evalContext = new Dictionary<string, object>
+                {
+                    ["statusCode"] = statusCode,
+                    ["status"] = statusCode,
+                    ["response"] = responseData ?? new { },
+                    ["body"] = responseData ?? new { },
+                    ["headers"] = response.Headers.ToDictionary(h => h.Key, h => string.Join(", ", h.Value))
+                };
+                
+                // Simple evaluation: check if code is a boolean expression
+                // Examples: 
+                //   "statusCode === 200"
+                //   "statusCode >= 200 && statusCode < 300"
+                //   "statusCode === 200 || statusCode === 201"
+                
+                var code = evaluatorCode.Trim();
+                
+                // Replace JavaScript operators with C# equivalents
+                code = code.Replace("===", "==")
+                          .Replace("!==", "!=")
+                          .Replace("&&", "and")
+                          .Replace("||", "or");
+                
+                // Simple parser for basic boolean expressions
+                var result = EvaluateBooleanExpression(code, evalContext);
+                
+                _console.Debug($"Success evaluator result: {result} (code: {evaluatorCode})");
+                
+                return await Task.FromResult(result);
+            }
+            catch (Exception ex)
+            {
+                _console.Warning($"Failed to evaluate success condition: {ex.Message}. Falling back to default.");
+                // Fall back to default 2xx check
+                return statusCode >= 200 && statusCode < 300;
+            }
+        }
+        
+        /// <summary>
+        /// Simple boolean expression evaluator
+        /// </summary>
+        private bool EvaluateBooleanExpression(string expression, Dictionary<string, object> context)
+        {
+            // Handle 'and' operator
+            if (expression.Contains(" and "))
+            {
+                var parts = expression.Split(new[] { " and " }, StringSplitOptions.None);
+                return parts.All(part => EvaluateBooleanExpression(part.Trim(), context));
+            }
+            
+            // Handle 'or' operator
+            if (expression.Contains(" or "))
+            {
+                var parts = expression.Split(new[] { " or " }, StringSplitOptions.None);
+                return parts.Any(part => EvaluateBooleanExpression(part.Trim(), context));
+            }
+            
+            // Handle comparison operators
+            var operators = new[] { ">=", "<=", "==", "!=", ">", "<" };
+            foreach (var op in operators)
+            {
+                if (expression.Contains(op))
+                {
+                    var parts = expression.Split(new[] { op }, 2, StringSplitOptions.None);
+                    if (parts.Length == 2)
+                    {
+                        var left = EvaluateValue(parts[0].Trim(), context);
+                        var right = EvaluateValue(parts[1].Trim(), context);
+                        
+                        return op switch
+                        {
+                            "==" => Equals(left, right),
+                            "!=" => !Equals(left, right),
+                            ">" => Compare(left, right) > 0,
+                            "<" => Compare(left, right) < 0,
+                            ">=" => Compare(left, right) >= 0,
+                            "<=" => Compare(left, right) <= 0,
+                            _ => false
+                        };
+                    }
+                }
+            }
+            
+            // Direct boolean value
+            if (bool.TryParse(expression, out var boolResult))
+            {
+                return boolResult;
+            }
+            
+            return false;
+        }
+        
+        /// <summary>
+        /// Evaluate a value (variable or literal)
+        /// </summary>
+        private object EvaluateValue(string value, Dictionary<string, object> context)
+        {
+            // Check if it's a variable
+            if (context.TryGetValue(value, out var contextValue))
+            {
+                return contextValue;
+            }
+            
+            // Try parse as number
+            if (int.TryParse(value, out var intValue))
+            {
+                return intValue;
+            }
+            
+            // Try parse as boolean
+            if (bool.TryParse(value, out var boolValue))
+            {
+                return boolValue;
+            }
+            
+            // Return as string (remove quotes if present)
+            return value.Trim('"', '\'');
+        }
+        
+        /// <summary>
+        /// Compare two values
+        /// </summary>
+        private int Compare(object left, object right)
+        {
+            if (left is int leftInt && right is int rightInt)
+            {
+                return leftInt.CompareTo(rightInt);
+            }
+            
+            if (left is string leftStr && right is string rightStr)
+            {
+                return string.Compare(leftStr, rightStr, StringComparison.Ordinal);
+            }
+            
+            return 0;
         }
 
         public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)

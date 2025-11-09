@@ -95,6 +95,8 @@ export class StartBlock extends WorkflowBlock {
 
 export class EndConfig {
     outputs?: Record<string, OutputDefinition>;
+    inputs?: Record<string, any>;  // Separate inputs for receiving final outputs
+    finalOutputs?: Record<string, any>; // Separate final outputs
 }
 
 export class EndBlock extends WorkflowBlock {
@@ -106,10 +108,14 @@ export class HttpRequestConfig {
     method: string = '';
     url: string = '';
     headers?: Record<string, string>;
+    inputs?: Record<string, any>;  // Separate inputs for receiving headers
+    outputs?: Record<string, any>; // Separate outputs for sending headers
     body?: any;
     timeout?: number;
     retries?: number;
     successCodes?: number[];
+    successEvaluator?: string;  // TypeScript/JavaScript code to evaluate success
+    evaluatorLanguage?: string; // 'typescript' or 'javascript'
 }
 
 export class HttpRequestBlock extends WorkflowBlock {
@@ -120,6 +126,8 @@ export class HttpRequestBlock extends WorkflowBlock {
 export class VariableConfig {
     operation: string = '';
     variables?: Record<string, any>;
+    inputs?: Record<string, any>;  // Separate inputs for receiving data
+    outputs?: Record<string, any>; // Separate outputs for sending data
 }
 
 export class VariableBlock extends WorkflowBlock {

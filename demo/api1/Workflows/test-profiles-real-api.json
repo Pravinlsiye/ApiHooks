@@ -45,7 +45,7 @@
               },
               "resourcePath": {
                 "type": "string",
-                "value": "/api/test",
+                "value": "/api/projects",
                 "description": "Resource to fetch"
               },
               "limit": {
@@ -55,7 +55,8 @@
               }
             }
           }
-        ]
+        ],
+        "selectedProfile": "Local"
       },
       "connections": [
         {
@@ -79,7 +80,9 @@
       "description": "GET request to API",
       "config": {
         "method": "GET",
-        "url": "{{apiUrl}}{{resourcePath}}"
+        "url": "{{apiUrl}}{{resourcePath}}",
+        "successEvaluator": "statusCode === 200",
+        "evaluatorLanguage": "typescript"
       },
       "inputPorts": [
         {
@@ -97,6 +100,20 @@
           "name": "response",
           "type": "array",
           "description": "API response data"
+        },
+        {
+          "name": "success",
+          "type": "any",
+          "description": "Success response",
+          "required": false,
+          "multiple": false
+        },
+        {
+          "name": "fail",
+          "type": "any",
+          "description": "Failure response",
+          "required": false,
+          "multiple": false
         }
       ],
       "outputs": {
@@ -105,7 +122,7 @@
       "connections": [
         {
           "fromBlock": "http1",
-          "fromPort": "response",
+          "fromPort": "success",
           "toBlock": "end1",
           "toPort": "data"
         }

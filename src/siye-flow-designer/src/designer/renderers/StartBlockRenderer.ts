@@ -75,55 +75,109 @@ export class StartBlockRenderer extends BlockRenderer {
     }
     
     /**
-     * Render combined ports for Start block
+     * Render combined ports for Start block with editable inputs
      */
     protected renderPorts(): string {
-        if (!this.block.inputPorts || this.block.inputPorts.length === 0) {
-            return '';
+        const startBlock = this.blockData as StartBlock;
+        if (!startBlock || !startBlock.config) return '';
+        
+        const effectiveInputs = this.getEffectiveInputs(startBlock);
+        const inputEntries = Object.entries(effectiveInputs);
+        
+        if (inputEntries.length === 0) {
+            return `
+                <div class="block-inputs-empty">
+                    <button class="btn-add-item-popup" data-block="${this.block.id}" data-item-type="input" data-port-type="input" title="Add input">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                        </svg>
+                        <span>Add Input</span>
+                    </button>
+                </div>
+            `;
         }
         
-        return this.block.inputPorts.map((inputPort, index) => {
-            const outputPort = this.block.outputPorts![index];
-            const typeIcon = this.getTypeIcon(inputPort.type);
+        return inputEntries.map(([inputName, inputDef]) => {
+            const inputInfo = inputDef as any;
+            const inputType = inputInfo.type || 'string';
+            const inputValue = inputInfo.value || inputInfo.default || '';
+            const typeIcon = this.getTypeIcon(inputType);
             
             return `
-                <div class="port-dual-row">
+                <div class="block-input-row" data-input-name="${this.escapeHtml(inputName)}">
                     <div class="port-input-tab" 
                          data-block="${this.block.id}" 
-                         data-port="${inputPort.name}"
+                         data-port="${this.escapeHtml(inputName)}"
                          data-port-type="input"
-                         data-value-type="${inputPort.type}">
+                         data-value-type="${inputType}">
                         <span class="port-tab"></span>
                     </div>
-                    <div class="port-center">
-                        <span class="port-name">${inputPort.name}</span>
-                        <span class="port-type">${typeIcon}</span>
+                    <div class="input-name-field">
+                        <input type="text" 
+                               class="block-input-name" 
+                               value="${this.escapeHtml(inputName)}" 
+                               placeholder="Input name"
+                               data-original-name="${this.escapeHtml(inputName)}"
+                               data-block="${this.block.id}">
                     </div>
+                    <div class="input-type-selector">
+                        <button class="input-type-btn" 
+                                data-block="${this.block.id}"
+                                data-input-name="${this.escapeHtml(inputName)}"
+                                data-current-type="${inputType}"
+                                title="Type: ${inputType}">
+                            ${typeIcon}
+                        </button>
+                        <div class="input-type-dropdown" 
+                             data-block="${this.block.id}"
+                             data-input-name="${this.escapeHtml(inputName)}">
+                            ${this.renderTypeOptions(inputType)}
+                        </div>
+                    </div>
+                    <div class="input-value-field">
+                        <input type="text" 
+                               class="block-input-value" 
+                               value="${this.escapeHtml(String(inputValue))}" 
+                               placeholder="Enter value or {{variable}}"
+                               data-block="${this.block.id}"
+                               data-input-name="${this.escapeHtml(inputName)}">
+                    </div>
+                    <button class="btn-edit-input" 
+                            data-block="${this.block.id}"
+                            data-input-name="${this.escapeHtml(inputName)}"
+                            title="Edit input">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086ZM11.189 6.25 9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l6.286-6.286Z"/>
+                        </svg>
+                    </button>
+                    <button class="btn-delete-input" 
+                            data-block="${this.block.id}"
+                            data-input-name="${this.escapeHtml(inputName)}"
+                            title="Delete input">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                    </button>
                     <div class="port-output-tab" 
                          data-block="${this.block.id}" 
-                         data-port="${outputPort.name}"
+                         data-port="${this.escapeHtml(inputName)}"
                          data-port-type="output"
-                         data-value-type="${outputPort.type}">
+                         data-value-type="${inputType}">
                         <span class="port-tab"></span>
                     </div>
                 </div>
             `;
-        }).join('');
-    }
-    
-    /**
-     * Get type icon for display
-     */
-    private getTypeIcon(type: string): string {
-        const typeIcons: Record<string, string> = {
-            'string': 'Aa',
-            'number': '#',
-            'boolean': '0/1',
-            'object': '{}',
-            'array': '[]',
-            'any': '*'
-        };
-        return typeIcons[type] || 'Aa';
+        }).join('') + `
+            <div class="block-add-input-row">
+                <button class="btn-add-item-popup" data-block="${this.block.id}" data-item-type="input" data-port-type="input" title="Add input">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                    </svg>
+                    <span>Add Input</span>
+                </button>
+            </div>
+        `;
     }
     
     /**
@@ -174,14 +228,49 @@ export class StartBlockRenderer extends BlockRenderer {
             || profiles[0].name;
         
         return `
-            <div class="profile-selector">
-                <select class="profile-dropdown" data-block="${this.block.id}">
-                    ${profiles.map(profile => `
-                        <option value="${profile.name}" ${profile.name === selectedProfile ? 'selected' : ''}>
-                            ${profile.name}${profile.default ? ' (default)' : ''}
-                        </option>
-                    `).join('')}
-                </select>
+            <div class="profile-selector-block">
+                <div class="profile-selector-header">
+                    <select class="profile-dropdown" data-block="${this.block.id}">
+                        ${profiles.map(profile => `
+                            <option value="${profile.name}" ${profile.name === selectedProfile ? 'selected' : ''}>
+                                ${profile.name}${profile.default ? ' (default)' : ''}
+                            </option>
+                        `).join('')}
+                    </select>
+                    <button class="btn-profile-actions" 
+                            data-block="${this.block.id}"
+                            title="Profile actions">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+                            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0z"/>
+                        </svg>
+                    </button>
+                    <div class="profile-actions-dropdown" data-block="${this.block.id}">
+                        <div class="profile-action-item" data-action="add">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                            </svg>
+                            Add Profile
+                        </div>
+                        ${profiles.length > 1 ? `
+                            <div class="profile-action-item" data-action="delete" data-profile="${this.escapeHtml(selectedProfile)}">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                </svg>
+                                Delete Profile
+                            </div>
+                        ` : ''}
+                        ${profiles.find(p => p.name === selectedProfile && !p.default) ? `
+                            <div class="profile-action-item" data-action="set-default" data-profile="${this.escapeHtml(selectedProfile)}">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
+                                </svg>
+                                Set as Default
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
             </div>
         `;
     }

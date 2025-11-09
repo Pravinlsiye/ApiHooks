@@ -165,11 +165,36 @@ export class WorkflowEngine {
                 }
                 return startBlock;
             case BlockType.End:
-                return new EndBlock();
-            case BlockType.HttpRequest:
-                return new HttpRequestBlock();
+                const endBlock = new EndBlock();
+                if (!endBlock.config.outputs) {
+                    endBlock.config.outputs = {};
+                }
+                return endBlock;
+                case BlockType.HttpRequest:
+                    const httpBlock = new HttpRequestBlock();
+                    if (!httpBlock.config.headers) {
+                        httpBlock.config.headers = {};
+                    }
+                    // Ensure HTTP Request blocks have success/fail output ports
+                    if (!httpBlock.outputPorts) {
+                        httpBlock.outputPorts = [];
+                    }
+                    // Add success/fail ports if not already present
+                    const hasSuccessPort = httpBlock.outputPorts.some(p => p.name === 'success');
+                    const hasFailPort = httpBlock.outputPorts.some(p => p.name === 'fail');
+                    if (!hasSuccessPort) {
+                        httpBlock.outputPorts.push({ name: 'success', type: 'any', description: 'Success response', required: false, multiple: false });
+                    }
+                    if (!hasFailPort) {
+                        httpBlock.outputPorts.push({ name: 'fail', type: 'any', description: 'Failure response', required: false, multiple: false });
+                    }
+                    return httpBlock;
             case BlockType.Variable:
-                return new VariableBlock();
+                const varBlock = new VariableBlock();
+                if (!varBlock.config.variables) {
+                    varBlock.config.variables = {};
+                }
+                return varBlock;
             case BlockType.Condition:
                 return new ConditionBlock();
             case BlockType.Delay:

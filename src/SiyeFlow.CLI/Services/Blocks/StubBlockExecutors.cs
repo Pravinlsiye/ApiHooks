@@ -18,8 +18,39 @@ namespace SiyeFlow.CLI.Services.Blocks
         public override BlockType BlockType => BlockType.Log;
         protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
         {
-            _console.Warning($"Log block not yet implemented");
-            return Task.FromResult(new BlockExecutionResult { Success = true });
+            var logBlock = CastBlock<LogBlock>(block);
+            var config = logBlock.Config;
+            var message = config.Message ?? "";
+            
+            // Replace variables in message from inputs
+            if (inputs != null)
+            {
+                foreach (var input in inputs)
+                {
+                    var placeholder = $"{{{{{input.Key}}}}}";
+                    if (message.Contains(placeholder))
+                    {
+                        var value = input.Value?.ToString() ?? "";
+                        message = message.Replace(placeholder, value);
+                    }
+                }
+            }
+            
+            // Also check variable store for any remaining variables
+            message = _variableStore.ReplaceVariables(message);
+            
+            _console.Info($"LOG [{config.Level ?? "info"}]: {message}");
+            
+            // Output "complete" port so workflow can continue to End block
+            return Task.FromResult(new BlockExecutionResult 
+            { 
+                Success = true,
+                Outputs = new Dictionary<string, object>
+                {
+                    ["complete"] = true,
+                    ["message"] = message
+                }
+            });
         }
         public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
         {

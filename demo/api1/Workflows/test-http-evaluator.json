@@ -1,0 +1,171 @@
+{
+  "name": "Test HTTP Success Evaluator",
+  "description": "Demonstrates custom success evaluation with TypeScript expressions",
+  "version": "1.0",
+  "blocks": [
+    {
+      "id": "start1",
+      "type": "start",
+      "name": "Configuration",
+      "config": {
+        "profiles": [
+          {
+            "name": "Default",
+            "description": "Default profile",
+            "default": true,
+            "inputs": {
+              "apiUrl": {
+                "type": "string",
+                "value": "https://jsonplaceholder.typicode.com",
+                "required": true
+              }
+            }
+          }
+        ],
+        "selectedProfile": "Default"
+      },
+      "connections": [
+        {
+          "fromBlock": "start1",
+          "fromPort": "apiUrl",
+          "toBlock": "http1",
+          "toPort": "apiUrl"
+        }
+      ]
+    },
+    {
+      "id": "http1",
+      "type": "http-request",
+      "name": "Test Status 200",
+      "description": "Only accept 200, not other 2xx",
+      "config": {
+        "method": "GET",
+        "url": "{{apiUrl}}/posts/1",
+        "successEvaluator": "statusCode === 200",
+        "evaluatorLanguage": "typescript"
+      },
+      "inputPorts": [
+        {
+          "name": "apiUrl",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "success",
+          "type": "any",
+          "description": "Success response",
+          "required": false,
+          "multiple": false
+        },
+        {
+          "name": "fail",
+          "type": "any",
+          "description": "Failure response",
+          "required": false,
+          "multiple": false
+        }
+      ],
+      "connections": [
+        {
+          "fromBlock": "start1",
+          "fromPort": "apiUrl",
+          "toBlock": "http2",
+          "toPort": "apiUrl"
+        },
+        {
+          "fromBlock": "http1",
+          "fromPort": "success",
+          "toBlock": "end_success",
+          "toPort": "result"
+        },
+        {
+          "fromBlock": "http1",
+          "fromPort": "fail",
+          "toBlock": "end_fail",
+          "toPort": "error"
+        }
+      ]
+    },
+    {
+      "id": "http2",
+      "type": "http-request",
+      "name": "Test 200 or 201",
+      "description": "Accept both 200 and 201",
+      "config": {
+        "method": "GET",
+        "url": "{{apiUrl}}/posts/1",
+        "successEvaluator": "statusCode === 200 || statusCode === 201",
+        "evaluatorLanguage": "typescript"
+      },
+      "inputPorts": [
+        {
+          "name": "apiUrl",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "success",
+          "type": "any",
+          "description": "Success response",
+          "required": false,
+          "multiple": false
+        },
+        {
+          "name": "fail",
+          "type": "any",
+          "description": "Failure response",
+          "required": false,
+          "multiple": false
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "end_success",
+      "type": "end",
+      "name": "Success",
+      "description": "All tests passed",
+      "config": {
+        "outputs": {
+          "result": {
+            "type": "string",
+            "value": "All HTTP success evaluators passed",
+            "description": "Success message"
+          }
+        }
+      },
+      "inputPorts": [
+        {
+          "name": "result",
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "id": "end_fail",
+      "type": "end",
+      "name": "Failed",
+      "description": "Test failed",
+      "config": {
+        "outputs": {
+          "error": {
+            "type": "string",
+            "value": "{{error}}",
+            "description": "Error message"
+          }
+        }
+      },
+      "inputPorts": [
+        {
+          "name": "error",
+          "type": "any"
+        }
+      ]
+    }
+  ]
+}
+

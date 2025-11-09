@@ -364,6 +364,12 @@ namespace SiyeFlow.Core.Models
 
         [JsonProperty("successCodes")]
         public List<int>? SuccessCodes { get; set; }
+        
+        [JsonProperty("successEvaluator")]
+        public string? SuccessEvaluator { get; set; }
+        
+        [JsonProperty("evaluatorLanguage")]
+        public string? EvaluatorLanguage { get; set; }
     }
 
     /// <summary>

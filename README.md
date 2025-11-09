@@ -31,9 +31,9 @@ app.UseSiyeFlow();
 
 ## 📚 Documentation
 
-- [Schema Design](docs/SCHEMA_DESIGN.md) - Complete workflow schema reference
-- [Progress](docs/PROGRESS.md) - Implementation status and tracking
-- [HTML Files](docs/HTML_FILES.md) - Differences between production and development HTML files
+- **[Workflow Schema](docs/SCHEMA_DESIGN.md)** - Complete schema reference with examples
+- **[Progress Tracker](docs/PROGRESS.md)** - Implementation status
+- **[Working Examples](demo/api1/Workflows/)** - Real workflow JSON files
 
 ## 🎯 Key Features
 
@@ -89,9 +89,9 @@ SiyeFlow/
 ├── demo/                     # Demo projects
 │   └── api1/                # Sample API with test workflows
 │       └── Workflows/       # Test workflow files
-└── docs/                     # Documentation
-    ├── SCHEMA_DESIGN.md     # Block schema reference
-    └── PROGRESS.md          # Implementation status
+└── docs/                            # Documentation
+    ├── SCHEMA_DESIGN.md            # Workflow schema reference
+    └── PROGRESS.md                 # Implementation status
 ```
 
 ## 📋 Workflow Definition Format

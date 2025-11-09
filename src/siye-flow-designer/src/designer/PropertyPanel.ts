@@ -145,6 +145,16 @@ export class PropertyPanel extends SimpleEventEmitter {
                     </div>
                     
                     <div class="property-group">
+                        <label>Success Evaluator (TypeScript)</label>
+                        <textarea rows="2" data-property="config.successEvaluator" 
+                                  placeholder="e.g., statusCode === 200 || statusCode === 201">${config?.successEvaluator || ''}</textarea>
+                        <small style="color: #8b949e; font-size: 11px; margin-top: 4px; display: block;">
+                            Available variables: statusCode, status, response, body, headers
+                            <br>Default: statusCode >= 200 && statusCode < 300
+                        </small>
+                    </div>
+                    
+                    <div class="property-group">
                         <label>Headers (JSON)</label>
                         <textarea rows="3" data-property="config.headers" 
                                   data-type="json">${JSON.stringify(config?.headers || {}, null, 2)}</textarea>
@@ -162,7 +172,7 @@ export class PropertyPanel extends SimpleEventEmitter {
                 html += `
                     <div class="property-group">
                         <label>Operation</label>
-                        <select data-property="config.operation">
+                        <select id="var-operation" data-property="config.operation">
                             <option value="set" ${config?.operation === 'set' ? 'selected' : ''}>Set</option>
                             <option value="get" ${config?.operation === 'get' ? 'selected' : ''}>Get</option>
                             <option value="delete" ${config?.operation === 'delete' ? 'selected' : ''}>Delete</option>
@@ -170,9 +180,16 @@ export class PropertyPanel extends SimpleEventEmitter {
                     </div>
                     
                     <div class="property-group">
-                        <label>Variables (JSON)</label>
-                        <textarea rows="5" data-property="config.variables" 
-                                  data-type="json">${JSON.stringify(config?.variables || {}, null, 2)}</textarea>
+                        <label>Variables</label>
+                        <div class="variable-list" id="variable-list">
+                            ${this.renderVariableList(config?.variables || {})}
+                        </div>
+                        <button type="button" class="btn-add-variable" id="btn-add-variable">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                            </svg>
+                            Add Variable
+                        </button>
                     </div>
                 `;
                 break;
@@ -238,22 +255,6 @@ export class PropertyPanel extends SimpleEventEmitter {
                 `;
                 break;
         }
-        
-        // Connection properties
-        html += `
-            <h4>Connections</h4>
-            <div class="property-group">
-                <label>On Success</label>
-                <input type="text" data-property="onSuccess" 
-                       value="${this.currentBlock.onSuccess || ''}">
-            </div>
-            
-            <div class="property-group">
-                <label>On Failure</label>
-                <input type="text" data-property="onFailure" 
-                       value="${this.currentBlock.onFailure || ''}">
-            </div>
-        `;
         
         return html;
     }
@@ -329,6 +330,78 @@ export class PropertyPanel extends SimpleEventEmitter {
     }
     
     /**
+     * Render variable list for Variable block
+     */
+    private renderVariableList(variables: Record<string, any>): string {
+        if (!variables || Object.keys(variables).length === 0) {
+            return '<div class="variable-empty">No variables defined</div>';
+        }
+        
+        let html = '';
+        for (const [varName, varValue] of Object.entries(variables)) {
+            const displayValue = this.formatVariableValue(varValue);
+            html += `
+                <div class="variable-item" data-variable-name="${this.escapeHtml(varName)}">
+                    <div class="variable-drag-handle">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                            <path d="M2 2h8v1H2V2zm0 2h8v1H2V4zm0 2h8v1H2V6zm0 2h8v1H2V8z"/>
+                        </svg>
+                    </div>
+                    <div class="variable-name">
+                        <input type="text" class="variable-name-input" 
+                               value="${this.escapeHtml(varName)}" 
+                               placeholder="Variable name"
+                               data-original-name="${this.escapeHtml(varName)}">
+                    </div>
+                    <div class="variable-value">
+                        <input type="text" class="variable-value-input" 
+                               value="${this.escapeHtml(String(varValue))}" 
+                               placeholder="Enter value or {{variable}}">
+                        <div class="variable-preview">${displayValue}</div>
+                    </div>
+                    <button type="button" class="btn-delete-variable" title="Delete variable">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }
+        return html;
+    }
+    
+    /**
+     * Format variable value for preview display
+     */
+    private formatVariableValue(value: any): string {
+        if (value === null || value === undefined) {
+            return '<span class="preview-placeholder">null</span>';
+        }
+        
+        const strValue = String(value);
+        
+        // Check if it's a variable reference ({{variable}})
+        const varRefMatch = strValue.match(/\{\{([^}]+)\}\}/);
+        if (varRefMatch) {
+            return `<span class="preview-variable">{{${this.escapeHtml(varRefMatch[1])}}}</span>`;
+        }
+        
+        // Show actual value (truncate if too long)
+        const displayValue = strValue.length > 30 ? strValue.substring(0, 30) + '...' : strValue;
+        return `<span class="preview-value">${this.escapeHtml(displayValue)}</span>`;
+    }
+    
+    /**
+     * Escape HTML to prevent XSS
+     */
+    private escapeHtml(text: string): string {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    /**
      * Setup event handlers for property inputs
      */
     private setupPropertyHandlers(): void {
@@ -342,6 +415,174 @@ export class PropertyPanel extends SimpleEventEmitter {
                 input.addEventListener('input', (e) => this.onPropertyChange(e));
             }
         });
+        
+        // Setup variable list handlers for Variable block
+        if (this.currentBlock?.type === BlockType.Variable) {
+            this.setupVariableListHandlers();
+        }
+    }
+    
+    /**
+     * Setup event handlers for variable list
+     */
+    private setupVariableListHandlers(): void {
+        const variableList = document.getElementById('variable-list');
+        const addButton = document.getElementById('btn-add-variable');
+        
+        if (!variableList || !addButton) return;
+        
+        // Add variable button
+        addButton.addEventListener('click', () => {
+            this.addNewVariable();
+        });
+        
+        // Delete variable buttons
+        variableList.querySelectorAll('.btn-delete-variable').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = (e.target as HTMLElement).closest('.variable-item');
+                if (item) {
+                    const varName = item.getAttribute('data-variable-name');
+                    if (varName) {
+                        this.deleteVariable(varName);
+                    }
+                }
+            });
+        });
+        
+        // Variable name and value inputs
+        variableList.querySelectorAll('.variable-name-input').forEach(input => {
+            input.addEventListener('blur', (e) => {
+                this.onVariableNameChange(e.target as HTMLInputElement);
+            });
+        });
+        
+        variableList.querySelectorAll('.variable-value-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                this.onVariableValueChange(e.target as HTMLInputElement);
+            });
+            input.addEventListener('blur', (e) => {
+                this.onVariableValueChange(e.target as HTMLInputElement);
+            });
+        });
+    }
+    
+    /**
+     * Add a new variable
+     */
+    private addNewVariable(): void {
+        if (!this.currentBlock || this.currentBlock.type !== BlockType.Variable) return;
+        
+        const config = (this.currentBlock as any).config;
+        if (!config.variables) {
+            config.variables = {};
+        }
+        
+        // Generate a unique variable name
+        let counter = 1;
+        let newName = `value${counter}`;
+        while (config.variables[newName] !== undefined) {
+            counter++;
+            newName = `value${counter}`;
+        }
+        
+        config.variables[newName] = '';
+        
+        // Emit change event
+        this.emit('propertyChange', {
+            blockId: this.currentBlock.id,
+            property: 'config.variables',
+            value: config.variables
+        });
+        
+        // Re-render to show the new variable
+        this.renderProperties();
+    }
+    
+    /**
+     * Delete a variable
+     */
+    private deleteVariable(varName: string): void {
+        if (!this.currentBlock || this.currentBlock.type !== BlockType.Variable) return;
+        
+        const config = (this.currentBlock as any).config;
+        if (config.variables && config.variables[varName] !== undefined) {
+            delete config.variables[varName];
+            
+            // Emit change event
+            this.emit('propertyChange', {
+                blockId: this.currentBlock.id,
+                property: 'config.variables',
+                value: config.variables
+            });
+            
+            // Re-render to update the list
+            this.renderProperties();
+        }
+    }
+    
+    /**
+     * Handle variable name change
+     */
+    private onVariableNameChange(input: HTMLInputElement): void {
+        if (!this.currentBlock || this.currentBlock.type !== BlockType.Variable) return;
+        
+        const originalName = input.dataset.originalName;
+        const newName = input.value.trim();
+        
+        if (!originalName || !newName || newName === originalName) return;
+        
+        const config = (this.currentBlock as any).config;
+        if (config.variables && config.variables[originalName] !== undefined) {
+            const value = config.variables[originalName];
+            delete config.variables[originalName];
+            config.variables[newName] = value;
+            
+            // Emit change event
+            this.emit('propertyChange', {
+                blockId: this.currentBlock.id,
+                property: 'config.variables',
+                value: config.variables
+            });
+            
+            // Re-render to update the list
+            this.renderProperties();
+        }
+    }
+    
+    /**
+     * Handle variable value change
+     */
+    private onVariableValueChange(input: HTMLInputElement): void {
+        if (!this.currentBlock || this.currentBlock.type !== BlockType.Variable) return;
+        
+        const item = input.closest('.variable-item');
+        if (!item) return;
+        
+        // Get the current variable name from the name input (may have been edited)
+        const nameInput = item.querySelector('.variable-name-input') as HTMLInputElement;
+        const varName = nameInput?.value.trim() || item.getAttribute('data-variable-name');
+        
+        if (!varName) return;
+        
+        const config = (this.currentBlock as any).config;
+        if (config.variables) {
+            const newValue = input.value;
+            config.variables[varName] = newValue;
+            
+            // Update preview
+            const preview = item.querySelector('.variable-preview');
+            if (preview) {
+                preview.innerHTML = this.formatVariableValue(newValue);
+            }
+            
+            // Emit change event
+            this.emit('propertyChange', {
+                blockId: this.currentBlock.id,
+                property: 'config.variables',
+                value: config.variables
+            });
+        }
     }
     
     /**

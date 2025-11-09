@@ -171,19 +171,19 @@ namespace SiyeFlow.CLI.Services
                     };
                     result.ExecutionPath.Add(record);
 
-                    // Check if block has failure outputs (e.g., from Evaluate block)
+                    // Check if block has failure outputs (e.g., from Evaluate or HttpRequest blocks)
                     // Even if Success=true, check for failure port outputs
-                    if (blockResult.Outputs != null && blockResult.Outputs.ContainsKey("failure"))
+                    if (blockResult.Outputs != null && (blockResult.Outputs.ContainsKey("failure") || blockResult.Outputs.ContainsKey("fail")))
                     {
                         // Block produced failure output - check if there's a failure handler
                         var hasFailureConnection = block.Connections?.Any(c => 
-                            c.FromPort == "failure" || c.FromPort == "error") ?? false;
+                            c.FromPort == "failure" || c.FromPort == "fail" || c.FromPort == "error") ?? false;
                         
                         if (!hasFailureConnection)
                         {
                             // No failure handler - stop workflow
                             result.Success = false;
-                            result.Error = blockResult.Error ?? blockResult.Outputs.GetValueOrDefault("errorMessage")?.ToString() ?? "Evaluation failed";
+                            result.Error = blockResult.Error ?? blockResult.Outputs.GetValueOrDefault("errorMessage")?.ToString() ?? blockResult.Outputs.GetValueOrDefault("error")?.ToString() ?? "Block execution failed";
                             break;
                         }
                         else
@@ -488,55 +488,55 @@ namespace SiyeFlow.CLI.Services
                 {
                     // Validate from block exists
                     if (!validBlockIds.Contains(connection.FromBlock))
-                    {
-                        result.IsValid = false;
-                        result.Errors.Add(new ValidationError
-                        {
-                            Code = "INVALID_CONNECTION",
+            {
+                result.IsValid = false;
+                result.Errors.Add(new ValidationError
+                {
+                    Code = "INVALID_CONNECTION",
                             Message = $"Block {block.Id} has connection from invalid block: {connection.FromBlock}",
-                            BlockId = block.Id
-                        });
-                    }
+                    BlockId = block.Id
+                });
+            }
 
                     // Validate to block exists
                     if (!validBlockIds.Contains(connection.ToBlock))
-                    {
-                        result.IsValid = false;
-                        result.Errors.Add(new ValidationError
-                        {
-                            Code = "INVALID_CONNECTION",
+            {
+                result.IsValid = false;
+                result.Errors.Add(new ValidationError
+                {
+                    Code = "INVALID_CONNECTION",
                             Message = $"Block {block.Id} has connection to invalid block: {connection.ToBlock}",
-                            BlockId = block.Id
-                        });
-                    }
+                    BlockId = block.Id
+                });
+            }
 
                     // Validate from port exists on source block
                     var fromBlock = allBlocks.FirstOrDefault(b => b.Id == connection.FromBlock);
                     if (fromBlock != null && fromBlock.OutputPorts != null)
                     {
                         if (!fromBlock.OutputPorts.Any(p => p.Name == connection.FromPort))
-                        {
+                {
                             result.Warnings.Add(new ValidationWarning
-                            {
+                    {
                                 Code = "INVALID_PORT",
                                 Message = $"Connection from {connection.FromBlock}.{connection.FromPort} references non-existent output port",
-                                BlockId = block.Id
-                            });
-                        }
+                        BlockId = block.Id
+                    });
+                }
                     }
 
                     // Validate to port exists on target block
                     var toBlock = allBlocks.FirstOrDefault(b => b.Id == connection.ToBlock);
                     if (toBlock != null && toBlock.InputPorts != null)
-                    {
+                {
                         if (!toBlock.InputPorts.Any(p => p.Name == connection.ToPort))
                         {
                             result.Warnings.Add(new ValidationWarning
-                            {
+                    {
                                 Code = "INVALID_PORT",
                                 Message = $"Connection to {connection.ToBlock}.{connection.ToPort} references non-existent input port",
-                                BlockId = block.Id
-                            });
+                        BlockId = block.Id
+                    });
                         }
                     }
                 }

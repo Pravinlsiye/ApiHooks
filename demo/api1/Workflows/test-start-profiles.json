@@ -71,16 +71,14 @@
             }
           }
         ],
-        "overrides": {
-          "timeout": 3000
-        }
+        "selectedProfile": "Development"
       },
       "connections": [
         {
           "fromBlock": "start1",
           "fromPort": "apiUrl",
           "toBlock": "http1",
-          "toPort": "url"
+          "toPort": "apiUrl"
         }
       ]
     },
@@ -88,14 +86,14 @@
       "id": "http1",
       "type": "http-request",
       "name": "Call API",
-      "description": "Fetch users from API",
+      "description": "Fetch projects from API",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/projects"
+        "url": "{{apiUrl}}/api/projects"
       },
       "inputPorts": [
         {
-          "name": "url",
+          "name": "apiUrl",
           "type": "string",
           "required": true,
           "description": "API base URL"
@@ -109,7 +107,7 @@
         }
       ],
       "outputs": {
-        "users": "$"
+        "projects": "$"
       },
       "connections": [
         {
@@ -141,7 +139,7 @@
           "fromBlock": "log1",
           "fromPort": "complete",
           "toBlock": "end1",
-          "toPort": "in"
+          "toPort": "complete"
         }
       ]
     },
@@ -150,27 +148,26 @@
       "type": "end",
       "name": "End",
       "description": "Workflow completion",
-      "inputPorts": [
-        {
-          "name": "in",
-          "type": "any",
-          "multiple": true
-        }
-      ],
       "config": {
         "outputs": {
           "apiUrl": {
             "type": "string",
-            "value": "{{url}}",
+            "value": "{{apiUrl}}",
             "description": "The final API URL used"
           },
           "result": {
             "type": "array",
-            "value": "{{users}}",
-            "description": "Users retrieved"
+            "value": "{{projects}}",
+            "description": "Projects retrieved"
           }
         }
-      }
+      },
+      "inputPorts": [
+        {
+          "name": "complete",
+          "type": "any"
+        }
+      ]
     }
   ]
 }

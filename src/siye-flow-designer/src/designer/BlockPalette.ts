@@ -1,5 +1,6 @@
 import { BLOCK_TEMPLATES, BlockTemplate, SimpleEventEmitter } from './VisualModels';
 import { ApiDefinition } from '../api/ApiDefinitionLoader';
+import { AlertModal } from '../components/AlertModal';
 
 /**
  * Block palette for dragging blocks onto the canvas
@@ -8,8 +9,9 @@ export class BlockPalette extends SimpleEventEmitter {
     private container: HTMLElement;
     private templates: BlockTemplate[] = BLOCK_TEMPLATES;
     private apiDefinitions: ApiDefinition[] = [];
+    private alertModal?: AlertModal;
     
-    constructor(containerId: string) {
+    constructor(containerId: string, alertModal?: AlertModal) {
         super();
         
         const element = document.getElementById(containerId);
@@ -18,6 +20,7 @@ export class BlockPalette extends SimpleEventEmitter {
         }
         
         this.container = element;
+        this.alertModal = alertModal;
         this.setupPalette();
     }
     
@@ -394,7 +397,11 @@ export class BlockPalette extends SimpleEventEmitter {
         
         // Check if locked
         if ((api as any).locked) {
-            alert('This API is provided by the host application and cannot be removed.');
+            if (this.alertModal) {
+                this.alertModal.show('This API is provided by the host application and cannot be removed.', 'Cannot Remove API', 'warning');
+            } else {
+                alert('This API is provided by the host application and cannot be removed.');
+            }
             return false;
         }
         

@@ -1,6 +1,7 @@
 {
   "name": "Test Start/End Blocks",
   "description": "Test workflow inputs and outputs with port-based connections",
+  "version": "1.0",
   "blocks": [
     {
       "id": "start",
@@ -12,19 +13,19 @@
           "userName": {
             "type": "string",
             "required": true,
-            "default": "TestUser",
+            "value": "TestUser",
             "description": "User name"
           },
           "maxItems": {
             "type": "number",
             "required": false,
-            "default": 10,
+            "value": 10,
             "description": "Maximum items"
           },
           "includeDetails": {
             "type": "boolean",
             "required": false,
-            "default": true,
+            "value": true,
             "description": "Include details flag"
           }
         }

@@ -21,12 +21,6 @@
                 "required": true,
                 "description": "API base URL"
               },
-              "projectId": {
-                "type": "string",
-                "value": "669f6214-c90e-485c-8cf3-b0b46d8f5e73",
-                "required": true,
-                "description": "Project ID (GUID) for API calls"
-              },
               "timeout": {
                 "type": "number",
                 "value": 5000,
@@ -44,12 +38,6 @@
                 "required": true,
                 "description": "API base URL"
               },
-              "projectId": {
-                "type": "string",
-                "value": "669f6214-c90e-485c-8cf3-b0b46d8f5e73",
-                "required": true,
-                "description": "Project ID (GUID) for API calls"
-              },
               "timeout": {
                 "type": "number",
                 "value": 30000,
@@ -64,25 +52,65 @@
         {
           "fromBlock": "start1",
           "fromPort": "apiUrl",
-          "toBlock": "http1",
-          "toPort": "url"
+          "toBlock": "http0",
+          "toPort": "apiUrl"
         },
         {
           "fromBlock": "start1",
-          "fromPort": "projectId",
-          "toBlock": "http1",
-          "toPort": "projectId"
+          "fromPort": "apiUrl",
+          "toBlock": "log1",
+          "toPort": "apiUrl"
         },
         {
           "fromBlock": "start1",
           "fromPort": "timeout",
           "toBlock": "log1",
           "toPort": "timeout"
+        }
+      ]
+    },
+    {
+      "id": "http0",
+      "type": "http-request",
+      "name": "Get Projects List",
+      "description": "Fetch list of projects to get a valid project ID",
+      "config": {
+        "method": "GET",
+        "url": "{{apiUrl}}/api/projects"
+      },
+      "inputPorts": [
+        {
+          "name": "apiUrl",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputPorts": [
+        {
+          "name": "response",
+          "type": "array",
+          "description": "List of projects"
+        },
+        {
+          "name": "firstProjectId",
+          "type": "string",
+          "description": "ID of the first project"
+        }
+      ],
+      "outputs": {
+        "firstProjectId": "$[0].id"
+      },
+      "connections": [
+        {
+          "fromBlock": "http0",
+          "fromPort": "firstProjectId",
+          "toBlock": "http1",
+          "toPort": "projectId"
         },
         {
           "fromBlock": "start1",
           "fromPort": "apiUrl",
-          "toBlock": "log1",
+          "toBlock": "http1",
           "toPort": "apiUrl"
         }
       ]
@@ -90,18 +118,18 @@
     {
       "id": "http1",
       "type": "http-request",
-      "name": "Get User Data",
-      "description": "Fetch user information from API",
+      "name": "Get Project Data",
+      "description": "Fetch project information from API",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/projects/{{projectId}}",
+        "url": "{{apiUrl}}/api/projects/{{projectId}}",
         "headers": {
           "Accept": "application/json"
         }
       },
       "inputPorts": [
         {
-          "name": "url",
+          "name": "apiUrl",
           "type": "string",
           "required": true
         },
@@ -134,7 +162,8 @@
       "type": "log",
       "name": "Log Configuration",
       "config": {
-        "message": "Using API: {{apiUrl}} with timeout: {{timeout}}ms"
+        "message": "Using API: {{apiUrl}} with timeout: {{timeout}}ms",
+        "level": "info"
       },
       "inputPorts": [
         {
@@ -145,6 +174,14 @@
           "name": "timeout",
           "type": "number"
         }
+      ],
+      "connections": [
+        {
+          "fromBlock": "log1",
+          "fromPort": "complete",
+          "toBlock": "end1",
+          "toPort": "complete"
+        }
       ]
     },
     {
@@ -152,7 +189,8 @@
       "type": "log",
       "name": "Log Response",
       "config": {
-        "message": "User data received: {{data}}"
+        "message": "Project data received: {{data}}",
+        "level": "info"
       },
       "inputPorts": [
         {
@@ -165,7 +203,7 @@
           "fromBlock": "log2",
           "fromPort": "complete",
           "toBlock": "end1",
-          "toPort": "in"
+          "toPort": "complete"
         }
       ]
     },
@@ -173,16 +211,26 @@
       "id": "end1",
       "type": "end",
       "name": "Complete",
+      "description": "Workflow completion",
+      "config": {
+        "outputs": {
+          "result": {
+            "type": "object",
+            "value": "{{userData}}",
+            "description": "Project data"
+          }
+        }
+      },
       "inputPorts": [
         {
-          "name": "in",
-          "type": "any",
-          "multiple": true
+          "name": "complete",
+          "type": "any"
+        },
+        {
+          "name": "logComplete",
+          "type": "any"
         }
-      ],
-      "outputs": {
-        "result": "{{userData}}"
-      }
+      ]
     }
   ]
 }

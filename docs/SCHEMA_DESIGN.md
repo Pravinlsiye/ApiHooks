@@ -1,8 +1,42 @@
-# SiyeFlow Schema - Block-Based Design
+# SiyeFlow Workflow Schema
+
+> **Port-Based Execution Model**: Blocks connect via named input/output ports for flexible, type-safe workflows.
 
 ## Overview
 
-The new schema uses typed blocks, where each block has a specific purpose and properties. This makes workflows more modular, powerful, and easier to visualize.
+SiyeFlow workflows are defined as JSON with typed blocks connected via ports. Each block performs a specific task (HTTP request, data transformation, condition check, etc.) and passes data through named ports to other blocks.
+
+### Migrating from Legacy Format?
+
+If you have workflows using `onSuccess`/`onFailure`:
+
+**Before:**
+```json
+{
+  "id": "http1",
+  "type": "http-request",
+  "onSuccess": "next-block",
+  "onFailure": "error-block"
+}
+```
+
+**After:**
+```json
+{
+  "id": "http1",
+  "type": "http-request",
+  "outputPorts": [
+    {"name": "success", "type": "any"},
+    {"name": "fail", "type": "any"}
+  ],
+  "connections": [
+    {"fromBlock": "http1", "fromPort": "success", "toBlock": "next-block", "toPort": "input"},
+    {"fromBlock": "http1", "fromPort": "fail", "toBlock": "error-block", "toPort": "error"}
+  ]
+}
+```
+
+See working examples in [`demo/api1/Workflows/`](../demo/api1/Workflows/).
 
 ## Core Concepts
 
@@ -13,10 +47,12 @@ Each block has a `type` field that determines its behavior:
 ```json
 {
   "id": "unique-id",
-  "type": "http-request|evaluate|condition|loop|delay|collect|log|variable",
+  "type": "start|end|http-request|evaluate|condition|loop|delay|collect|log|variable|try-catch",
   "name": "Human readable name",
   "description": "Optional description",
-  // Type-specific properties...
+  "inputPorts": [],   // Ports for receiving data
+  "outputPorts": [],  // Ports for sending data
+  "connections": []   // Port-based connections to other blocks
 }
 ```
 
@@ -27,22 +63,48 @@ All blocks share these properties:
 ```json
 {
   "id": "string",              // Unique identifier
-  "type": "string",            // Block type
+  "type": "string",            // Block type (start, end, http-request, etc.)
   "name": "string",            // Display name
   "description": "string?",     // Optional description
-  "inputs": {                  // Input parameters from other blocks
-    "paramName": "{{sourceBlockId.outputName}}"
+  
+  // Port-based execution (current model)
+  "inputPorts": [              // Define input ports
+    {
+      "name": "portName",
+      "type": "string|number|boolean|array|object|any",
+      "required": true,
+      "description": "Port description"
+    }
+  ],
+  "outputPorts": [             // Define output ports
+    {
+      "name": "portName",
+      "type": "string|number|boolean|array|object|any",
+      "description": "Port description"
+    }
+  ],
+  "connections": [             // Connections to other blocks
+    {
+      "fromBlock": "thisBlockId",
+      "fromPort": "outputPortName",
+      "toBlock": "targetBlockId",
+      "toPort": "inputPortName"
+    }
+  ],
+  
+  // Configuration
+  "config": {                  // Block-specific configuration
+    // Varies by block type
   },
-  "outputs": {                 // Output variables this block produces
-    "outputName": "jsonPath or value"
-  },
-  "onSuccess": "nextBlockId",  // Next block on success
-  "onFailure": "errorBlockId", // Next block on failure
-  "onComplete": "alwaysBlockId" // Always execute after (finally)
+  
+  // Output extraction (JSONPath)
+  "outputs": {                 // Extract variables from block output
+    "variableName": "$.path.to.data"  // JSONPath expression
+  }
 }
 ```
 
-**Future Enhancement**: Add `"dependsOn": ["blockId1", "blockId2"]` property for parallel execution support.
+**Note**: The old `onSuccess`, `onFailure`, and `onComplete` properties have been replaced by port-based connections for more flexible workflow routing.
 
 ## Block Types
 
@@ -228,6 +290,10 @@ siyeflow execute -w workflow.json -p Development -i '{"timeout": 1000}'
 
 ### 4. HTTP Request Block
 
+The HTTP Request block makes HTTP calls and supports port-based connections with success/fail routing.
+
+#### Configuration Properties
+
 ```json
 {
   "id": "fetch-user",
@@ -243,14 +309,97 @@ siyeflow execute -w workflow.json -p Development -i '{"timeout": 1000}'
       "name": "{{userName}}"
     },
     "timeout": 30000,
-    "retries": 3
+    "retries": 3,
+    "successCodes": [200, 201],  // Optional: custom success codes
+    "successEvaluator": "statusCode === 200 || statusCode === 201",  // Optional: TypeScript expression
+    "evaluatorLanguage": "typescript"  // "typescript" or "javascript"
   },
+  "inputPorts": [
+    {
+      "name": "baseUrl",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "userId",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "outputPorts": [
+    {
+      "name": "response",
+      "type": "object",
+      "description": "Full response data"
+    },
+    {
+      "name": "success",
+      "type": "any",
+      "description": "Success response (routes here if successful)"
+    },
+    {
+      "name": "fail",
+      "type": "any",
+      "description": "Failure response (routes here if failed)"
+    }
+  ],
   "outputs": {
-    "user": "$",
-    "userId": "$.id",
-    "userName": "$.name"
+    "user": "$",           // JSONPath: extract entire response
+    "userId": "$.id",      // JSONPath: extract id from response
+    "userName": "$.name"   // JSONPath: extract name from response
+  },
+  "connections": [
+    {
+      "fromBlock": "fetch-user",
+      "fromPort": "success",
+      "toBlock": "process-user",
+      "toPort": "userData"
+    },
+    {
+      "fromBlock": "fetch-user",
+      "fromPort": "fail",
+      "toBlock": "handle-error",
+      "toPort": "error"
+    }
+  ]
+}
+```
+
+#### Success Evaluation
+
+**Default behavior** (if no `successEvaluator` or `successCodes` specified):
+- Any 2xx status code (200-299) = success
+
+**Custom success codes**:
+```json
+{
+  "config": {
+    "successCodes": [200, 201, 304]  // Only these codes are success
   }
 }
+```
+
+**Custom TypeScript evaluator** (most flexible):
+```json
+{
+  "config": {
+    "successEvaluator": "statusCode === 200 && response.status === 'ok'",
+    "evaluatorLanguage": "typescript"
+  }
+}
+```
+
+**Available variables:**
+- `statusCode`, `status` - HTTP status code (number)
+- `response`, `body` - Parsed response body
+- `headers` - Response headers (object)
+
+**Examples:**
+```typescript
+"statusCode === 200"                                      // Exact match
+"statusCode === 200 || statusCode === 201"                // Multiple codes
+"statusCode >= 200 && statusCode < 300"                   // Range
+"(statusCode >= 200 && statusCode < 300) || statusCode === 304"  // Complex
 ```
 
 ### 5. Evaluate Block (Data Processing)
@@ -442,7 +591,13 @@ siyeflow execute -w workflow.json -p Development -i '{"timeout": 1000}'
 ```
 
 
-## Complete Workflow Example
+## Working Examples
+
+See real workflow examples in [`demo/api1/Workflows/`](../demo/api1/Workflows/):
+- `test-profiles-real-api.json` - Profile-based configuration
+- `test-port-connections.json` - Port-based connections
+- `test-http-evaluator.json` - Custom success evaluation
+- `test-start-block-ports.json` - Complete workflow with all features
 
 ```json
 {
@@ -690,15 +845,20 @@ siyeflow execute -w workflow.json -p Development -i '{"timeout": 1000}'
 }
 ```
 
-## Benefits of This Design
+## Benefits of Port-Based Design
 
 1. **Modularity**: Each block type has its own schema and behavior
 2. **Extensibility**: Easy to add new block types
 3. **Visual Clarity**: UI can render different blocks with different styles/icons
-4. **Type Safety**: Each block type has defined inputs/outputs
+4. **Type Safety**: Each block type has defined inputs/outputs with type checking
 5. **Reusability**: Blocks can be saved as templates
 6. **Debugging**: Clear flow with logging and evaluation blocks
 7. **Power**: Supports complex workflows with loops, conditions, and data processing
+8. **Flexibility**: Port-based connections allow for:
+   - Multiple output paths (success/fail/custom)
+   - Conditional routing based on block results
+   - Parallel execution branches
+   - Dynamic workflow composition
 
 ## Special Variables
 

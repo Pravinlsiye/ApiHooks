@@ -48,6 +48,396 @@ export abstract class BlockRenderer {
     }
     
     /**
+     * Render editable input rows (with input ports on left, no output ports)
+     */
+    protected renderEditableInputList(
+        items: Record<string, any>,
+        itemType: 'variable' | 'header' | 'output',
+        blockId: string,
+        portType: 'input' | 'output' = 'input'
+    ): string {
+        const itemEntries = Object.entries(items || {});
+        
+        if (itemEntries.length === 0) {
+            return `
+                <div class="block-inputs-empty">
+                    <button class="btn-add-item-popup" data-block="${blockId}" data-item-type="${itemType}" data-port-type="${portType}" title="Add ${itemType} ${portType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                        </svg>
+                        <span>Add ${portType === 'input' ? 'Input' : 'Output'}</span>
+                    </button>
+                </div>
+            `;
+        }
+        
+        return itemEntries.map(([itemName, itemValue]) => {
+            const displayValue = typeof itemValue === 'object' ? JSON.stringify(itemValue) : String(itemValue || '');
+            const typeIcon = this.getTypeIconForValue(itemValue);
+            const itemTypeValue = this.getTypeForValue(itemValue);
+            
+            return `
+                <div class="block-input-row" data-item-name="${this.escapeHtml(itemName)}" data-item-type="${itemType}" data-port-type="${portType}">
+                    <div class="port-input-tab" 
+                         data-block="${blockId}" 
+                         data-port="${this.escapeHtml(itemName)}"
+                         data-port-type="${portType}"
+                         data-value-type="${itemTypeValue}">
+                        <span class="port-tab"></span>
+                    </div>
+                    <div class="input-name-field">
+                        <input type="text" 
+                               class="block-input-name" 
+                               value="${this.escapeHtml(itemName)}" 
+                               placeholder="${itemType} name"
+                               data-original-name="${this.escapeHtml(itemName)}"
+                               data-block="${blockId}"
+                               data-item-type="${itemType}">
+                    </div>
+                    <div class="input-type-selector">
+                        <button class="input-type-btn" 
+                                data-block="${blockId}"
+                                data-item-name="${this.escapeHtml(itemName)}"
+                                data-item-type="${itemType}"
+                                data-current-type="${itemTypeValue}"
+                                title="Type: ${itemTypeValue}">
+                            ${typeIcon}
+                        </button>
+                        <div class="input-type-dropdown" 
+                             data-block="${blockId}"
+                             data-item-name="${this.escapeHtml(itemName)}"
+                             data-item-type="${itemType}">
+                            ${this.renderTypeOptions(itemTypeValue)}
+                        </div>
+                    </div>
+                    <div class="input-value-field">
+                        <input type="text" 
+                               class="block-input-value" 
+                               value="${this.escapeHtml(displayValue)}" 
+                               placeholder="Enter value or {{variable}}"
+                               data-block="${blockId}"
+                               data-item-name="${this.escapeHtml(itemName)}"
+                               data-item-type="${itemType}">
+                    </div>
+                    <button class="btn-edit-input" 
+                            data-block="${blockId}"
+                            data-item-name="${this.escapeHtml(itemName)}"
+                            data-item-type="${itemType}"
+                            data-port-type="${portType}"
+                            title="Edit ${itemType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086ZM11.189 6.25 9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l6.286-6.286Z"/>
+                        </svg>
+                    </button>
+                    <button class="btn-delete-input" 
+                            data-block="${blockId}"
+                            data-item-name="${this.escapeHtml(itemName)}"
+                            data-item-type="${itemType}"
+                            title="Delete ${itemType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }).join('') + `
+            <div class="block-add-input-row">
+                <button class="btn-add-item-popup" data-block="${blockId}" data-item-type="${itemType}" data-port-type="${portType}" title="Add ${itemType} ${portType}">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                    </svg>
+                    <span>Add ${portType === 'input' ? 'Input' : 'Output'}</span>
+                </button>
+            </div>
+        `;
+    }
+    
+    /**
+     * Render editable output rows (with output ports on right, no input ports)
+     */
+    protected renderEditableOutputList(
+        items: Record<string, any>,
+        itemType: 'variable' | 'header' | 'output',
+        blockId: string,
+        portType: 'input' | 'output' = 'output'
+    ): string {
+        const itemEntries = Object.entries(items || {});
+        
+        if (itemEntries.length === 0) {
+            return `
+                <div class="block-inputs-empty">
+                    <button class="btn-add-item-popup" data-block="${blockId}" data-item-type="${itemType}" data-port-type="${portType}" title="Add ${itemType} ${portType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                        </svg>
+                        <span>Add ${portType === 'input' ? 'Input' : 'Output'}</span>
+                    </button>
+                </div>
+            `;
+        }
+        
+        return itemEntries.map(([itemName, itemValue]) => {
+            const displayValue = typeof itemValue === 'object' ? JSON.stringify(itemValue) : String(itemValue || '');
+            const typeIcon = this.getTypeIconForValue(itemValue);
+            const itemTypeValue = this.getTypeForValue(itemValue);
+            
+            return `
+                <div class="block-input-row" data-item-name="${this.escapeHtml(itemName)}" data-item-type="${itemType}" data-port-type="${portType}">
+                    <div class="input-name-field">
+                        <input type="text" 
+                               class="block-input-name" 
+                               value="${this.escapeHtml(itemName)}" 
+                               placeholder="${itemType} name"
+                               data-original-name="${this.escapeHtml(itemName)}"
+                               data-block="${blockId}"
+                               data-item-type="${itemType}">
+                    </div>
+                    <div class="input-type-selector">
+                        <button class="input-type-btn" 
+                                data-block="${blockId}"
+                                data-item-name="${this.escapeHtml(itemName)}"
+                                data-item-type="${itemType}"
+                                data-current-type="${itemTypeValue}"
+                                title="Type: ${itemTypeValue}">
+                            ${typeIcon}
+                        </button>
+                        <div class="input-type-dropdown" 
+                             data-block="${blockId}"
+                             data-item-name="${this.escapeHtml(itemName)}"
+                             data-item-type="${itemType}">
+                            ${this.renderTypeOptions(itemTypeValue)}
+                        </div>
+                    </div>
+                    <div class="input-value-field">
+                        <input type="text" 
+                               class="block-input-value" 
+                               value="${this.escapeHtml(displayValue)}" 
+                               placeholder="Enter value or {{variable}}"
+                               data-block="${blockId}"
+                               data-item-name="${this.escapeHtml(itemName)}"
+                               data-item-type="${itemType}">
+                    </div>
+                    <button class="btn-edit-input" 
+                            data-block="${blockId}"
+                            data-item-name="${this.escapeHtml(itemName)}"
+                            data-item-type="${itemType}"
+                            data-port-type="${portType}"
+                            title="Edit ${itemType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086ZM11.189 6.25 9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l6.286-6.286Z"/>
+                        </svg>
+                    </button>
+                    <button class="btn-delete-input" 
+                            data-block="${blockId}"
+                            data-item-name="${this.escapeHtml(itemName)}"
+                            data-item-type="${itemType}"
+                            title="Delete ${itemType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                    </button>
+                    <div class="port-output-tab" 
+                         data-block="${blockId}" 
+                         data-port="${this.escapeHtml(itemName)}"
+                         data-port-type="${portType}"
+                         data-value-type="${itemTypeValue}">
+                        <span class="port-tab"></span>
+                    </div>
+                </div>
+            `;
+        }).join('') + `
+            <div class="block-add-input-row">
+                <button class="btn-add-item-popup" data-block="${blockId}" data-item-type="${itemType}" data-port-type="${portType}" title="Add ${itemType} ${portType}">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                    </svg>
+                    <span>Add ${portType === 'input' ? 'Input' : 'Output'}</span>
+                </button>
+            </div>
+        `;
+    }
+    
+    /**
+     * Render a list of editable key-value pairs (variables, headers, outputs, etc.)
+     * DEPRECATED: Use renderEditableInputList and renderEditableOutputList instead
+     */
+    protected renderEditableKeyValueList(
+        items: Record<string, any>,
+        itemType: 'variable' | 'header' | 'output',
+        blockId: string
+    ): string {
+        const itemEntries = Object.entries(items || {});
+        
+        if (itemEntries.length === 0) {
+            return `
+                <div class="block-inputs-empty">
+                    <button class="btn-add-item-popup" data-block="${blockId}" data-item-type="${itemType}" data-port-type="input" title="Add ${itemType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                        </svg>
+                        <span>Add ${itemType}</span>
+                    </button>
+                </div>
+            `;
+        }
+        
+        return itemEntries.map(([itemName, itemValue]) => {
+            const displayValue = typeof itemValue === 'object' ? JSON.stringify(itemValue) : String(itemValue || '');
+            const typeIcon = this.getTypeIconForValue(itemValue);
+            const itemTypeValue = this.getTypeForValue(itemValue);
+            
+            return `
+                <div class="block-input-row" data-item-name="${this.escapeHtml(itemName)}" data-item-type="${itemType}">
+                    <div class="port-input-tab" 
+                         data-block="${blockId}" 
+                         data-port="${this.escapeHtml(itemName)}"
+                         data-port-type="input"
+                         data-value-type="${itemTypeValue}">
+                        <span class="port-tab"></span>
+                    </div>
+                    <div class="input-name-field">
+                        <input type="text" 
+                               class="block-input-name" 
+                               value="${this.escapeHtml(itemName)}" 
+                               placeholder="${itemType} name"
+                               data-original-name="${this.escapeHtml(itemName)}"
+                               data-block="${blockId}"
+                               data-item-type="${itemType}">
+                    </div>
+                    <div class="input-type-selector">
+                        <button class="input-type-btn" 
+                                data-block="${blockId}"
+                                data-item-name="${this.escapeHtml(itemName)}"
+                                data-item-type="${itemType}"
+                                data-current-type="${itemTypeValue}"
+                                title="Type: ${itemTypeValue}">
+                            ${typeIcon}
+                        </button>
+                        <div class="input-type-dropdown" 
+                             data-block="${blockId}"
+                             data-item-name="${this.escapeHtml(itemName)}"
+                             data-item-type="${itemType}">
+                            ${this.renderTypeOptions(itemTypeValue)}
+                        </div>
+                    </div>
+                    <div class="input-value-field">
+                        <input type="text" 
+                               class="block-input-value" 
+                               value="${this.escapeHtml(displayValue)}" 
+                               placeholder="Enter value or {{variable}}"
+                               data-block="${blockId}"
+                               data-item-name="${this.escapeHtml(itemName)}"
+                               data-item-type="${itemType}">
+                    </div>
+                    <button class="btn-edit-input" 
+                            data-block="${blockId}"
+                            data-item-name="${this.escapeHtml(itemName)}"
+                            data-item-type="${itemType}"
+                            data-port-type="input"
+                            title="Edit ${itemType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086ZM11.189 6.25 9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064l6.286-6.286Z"/>
+                        </svg>
+                    </button>
+                    <button class="btn-delete-input" 
+                            data-block="${blockId}"
+                            data-item-name="${this.escapeHtml(itemName)}"
+                            data-item-type="${itemType}"
+                            title="Delete ${itemType}">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                    </button>
+                    <div class="port-output-tab" 
+                         data-block="${blockId}" 
+                         data-port="${this.escapeHtml(itemName)}"
+                         data-port-type="output"
+                         data-value-type="${itemTypeValue}">
+                        <span class="port-tab"></span>
+                    </div>
+                </div>
+            `;
+        }).join('') + `
+            <div class="block-add-input-row">
+                <button class="btn-add-item-popup" data-block="${blockId}" data-item-type="${itemType}" data-port-type="input" title="Add ${itemType}">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7.5 4a.5.5 0 0 1 1 0v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0V8h-3a.5.5 0 0 1 0-1h3V4z"/>
+                    </svg>
+                    <span>Add ${itemType}</span>
+                </button>
+            </div>
+        `;
+    }
+    
+    /**
+     * Get type icon for a value
+     */
+    protected getTypeIconForValue(value: any): string {
+        return this.getTypeIcon(this.getTypeForValue(value));
+    }
+    
+    /**
+     * Get type for a value
+     */
+    protected getTypeForValue(value: any): string {
+        if (value === null || value === undefined) return 'string';
+        if (typeof value === 'number') return 'number';
+        if (typeof value === 'boolean') return 'boolean';
+        if (Array.isArray(value)) return 'array';
+        if (typeof value === 'object') return 'object';
+        return 'string';
+    }
+    
+    /**
+     * Get type icon for display
+     */
+    protected getTypeIcon(type: string): string {
+        const typeIcons: Record<string, string> = {
+            'string': 'Aa',
+            'number': '#',
+            'boolean': '0/1',
+            'object': '{}',
+            'array': '[]',
+            'any': '*'
+        };
+        return typeIcons[type] || 'Aa';
+    }
+    
+    /**
+     * Render type options dropdown
+     */
+    protected renderTypeOptions(currentType: string): string {
+        const types = [
+            { value: 'string', icon: 'Aa', label: 'String' },
+            { value: 'number', icon: '#', label: 'Number' },
+            { value: 'boolean', icon: '0/1', label: 'Boolean' },
+            { value: 'object', icon: '{}', label: 'Object' },
+            { value: 'array', icon: '[]', label: 'Array' },
+            { value: 'any', icon: '*', label: 'Any' }
+        ];
+        
+        return types.map(type => `
+            <div class="input-type-option ${type.value === currentType ? 'selected' : ''}" 
+                 data-type="${type.value}">
+                <span class="type-icon">${type.icon}</span>
+                <span class="type-label">${type.label}</span>
+            </div>
+        `).join('');
+    }
+    
+    /**
+     * Escape HTML to prevent XSS
+     */
+    protected escapeHtml(text: string): string {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    /**
      * Render custom content (override in subclasses)
      */
     protected renderCustomContent(): string {

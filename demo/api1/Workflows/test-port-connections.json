@@ -22,24 +22,12 @@
           }
         }
       },
-      "outputPorts": [
-        {
-          "name": "apiUrl",
-          "type": "string",
-          "multiple": true
-        },
-        {
-          "name": "timeout",
-          "type": "number",
-          "multiple": true
-        }
-      ],
       "connections": [
         {
           "fromBlock": "start1",
           "fromPort": "apiUrl",
           "toBlock": "http0",
-          "toPort": "url"
+          "toPort": "apiUrl"
         }
       ]
     },
@@ -49,11 +37,11 @@
       "name": "Get Projects List",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/projects"
+        "url": "{{apiUrl}}/api/projects"
       },
       "inputPorts": [
         {
-          "name": "url",
+          "name": "apiUrl",
           "type": "string",
           "required": true
         }
@@ -84,13 +72,13 @@
           "fromBlock": "start1",
           "fromPort": "apiUrl",
           "toBlock": "http1",
-          "toPort": "url"
+          "toPort": "apiUrl"
         },
         {
           "fromBlock": "start1",
           "fromPort": "apiUrl",
           "toBlock": "http2",
-          "toPort": "url"
+          "toPort": "apiUrl"
         }
       ]
     },
@@ -100,11 +88,11 @@
       "name": "Get Project",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/projects/{{projectId}}"
+        "url": "{{apiUrl}}/api/projects/{{projectId}}"
       },
       "inputPorts": [
         {
-          "name": "url",
+          "name": "apiUrl",
           "type": "string",
           "required": true
         },
@@ -126,6 +114,9 @@
           "multiple": false
         }
       ],
+      "outputs": {
+        "userData": "$"
+      },
       "connections": [
         {
           "fromBlock": "http1",
@@ -141,11 +132,11 @@
       "name": "Get All Projects",
       "config": {
         "method": "GET",
-        "url": "{{url}}/api/projects"
+        "url": "{{apiUrl}}/api/projects"
       },
       "inputPorts": [
         {
-          "name": "url",
+          "name": "apiUrl",
           "type": "string",
           "required": true
         }
@@ -159,6 +150,14 @@
         {
           "name": "count",
           "type": "number"
+        }
+      ],
+      "connections": [
+        {
+          "fromBlock": "http2",
+          "fromPort": "response",
+          "toBlock": "end1",
+          "toPort": "allProjects"
         }
       ]
     },
@@ -219,6 +218,11 @@
           "projectDescription": {
             "type": "string",
             "value": "{{projectDescription}}"
+          },
+          "allProjects": {
+            "type": "array",
+            "value": "{{allProjects}}",
+            "description": "All projects from parallel request"
           }
         }
       },
@@ -230,6 +234,10 @@
         {
           "name": "projectDescription",
           "type": "string"
+        },
+        {
+          "name": "allProjects",
+          "type": "array"
         }
       ]
     }
