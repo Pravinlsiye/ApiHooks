@@ -10,6 +10,7 @@
     <Authors>SiyeFlow</Authors>
     <Description>Embedded UI for visualizing and executing API workflows in ASP.NET Core applications</Description>
     <PackageTags>workflow;api;visualization;swagger-like</PackageTags>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,10 +27,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="UI\**\*" />
+    <EmbeddedResource Include="UI\index.html" />
+    <EmbeddedResource Include="UI\style.css" />
+    <EmbeddedResource Include="UI\siye-flow-designer.es.js" />
+    <EmbeddedResource Include="UI\siye-flow-designer.umd.js" />
   </ItemGroup>
   
-  <Target Name="BuildDesigner" BeforeTargets="PreBuildEvent">
+  <Target Name="BuildDesigner" BeforeTargets="PrepareForBuild">
     <Message Text="Building SiyeFlow Designer..." Importance="high" />
     <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(ProjectDir)build-designer.ps1&quot;" />
   </Target>

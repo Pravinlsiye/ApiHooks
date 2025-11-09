@@ -31,17 +31,20 @@ app.UseSiyeFlow();
 
 ## 📚 Documentation
 
-- [Schema Design](docs/SCHEMA_DESIGN.md) - Complete workflow schema
-- [Progress](docs/PROGRESS.md) - Implementation status
+- [Schema Design](docs/SCHEMA_DESIGN.md) - Complete workflow schema reference
+- [Progress](docs/PROGRESS.md) - Implementation status and tracking
+- [HTML Files](docs/HTML_FILES.md) - Differences between production and development HTML files
 
 ## 🎯 Key Features
 
 - 🎨 **Visual Workflow Designer** - Drag & drop API endpoints to create workflows
-- 📊 **Interactive Block Diagrams** - See your workflow as connected blocks  
-- 🔄 **Variable Management** - Define variables and extract data from responses
+- 📊 **Port-Based Connections** - Visual port system for connecting workflow blocks
+- 🔄 **Profile System** - Multiple input profiles for Start blocks (Development/Production/etc.)
+- 🔄 **Variable Management** - Define variables and extract data from responses using JSONPath
 - 🎯 **Endpoint Discovery** - Automatically loads endpoints from your Swagger/OpenAPI
 - 📝 **JSON Export** - Save workflows as JSON files for use with CLI
 - 🔌 **Easy Integration** - Embed in any ASP.NET Core application
+- 🧩 **Block-Based Architecture** - Modular workflow blocks (HTTP, Condition, Loop, etc.)
 
 ## 📦 Quick Start
 
@@ -81,7 +84,8 @@ SiyeFlow/
 ├── src/                      # All source code
 │   ├── SiyeFlow.CLI/        # Command-line workflow engine
 │   ├── SiyeFlow.Core/       # Shared models and interfaces
-│   └── SiyeFlow.UI/         # Embeddable UI designer
+│   ├── SiyeFlow.UI/         # Embeddable UI designer middleware
+│   └── siye-flow-designer/  # Standalone TypeScript designer (source)
 ├── demo/                     # Demo projects
 │   └── api1/                # Sample API with test workflows
 │       └── Workflows/       # Test workflow files
@@ -92,7 +96,7 @@ SiyeFlow/
 
 ## 📋 Workflow Definition Format
 
-Workflows use a block-based JSON structure for maximum flexibility:
+Workflows use a **port-based block structure** for maximum flexibility:
 
 ```json
 {
@@ -105,12 +109,26 @@ Workflows use a block-based JSON structure for maximum flexibility:
       "type": "start",
       "name": "Start",
       "config": {
-        "inputs": {
-          "email": { "type": "string", "required": true },
-          "password": { "type": "string", "required": true }
-        }
+        "profiles": [
+          {
+            "name": "Development",
+            "inputs": {
+              "email": { "type": "string", "required": true },
+              "password": { "type": "string", "required": true }
+            }
+          }
+        ],
+        "selectedProfile": "Development"
       },
-      "onSuccess": "register-user"
+      "outputPorts": [
+        { "name": "success", "type": "success" }
+      ],
+      "connections": [
+        {
+          "from": { "blockId": "start", "portName": "success" },
+          "to": { "blockId": "register-user", "portName": "input" }
+        }
+      ]
     },
     {
       "id": "register-user",
@@ -128,21 +146,10 @@ Workflows use a block-based JSON structure for maximum flexibility:
         "userId": "$.id",
         "status": "$.status"
       },
-      "onSuccess": "send-email"
-    },
-    {
-      "id": "send-email",
-      "type": "http-request",
-      "name": "Send Welcome Email",
-      "config": {
-        "method": "POST",
-        "url": "https://api.example.com/emails",
-        "body": {
-          "userId": "{{userId}}",
-          "template": "welcome"
-        }
-      },
-      "onSuccess": "end"
+      "outputPorts": [
+        { "name": "success", "type": "success" },
+        { "name": "failure", "type": "failure" }
+      ]
     },
     {
       "id": "end",
@@ -153,14 +160,22 @@ Workflows use a block-based JSON structure for maximum flexibility:
 }
 ```
 
+**Key Features:**
+- **Port-Based Connections**: Visual port system for connecting blocks
+- **Profile System**: Multiple input configurations for Start blocks
+- **JSONPath Extraction**: Extract data using `$.path` syntax
+- **Variable Interpolation**: Use `{{variableName}}` in configs
+
 ## 🖼️ Visual Workflow Designer
 
 The SiyeFlow UI provides an intuitive interface for creating workflows:
 
-- **Drag & Drop**: Simply drag API endpoints onto the canvas
-- **Visual Connections**: Connect steps with visual lines
-- **Properties Panel**: Configure each step's parameters, headers, and body
-- **Export to JSON**: Save your workflow for use with the CLI or API
+- **Drag & Drop**: Simply drag API endpoints or blocks onto the canvas
+- **Port-Based Connections**: Connect blocks using visual input/output ports
+- **Profile Management**: Switch between different input profiles for Start blocks
+- **Properties Panel**: Configure each block's parameters, headers, and body
+- **Export to JSON**: Save your workflow for use with the CLI
+- **Import Workflows**: Load existing workflow JSON files
 
 ## 🔧 Advanced Features
 
@@ -221,6 +236,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🚀 Future Enhancements
 
 - [x] Visual workflow designer (drag & drop) ✅
+- [x] Port-based connections ✅
+- [x] Profile system for Start blocks ✅
 - [ ] Workflow templates library
 - [ ] Parallel step execution
 - [ ] Webhook triggers  
@@ -228,6 +245,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [ ] Export to code generation
 - [ ] Step-by-step debugger
 - [ ] Undo/Redo in designer
+- [ ] Loop and Try/Catch block executors
 
 ---
 

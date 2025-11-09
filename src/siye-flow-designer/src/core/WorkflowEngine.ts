@@ -155,6 +155,7 @@ export class WorkflowEngine {
                         inputs: {
                             value1: {
                                 type: 'string',
+                                required: false,
                                 value: '',
                                 description: 'Input value 1'
                             }

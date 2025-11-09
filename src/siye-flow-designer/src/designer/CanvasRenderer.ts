@@ -1,4 +1,4 @@
-import { VisualBlock, VisualConnection, Position, SimpleEventEmitter } from './VisualModels';
+import { VisualBlock, VisualConnection, VisualPort, Position, SimpleEventEmitter } from './VisualModels';
 import { AnyWorkflowBlock } from '../models/workflow-models';
 import { BlockRendererFactory } from './renderers/BlockRendererFactory';
 
@@ -288,7 +288,6 @@ export class CanvasRenderer extends SimpleEventEmitter {
         
         // Calculate curve between the two straight segments
         const horizontalGap = inStartX - outEndX;
-        const verticalGap = inStartY - outEndY;
         
         // Curve control points (positioned along the straight segments)
         const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
@@ -462,19 +461,19 @@ export class CanvasRenderer extends SimpleEventEmitter {
      */
     private checkConnectionHover(): void {
         const HOVER_DISTANCE = 10; // pixels
-        let nearestConnection: { id: string, distance: number } | null = null;
+        let nearestConnection: { id: string; distance: number } | null = null;
         
-        this.connections.forEach((connection, id) => {
+        for (const [id, connection] of this.connections.entries()) {
             const sourceBlock = this.blocks.get(connection.sourceBlockId);
             const targetBlock = this.blocks.get(connection.targetBlockId);
             
-            if (!sourceBlock || !targetBlock) return;
+            if (!sourceBlock || !targetBlock) continue;
             
             // Get ports
             const sourcePort = sourceBlock.outputPorts?.find(p => p.name === connection.sourcePortName);
             const targetPort = targetBlock.inputPorts?.find(p => p.name === connection.targetPortName);
             
-            if (!sourcePort || !targetPort) return;
+            if (!sourcePort || !targetPort) continue;
             
             // Use centralized method to get port tab positions
             const start = this.getPortTabPosition(sourceBlock, sourcePort);
@@ -496,18 +495,21 @@ export class CanvasRenderer extends SimpleEventEmitter {
             if (distance < HOVER_DISTANCE && (!nearestConnection || distance < nearestConnection.distance)) {
                 nearestConnection = { id, distance };
             }
-        });
+        }
         
-        if (nearestConnection && nearestConnection.id !== this.hoveredConnection) {
-            this.hoveredConnection = nearestConnection.id;
-            this.showDeleteButton(this.mousePosition, nearestConnection.id);
-        } else if (!nearestConnection && this.hoveredConnection) {
+        if (nearestConnection) {
+            const connectionId = nearestConnection.id;
+            if (connectionId !== this.hoveredConnection) {
+                this.hoveredConnection = connectionId;
+                this.showDeleteButton(this.mousePosition, connectionId);
+            } else if (this.deleteButtonElement) {
+                // Update button position
+                this.deleteButtonElement.setAttribute('x', String(this.mousePosition.x - 12));
+                this.deleteButtonElement.setAttribute('y', String(this.mousePosition.y - 12));
+            }
+        } else if (this.hoveredConnection) {
             this.hoveredConnection = null;
             this.hideDeleteButton();
-        } else if (nearestConnection && this.deleteButtonElement) {
-            // Update button position
-            this.deleteButtonElement.setAttribute('x', String(this.mousePosition.x - 12));
-            this.deleteButtonElement.setAttribute('y', String(this.mousePosition.y - 12));
         }
     }
     

@@ -1,3 +1,4 @@
+import './styles.css';
 import { WorkflowDesigner } from './designer/WorkflowDesigner';
 import { DEFAULT_CONFIG, createEmbeddedConfig } from './designer/DesignerConfig';
 

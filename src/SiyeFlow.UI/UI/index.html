@@ -1,10 +1,18 @@
 <!DOCTYPE html>
+<!-- 
+    IMPORTANT: This is a template file that is preserved during builds.
+    Changes to this file will NOT be overwritten by the build script.
+    The build script (build-designer.ps1) explicitly preserves this file.
+    
+    This file is processed by SiyeFlowMiddleware.cs which replaces {{RoutePrefix}}
+    with the actual route prefix before serving.
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SiyeFlow Designer</title>
-    <link rel="stylesheet" href="/_siyeflow/style.css">
+    <link rel="stylesheet" href="/{{RoutePrefix}}/style.css">
     <style>
         body {
             margin: 0;
@@ -36,23 +44,42 @@
         };
     </script>
     
-    <script type="module">
-        import { WorkflowDesigner, createEmbeddedConfig } from '/_siyeflow/siye-flow-designer.es.js';
-        
-        // Create embedded configuration
-        const config = createEmbeddedConfig(
-            window.SiyeFlowConfig.apiBasePath,
-            window.SiyeFlowConfig.hostApis
-        );
-        
-        // Initialize designer with embedded config
-        const designer = new WorkflowDesigner('designer-container', config);
-        
-        console.log('SiyeFlow Designer initialized in embedded mode');
-        console.log('Host APIs will be loaded automatically');
-        
-        // Expose for debugging
-        window.siyeFlowDesigner = designer;
+    <script src="/{{RoutePrefix}}/siye-flow-designer.umd.js"></script>
+    <script>
+        // Wait for UMD script to load, then initialize
+        if (typeof SiyeFlowDesigner !== 'undefined') {
+            const { WorkflowDesigner, createEmbeddedConfig } = SiyeFlowDesigner;
+            
+            // Create embedded configuration
+            const config = createEmbeddedConfig(
+                window.SiyeFlowConfig.apiBasePath,
+                window.SiyeFlowConfig.hostApis
+            );
+            
+            // Initialize designer with embedded config
+            const designer = new WorkflowDesigner('designer-container', config);
+            
+            console.log('SiyeFlow Designer initialized in embedded mode');
+            console.log('Host APIs will be loaded automatically');
+            
+            // Expose for debugging
+            window.siyeFlowDesigner = designer;
+        } else {
+            // Fallback: wait for script to load
+            window.addEventListener('load', () => {
+                if (typeof SiyeFlowDesigner !== 'undefined') {
+                    const { WorkflowDesigner, createEmbeddedConfig } = SiyeFlowDesigner;
+                    const config = createEmbeddedConfig(
+                        window.SiyeFlowConfig.apiBasePath,
+                        window.SiyeFlowConfig.hostApis
+                    );
+                    const designer = new WorkflowDesigner('designer-container', config);
+                    window.siyeFlowDesigner = designer;
+                } else {
+                    console.error('SiyeFlowDesigner not found. Make sure siye-flow-designer.umd.js is loaded.');
+                }
+            });
+        }
     </script>
 </body>
 </html>

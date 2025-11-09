@@ -49,7 +49,15 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// Only use HTTPS redirection if HTTPS is configured (check launchSettings or environment)
+var urls = app.Configuration["ASPNETCORE_URLS"] ?? "";
+var hasHttps = urls.Contains("https://") || app.Environment.IsProduction();
+
+if (hasHttps)
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseCors();
 
 // Use SiyeFlow Designer UI - accessible at /workflows

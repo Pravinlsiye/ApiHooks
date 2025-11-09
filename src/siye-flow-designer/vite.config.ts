@@ -14,10 +14,17 @@ export default defineConfig({
       name: 'SiyeFlowDesigner',
       fileName: (format) => `siye-flow-designer.${format}.js`,
     },
+    cssCodeSplit: false,
     rollupOptions: {
       external: [],
       output: {
         globals: {},
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name === 'style.css') {
+            return 'style.css';
+          }
+          return assetInfo.name || 'asset';
+        },
       },
     },
   },
