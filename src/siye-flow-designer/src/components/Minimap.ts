@@ -278,10 +278,10 @@ export class Minimap extends BaseComponent {
             const visibleWidth = containerRect.width / zoomLevel;
             const visibleHeight = containerRect.height / zoomLevel;
             
-            const viewportX = scrollLeft;
-            const viewportY = scrollTop;
-            const viewportRight = scrollLeft + visibleWidth;
-            const viewportBottom = scrollTop + visibleHeight;
+            const viewportX = scrollLeft / zoomLevel;
+            const viewportY = scrollTop / zoomLevel;
+            const viewportRight = viewportX + visibleWidth;
+            const viewportBottom = viewportY + visibleHeight;
             
             if (this.blocks.size === 0) {
                 // If no blocks, use viewport as the base
@@ -369,8 +369,12 @@ export class Minimap extends BaseComponent {
         const canvasVisibleHeight = visibleHeight / zoomLevel;
         
         // Update viewport indicator (coordinates are in canvas space)
-        this.viewportIndicator.setAttribute('x', scrollLeft.toString());
-        this.viewportIndicator.setAttribute('y', scrollTop.toString());
+        // The scroll position needs to be divided by zoom to get canvas coordinates
+        const viewportCanvasX = scrollLeft / zoomLevel;
+        const viewportCanvasY = scrollTop / zoomLevel;
+        
+        this.viewportIndicator.setAttribute('x', viewportCanvasX.toString());
+        this.viewportIndicator.setAttribute('y', viewportCanvasY.toString());
         this.viewportIndicator.setAttribute('width', canvasVisibleWidth.toString());
         this.viewportIndicator.setAttribute('height', canvasVisibleHeight.toString());
         
@@ -379,19 +383,19 @@ export class Minimap extends BaseComponent {
         
         // Check if viewport is within blocks-only bounds (with some margin)
         const margin = this.PADDING * 0.5;
-        const viewportRight = scrollLeft + canvasVisibleWidth;
-        const viewportBottom = scrollTop + canvasVisibleHeight;
+        const viewportRight = viewportCanvasX + canvasVisibleWidth;
+        const viewportBottom = viewportCanvasY + canvasVisibleHeight;
         
         const viewportInBlocksBounds = 
-            scrollLeft >= blocksOnlyBounds.x + margin &&
-            scrollTop >= blocksOnlyBounds.y + margin &&
+            viewportCanvasX >= blocksOnlyBounds.x + margin &&
+            viewportCanvasY >= blocksOnlyBounds.y + margin &&
             viewportRight <= blocksOnlyBounds.x + blocksOnlyBounds.width - margin &&
             viewportBottom <= blocksOnlyBounds.y + blocksOnlyBounds.height - margin;
         
         // Check if viewport is outside current viewBox bounds (with some margin)
         const viewportOutsideCurrentBounds = 
-            scrollLeft < this.viewBoxX + margin ||
-            scrollTop < this.viewBoxY + margin ||
+            viewportCanvasX < this.viewBoxX + margin ||
+            viewportCanvasY < this.viewBoxY + margin ||
             viewportRight > this.viewBoxX + this.viewBoxWidth - margin ||
             viewportBottom > this.viewBoxY + this.viewBoxHeight - margin;
         
@@ -483,17 +487,22 @@ export class Minimap extends BaseComponent {
         
         // Center viewport on clicked position
         const containerRect = this.canvasContainer.getBoundingClientRect();
-        this.canvasContainer.scrollLeft = svgX - (containerRect.width / 2);
-        this.canvasContainer.scrollTop = svgY - (containerRect.height / 2);
+        const zoomLevel = this.getZoomLevel ? this.getZoomLevel() : 1.0;
+        
+        // Convert canvas coordinates to scroll coordinates (multiply by zoom)
+        const scrollX = svgX * zoomLevel - (containerRect.width / 2);
+        const scrollY = svgY * zoomLevel - (containerRect.height / 2);
+        
+        this.canvasContainer.scrollLeft = scrollX;
+        this.canvasContainer.scrollTop = scrollY;
     }
     
     /**
      * Set canvas dimensions
-     * Canvas is now infinite - this method is kept for compatibility but does nothing
+     * Updates minimap when canvas size changes dynamically
      */
-    public setCanvasSize(_width: number, _height: number): void {
-        // Canvas is infinite - no need to update size
-        // Just update canvas wrapper reference in case it was recreated
+    public setCanvasSize(width: number, height: number): void {
+        // Update canvas wrapper reference in case it was recreated
         const newWrapper = DOMUpdater.query<HTMLElement>(this.canvasContainer, '.canvas-wrapper');
         if (newWrapper && newWrapper !== this.canvasWrapper) {
             // Disconnect old observers
@@ -511,8 +520,9 @@ export class Minimap extends BaseComponent {
             this.setupZoomObserver();
         }
         
-        // Re-render blocks to update minimap view
-        this.renderBlocks();
+        // Recalculate view based on new dynamic canvas size
+        this.updateBlocks(this.blocks);
+        this.updateViewport();
     }
     
     /**

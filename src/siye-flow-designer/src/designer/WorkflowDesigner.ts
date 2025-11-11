@@ -122,17 +122,16 @@ export class WorkflowDesigner extends BaseComponent {
         this.blockPalette = new BlockPalette('block-palette', this.alertModal);
         this.canvas = new CanvasRenderer('canvas-container');
         
-        // Set default viewport position (center of infinite canvas)
+        // Set default viewport position to reasonable area
         // This ensures blocks appear in a visible area when first added
         const canvasContainer = DOMUpdater.query<HTMLElement>(this.container, '#canvas-container');
         if (canvasContainer) {
-            // Default viewport: center of infinite canvas (100000x100000)
-            // Scroll to center so blocks appear in visible area
-            const DEFAULT_VIEW_X = 50000; // Center X
-            const DEFAULT_VIEW_Y = 50000; // Center Y
+            // Default viewport: start at a reasonable position
+            const DEFAULT_VIEW_X = 1000; // Give some padding from edge
+            const DEFAULT_VIEW_Y = 1000; // Give some padding from edge
             requestAnimationFrame(() => {
-                canvasContainer.scrollLeft = DEFAULT_VIEW_X - (canvasContainer.clientWidth / 2);
-                canvasContainer.scrollTop = DEFAULT_VIEW_Y - (canvasContainer.clientHeight / 2);
+                canvasContainer.scrollLeft = DEFAULT_VIEW_X;
+                canvasContainer.scrollTop = DEFAULT_VIEW_Y;
             });
         }
         
@@ -396,9 +395,9 @@ export class WorkflowDesigner extends BaseComponent {
      * Initialize with a default workflow
      */
     private initializeDefaultWorkflow(): void {
-        // Create default start and end blocks at default viewport center
-        const DEFAULT_VIEW_X = 50000;
-        const DEFAULT_VIEW_Y = 50000;
+        // Create default start and end blocks at visible area
+        const DEFAULT_VIEW_X = 2000;
+        const DEFAULT_VIEW_Y = 2000;
         
         const startBlock = this.engine.createBlock(BlockType.Start);
         startBlock.name = 'Start';
@@ -1545,14 +1544,14 @@ export class WorkflowDesigner extends BaseComponent {
     
     /**
      * Position blocks when importing
-     * Positions blocks around the default viewport center (50000, 50000)
+     * Positions blocks in a visible area with proper spacing
      */
     private positionBlocks(): void {
         const blocks = this.engine.getBlocks();
         const spacing = 150;
-        // Start from default viewport center (50000, 50000)
-        const DEFAULT_VIEW_X = 50000;
-        const DEFAULT_VIEW_Y = 50000;
+        // Start from a reasonable visible position
+        const DEFAULT_VIEW_X = 2000;
+        const DEFAULT_VIEW_Y = 2000;
         let x = DEFAULT_VIEW_X - 400; // Offset to left of center
         let y = DEFAULT_VIEW_Y - 100; // Offset above center
         

@@ -28,8 +28,8 @@ export class CanvasStateManager extends SimpleEventEmitter {
             mousePosition: { x: 0, y: 0 },
             hoveredConnection: null,
             deleteButtonElement: null,
-            canvasWidth: 100000, // Infinite canvas
-            canvasHeight: 100000, // Infinite canvas
+            canvasWidth: 8000, // Dynamic canvas - will be updated based on content
+            canvasHeight: 8000, // Dynamic canvas - will be updated based on content
             canvasWrapper: null
         };
         
@@ -82,18 +82,22 @@ export class CanvasStateManager extends SimpleEventEmitter {
     }
     
     setDragging(isDragging: boolean, blockId: string | null = null, offset: Position = { x: 0, y: 0 }): void {
-        this.reactiveState.setState({
-            isDragging,
-            draggedBlockId: blockId,
-            dragOffset: offset
-        } as Partial<CanvasState>);
+        this.reactiveState.batchUpdate(() => {
+            this.reactiveState.setState({
+                isDragging,
+                draggedBlockId: blockId,
+                dragOffset: offset
+            } as Partial<CanvasState>);
+        });
     }
     
     setPanning(isPanning: boolean, panStart: Position = { x: 0, y: 0 }): void {
-        this.reactiveState.setState({
-            isPanning,
-            panStart
-        } as Partial<CanvasState>);
+        this.reactiveState.batchUpdate(() => {
+            this.reactiveState.setState({
+                isPanning,
+                panStart
+            } as Partial<CanvasState>);
+        });
     }
     
     setPanMode(panMode: boolean): void {
@@ -101,10 +105,12 @@ export class CanvasStateManager extends SimpleEventEmitter {
     }
     
     setConnecting(isConnecting: boolean, connectionStart: { blockId: string, portName: string, position: Position } | null = null): void {
-        this.reactiveState.setState({
-            isConnecting,
-            connectionStart
-        } as Partial<CanvasState>);
+        this.reactiveState.batchUpdate(() => {
+            this.reactiveState.setState({
+                isConnecting,
+                connectionStart
+            } as Partial<CanvasState>);
+        });
     }
     
     setMousePosition(position: Position): void {
@@ -120,14 +126,24 @@ export class CanvasStateManager extends SimpleEventEmitter {
     }
     
     setCanvasSize(width: number, height: number): void {
-        this.reactiveState.setState({
-            canvasWidth: width,
-            canvasHeight: height
-        } as Partial<CanvasState>);
+        this.reactiveState.batchUpdate(() => {
+            this.reactiveState.setState({
+                canvasWidth: width,
+                canvasHeight: height
+            } as Partial<CanvasState>);
+        });
     }
     
     setCanvasWrapper(wrapper: HTMLElement | null): void {
         this.reactiveState.setState({ canvasWrapper: wrapper } as Partial<CanvasState>);
+    }
+    
+    /**
+     * Batch multiple state updates for performance
+     * @param updateFn Function containing multiple state updates
+     */
+    batchUpdate(updateFn: () => void): void {
+        this.reactiveState.batchUpdate(updateFn);
     }
 }
 

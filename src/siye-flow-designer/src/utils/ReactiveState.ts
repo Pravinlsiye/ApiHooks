@@ -16,6 +16,8 @@ type RenderCallback = () => void;
 export class ReactiveState<T> extends SimpleEventEmitter {
     private state: T;
     private renderCallbacks: Set<RenderCallback> = new Set();
+    private isBatchingUpdates: boolean = false;
+    private pendingRender: boolean = false;
     
     constructor(initialState: T) {
         super();
@@ -111,6 +113,12 @@ export class ReactiveState<T> extends SimpleEventEmitter {
      * Trigger all render callbacks
      */
     private triggerRender(): void {
+        if (this.isBatchingUpdates) {
+            // If batching, just mark that a render is pending
+            this.pendingRender = true;
+            return;
+        }
+        
         this.renderCallbacks.forEach(callback => {
             try {
                 callback();
@@ -118,6 +126,44 @@ export class ReactiveState<T> extends SimpleEventEmitter {
                 console.error('Error in render callback:', error);
             }
         });
+    }
+    
+    /**
+     * Batch multiple state updates to trigger only one render
+     * Useful for operations that update multiple state properties
+     * 
+     * @param updateFn Function containing multiple setState calls
+     * 
+     * @example
+     * ```typescript
+     * state.batchUpdate(() => {
+     *   state.setState({ isDragging: true });
+     *   state.setState({ draggedBlockId: blockId });
+     *   state.setState({ dragOffset: offset });
+     * }); // Only one render triggered
+     * ```
+     */
+    batchUpdate(updateFn: () => void): void {
+        if (this.isBatchingUpdates) {
+            // Already batching, just execute
+            updateFn();
+            return;
+        }
+        
+        this.isBatchingUpdates = true;
+        this.pendingRender = false;
+        
+        try {
+            updateFn();
+        } finally {
+            this.isBatchingUpdates = false;
+            
+            // Trigger a single render if any updates occurred
+            if (this.pendingRender) {
+                this.pendingRender = false;
+                this.triggerRender();
+            }
+        }
     }
     
     /**

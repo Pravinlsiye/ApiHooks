@@ -70,14 +70,10 @@ export class ZoomPanManager extends SimpleEventEmitter {
                     
                     // Only adjust scroll position if zoom actually changed and we're not in initial setup
                     if (adjustScroll && oldZoomLevel !== undefined && oldZoomLevel !== this.zoomLevel && this.isInitialized) {
-                        // Adjust scroll position to keep the same canvas point at viewport center
-                        // After zoom, the visible area in canvas coordinates is: containerWidth / zoomLevel
-                        const newVisibleWidth = containerRect.width / this.zoomLevel;
-                        const newVisibleHeight = containerRect.height / this.zoomLevel;
-                        
                         // Calculate new scroll position to keep canvasCenterX/Y at viewport center
-                        const newScrollLeft = canvasCenterX - (newVisibleWidth / 2);
-                        const newScrollTop = canvasCenterY - (newVisibleHeight / 2);
+                        // When zoomed, we need to scale the scroll position by the zoom level
+                        const newScrollLeft = (canvasCenterX * this.zoomLevel) - viewportCenterX;
+                        const newScrollTop = (canvasCenterY * this.zoomLevel) - viewportCenterY;
                         
                         // Apply scroll adjustment
                         this.container.scrollLeft = Math.max(0, newScrollLeft);
@@ -222,8 +218,12 @@ export class ZoomPanManager extends SimpleEventEmitter {
         // Step 8: Scroll to center blocks AFTER transform is applied
         requestAnimationFrame(() => {
             // Set scroll position
-            this.container.scrollLeft = Math.max(0, targetScrollX);
-            this.container.scrollTop = Math.max(0, targetScrollY);
+            // When zoomed, we need to scale the scroll position by the zoom level
+            const scaledScrollX = targetScrollX * newZoom;
+            const scaledScrollY = targetScrollY * newZoom;
+            
+            this.container.scrollLeft = Math.max(0, scaledScrollX);
+            this.container.scrollTop = Math.max(0, scaledScrollY);
             
             // Emit zoom changed event AFTER scroll is set
             this.emit('zoomChanged', this.zoomLevel);
@@ -241,14 +241,41 @@ export class ZoomPanManager extends SimpleEventEmitter {
      * Convert screen coordinates to canvas coordinates accounting for zoom
      */
     public screenToCanvas(screenX: number, screenY: number): Position {
-        if (!this.canvasWrapper) {
+        if (!this.canvasWrapper || !this.container) {
             return { x: screenX, y: screenY };
         }
         
-        const rect = this.canvasWrapper.getBoundingClientRect();
+        const containerRect = this.container.getBoundingClientRect();
+        
+        // Calculate position relative to the container viewport
+        const viewportX = screenX - containerRect.left;
+        const viewportY = screenY - containerRect.top;
+        
+        // Add scroll offset and divide by zoom to get canvas coordinates
         return {
-            x: (screenX - rect.left + this.canvasWrapper.scrollLeft) / this.zoomLevel,
-            y: (screenY - rect.top + this.canvasWrapper.scrollTop) / this.zoomLevel
+            x: (viewportX + this.container.scrollLeft) / this.zoomLevel,
+            y: (viewportY + this.container.scrollTop) / this.zoomLevel
+        };
+    }
+    
+    /**
+     * Convert canvas coordinates to viewport coordinates
+     */
+    public canvasToViewport(canvasX: number, canvasY: number): Position {
+        return {
+            x: (canvasX * this.zoomLevel) - this.container.scrollLeft,
+            y: (canvasY * this.zoomLevel) - this.container.scrollTop
+        };
+    }
+    
+    /**
+     * Get viewport center in screen coordinates
+     */
+    public getViewportCenter(): Position {
+        const rect = this.container.getBoundingClientRect();
+        return {
+            x: rect.width / 2,
+            y: rect.height / 2
         };
     }
 }

@@ -228,9 +228,20 @@ export class CanvasRenderer extends BaseComponent {
         });
     }
     
+    // Canvas bounds tracking
+    private canvasBounds = { 
+        width: 8000, 
+        height: 8000,
+        minX: 0,
+        minY: 0,
+        maxX: 8000,
+        maxY: 8000
+    };
+    private readonly CANVAS_PADDING = 2000;
+    
     /**
      * Setup the canvas and SVG elements
-     * Canvas is infinite size (100000x100000) - only viewport is limited
+     * Canvas uses dynamic sizing based on content
      */
     private setupCanvas(): void {
         // Preserve minimap container if it exists (it's appended to canvas-container)
@@ -243,19 +254,17 @@ export class CanvasRenderer extends BaseComponent {
             parentElement.removeChild(minimapContainer);
         }
         
-        // Use very large size for infinite canvas (100000x100000)
-        // The viewport (canvas-container) will handle the visible area
-        const INFINITE_SIZE = 100000;
+        // Start with reasonable default size
         this.container.innerHTML = `
-            <div class="canvas-wrapper" style="position: relative; width: ${INFINITE_SIZE}px; height: ${INFINITE_SIZE}px;">
-                <svg class="connections-svg" style="position: absolute; top: 0; left: 0; width: ${INFINITE_SIZE}px; height: ${INFINITE_SIZE}px; z-index: 0;">
+            <div class="canvas-wrapper" style="position: relative; width: ${this.canvasBounds.width}px; height: ${this.canvasBounds.height}px;">
+                <svg class="connections-svg" style="position: absolute; top: 0; left: 0; width: ${this.canvasBounds.width}px; height: ${this.canvasBounds.height}px; z-index: 0;">
                     <defs>
                         <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
                             <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff" />
                         </marker>
                     </defs>
                 </svg>
-                <div class="blocks-layer" style="position: relative; width: ${INFINITE_SIZE}px; height: ${INFINITE_SIZE}px;"></div>
+                <div class="blocks-layer" style="position: relative; width: ${this.canvasBounds.width}px; height: ${this.canvasBounds.height}px;"></div>
             </div>
         `;
         
@@ -284,6 +293,9 @@ export class CanvasRenderer extends BaseComponent {
         this.addEventListener(wrapper, 'mousemove', this.throttledMouseMove as EventListener);
         this.addEventListener(wrapper, 'mouseup', (e) => this.onMouseUp(e as MouseEvent));
         
+        // Setup event delegation for dynamic block elements
+        this.setupBlockEventDelegation(wrapper);
+        
         // Capture mousedown on wrapper for pan mode
         this.addEventListener(wrapper, 'mousedown', (e) => {
             const state = this.stateManager.getState();
@@ -296,6 +308,104 @@ export class CanvasRenderer extends BaseComponent {
                 }
             }
         }, true);
+    }
+    
+    /**
+     * Setup event delegation for dynamic block elements
+     * This ensures events work even when blocks are re-rendered
+     */
+    private setupBlockEventDelegation(wrapper: HTMLElement): void {
+        // Delegate block mousedown events
+        this.addEventListener(wrapper, 'mousedown', (e) => {
+            const target = e.target as HTMLElement;
+            const blockElement = target.closest('.workflow-block') as HTMLElement;
+            
+            if (blockElement) {
+                const blockId = blockElement.id.replace('block-', '');
+                
+                // Check if clicking on port
+                const portElement = target.closest('.port-input-tab, .port-output-tab, .port-row') as HTMLElement;
+                if (portElement) {
+                    this.onPortMouseDown(e as MouseEvent);
+                    return;
+                }
+                
+                // Check if clicking on interactive elements
+                if (!target.closest('.profile-dropdown') &&
+                    !target.closest('.btn-profile-actions') &&
+                    !target.closest('.profile-actions-dropdown') &&
+                    !target.closest('.block-input-name') &&
+                    !target.closest('.block-input-value') &&
+                    !target.closest('.input-type-btn') &&
+                    !target.closest('.input-type-dropdown') &&
+                    !target.closest('.btn-delete-input') &&
+                    !target.closest('.btn-add-input-on-block') &&
+                    !target.closest('.block-delete-btn') &&
+                    !target.classList.contains('port-name')) {
+                    this.onBlockMouseDown(e as MouseEvent, blockId);
+                }
+            }
+        }, true);
+        
+        // Delegate block click events
+        this.addEventListener(wrapper, 'click', (e) => {
+            const target = e.target as HTMLElement;
+            const blockElement = target.closest('.workflow-block') as HTMLElement;
+            
+            if (blockElement) {
+                const blockId = blockElement.id.replace('block-', '');
+                
+                // Handle delete button click
+                if (target.closest('.block-delete-btn')) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const blockData = this.getBlockData(blockId);
+                    const blockName = blockData?.name || blockId;
+                    this.confirmModal.show(
+                        `Delete block "${blockName}"?\n\nAll connections will be removed.`,
+                        'Delete Block',
+                        'Delete',
+                        'Cancel',
+                        () => {
+                            this.emit('blockDelete', { blockId });
+                        }
+                    );
+                    return;
+                }
+                
+                // Check if clicking on interactive elements
+                if (!target.closest('.profile-dropdown') &&
+                    !target.closest('.btn-profile-actions') &&
+                    !target.closest('.profile-actions-dropdown') &&
+                    !target.closest('.block-input-name') &&
+                    !target.closest('.block-input-value') &&
+                    !target.closest('.input-type-btn') &&
+                    !target.closest('.input-type-dropdown') &&
+                    !target.closest('.btn-delete-input') &&
+                    !target.closest('.btn-edit-input') &&
+                    !target.closest('.btn-add-input-on-block') &&
+                    !target.closest('.btn-add-item-popup') &&
+                    !target.classList.contains('port-row') &&
+                    !target.classList.contains('port-tab') &&
+                    !target.classList.contains('port-name')) {
+                    this.onBlockClick(e as MouseEvent, blockId);
+                }
+            }
+        }, true);
+        
+        // Delegate port double-click events
+        this.addEventListener(wrapper, 'dblclick', (e) => {
+            const target = e.target as HTMLElement;
+            const portElement = target.closest('.port-input-tab, .port-row') as HTMLElement;
+            
+            if (portElement && portElement.dataset.portType === 'input') {
+                e.stopPropagation();
+                e.preventDefault();
+                const blockId = portElement.dataset.block || '';
+                const portName = portElement.dataset.port || '';
+                this.deleteConnectionToPort(blockId, portName);
+            }
+        });
     }
     
     /**
@@ -337,6 +447,9 @@ export class CanvasRenderer extends BaseComponent {
         }
         
         const state = this.stateManager.getState();
+        
+        // Update canvas size before rendering
+        this.updateCanvasSize();
         
         // Ensure blocks-layer is visible and properly positioned
         blocksLayer.style.position = 'relative';
@@ -450,29 +563,11 @@ export class CanvasRenderer extends BaseComponent {
     
     /**
      * Setup event handlers for a block element
+     * Most events now use delegation, but some inline editors still need direct binding
      */
     private setupBlockEventHandlers(element: HTMLElement, block: VisualBlock): void {
-        // Note: These event listeners are added to dynamically created elements
-        // They will be cleaned up when the element is removed from DOM
-        element.addEventListener('mousedown', (e) => this.onBlockMouseDown(e, block.id));
-        element.addEventListener('click', (e) => this.onBlockClick(e, block.id));
-        
-        // HTTP Request inline editors
+        // HTTP Request inline editors (need direct binding for form elements)
         this.setupHttpRequestHandlers(element, block.id);
-        
-        // Port event handlers
-        const portTabs = element.querySelectorAll('.port-input-tab, .port-output-tab, .port-row');
-        portTabs.forEach(port => {
-            port.addEventListener('mousedown', (e) => this.onPortMouseDown(e as MouseEvent));
-            port.addEventListener('dblclick', (e) => {
-                const portElement = e.currentTarget as HTMLElement;
-                if (portElement.dataset.portType === 'input') {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    this.deleteConnectionToPort(block.id, portElement.dataset.port || '');
-                }
-            });
-        });
         
         // Profile selector handler for Start blocks
         this.setupProfileHandlers(element, block.id);
@@ -489,25 +584,6 @@ export class CanvasRenderer extends BaseComponent {
         if (block.type === 'variable' || block.type === 'http-request') {
             this.blockEventHandler.setupEditableKeyValueHandlers(element, block.id);
         }
-        
-        // Delete button handler
-        const deleteBtn = element.querySelector('.block-delete-btn') as HTMLButtonElement;
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    const blockName = this.getBlockData(block.id)?.name || block.id;
-                    this.confirmModal.show(
-                        `Delete block "${blockName}"?\n\nAll connections will be removed.`,
-                        'Delete Block',
-                        'Delete',
-                        'Cancel',
-                        () => {
-                            this.emit('blockDelete', { blockId: block.id });
-                        }
-                    );
-                });
-            }
     }
     
     /**
@@ -776,26 +852,27 @@ export class CanvasRenderer extends BaseComponent {
             
             if (portElement) {
                 // Find the actual port-tab element (the circular connection point)
-                const tabElement = portElement.querySelector('.port-tab');
+                const tabElement = portElement.querySelector('.port-tab') || portElement;
                 
                 if (tabElement) {
                     const rect = tabElement.getBoundingClientRect();
-                    const canvasWrapper = this.container.querySelector('.canvas-wrapper') as HTMLElement;
+                    const containerRect = this.container.getBoundingClientRect();
+                    const scale = this.zoomPanManager.getZoomLevel();
                     
-                    if (canvasWrapper) {
-                        const canvasRect = canvasWrapper.getBoundingClientRect();
-                        const scale = this.zoomPanManager.getZoomLevel();
-                        
-                        // Calculate position relative to canvas, accounting for scroll and zoom
-                        const x = (rect.left - canvasRect.left + canvasWrapper.scrollLeft + (rect.width / 2)) / scale;
-                        const y = (rect.top - canvasRect.top + canvasWrapper.scrollTop + (rect.height / 2)) / scale;
-                        
-                        return { x, y };
-                    }
+                    // Calculate position in canvas coordinates
+                    // Account for container scroll and zoom transform
+                    const viewportX = rect.left + (rect.width / 2) - containerRect.left;
+                    const viewportY = rect.top + (rect.height / 2) - containerRect.top;
+                    
+                    // Convert viewport coordinates to canvas coordinates
+                    const x = (viewportX + this.container.scrollLeft) / scale;
+                    const y = (viewportY + this.container.scrollTop) / scale;
+                    
+                    return { x, y };
                 }
             }
         }
-        console.warn('Failed to calculate port tab position for block', block.id, 'port', port.name);
+        
         // Fallback: calculate position from block position + port offset
         return {
             x: block.position.x + port.position.x,
@@ -905,8 +982,8 @@ export class CanvasRenderer extends BaseComponent {
         const wrapper = this.container.querySelector('.canvas-wrapper') as HTMLElement;
         if (wrapper) {
             const panStart = {
-                x: e.clientX + wrapper.scrollLeft,
-                y: e.clientY + wrapper.scrollTop
+                x: e.clientX + this.container.scrollLeft,
+                y: e.clientY + this.container.scrollTop
             };
             this.stateManager.setPanning(true, panStart);
             wrapper.style.cursor = 'grabbing';
@@ -933,8 +1010,8 @@ export class CanvasRenderer extends BaseComponent {
             e.preventDefault();
             const deltaX = state.panStart.x - e.clientX;
             const deltaY = state.panStart.y - e.clientY;
-            wrapper.scrollLeft = deltaX;
-            wrapper.scrollTop = deltaY;
+            this.container.scrollLeft = deltaX;
+            this.container.scrollTop = deltaY;
             return;
         }
         
@@ -1185,14 +1262,81 @@ export class CanvasRenderer extends BaseComponent {
         }
     }
     
+    /**
+     * Update canvas size based on content bounds
+     */
+    private updateCanvasSize(): void {
+        const bounds = this.calculateContentBounds();
+        
+        // Only resize if bounds have changed significantly (avoid micro-resizes)
+        const sizeChanged = Math.abs(bounds.width - this.canvasBounds.width) > 100 ||
+                          Math.abs(bounds.height - this.canvasBounds.height) > 100;
+        
+        if (sizeChanged) {
+            this.canvasBounds = bounds;
+            
+            // Update canvas wrapper and SVG sizes
+            const wrapper = this.container.querySelector('.canvas-wrapper') as HTMLElement;
+            const svg = this.svg;
+            
+            if (wrapper && svg) {
+                wrapper.style.width = `${bounds.width}px`;
+                wrapper.style.height = `${bounds.height}px`;
+                svg.style.width = `${bounds.width}px`;
+                svg.style.height = `${bounds.height}px`;
+                
+                const blocksLayer = wrapper.querySelector('.blocks-layer') as HTMLElement;
+                if (blocksLayer) {
+                    blocksLayer.style.width = `${bounds.width}px`;
+                    blocksLayer.style.height = `${bounds.height}px`;
+                }
+            }
+            
+            // Notify state manager of new size
+            this.stateManager.setCanvasSize(bounds.width, bounds.height);
+        }
+    }
+    
+    /**
+     * Calculate content bounds including all blocks and viewport
+     */
+    private calculateContentBounds(): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } {
+        const blocks = this.stateManager.getBlocks();
+        const viewportRect = this.container.getBoundingClientRect();
+        const zoom = this.zoomPanManager.getZoomLevel();
+        
+        // Start with viewport bounds
+        let minX = this.container.scrollLeft / zoom;
+        let minY = this.container.scrollTop / zoom;
+        let maxX = minX + (viewportRect.width / zoom);
+        let maxY = minY + (viewportRect.height / zoom);
+        
+        // Expand to include all blocks
+        blocks.forEach(block => {
+            minX = Math.min(minX, block.position.x - this.CANVAS_PADDING);
+            minY = Math.min(minY, block.position.y - this.CANVAS_PADDING);
+            maxX = Math.max(maxX, block.position.x + block.width + this.CANVAS_PADDING);
+            maxY = Math.max(maxY, block.position.y + block.height + this.CANVAS_PADDING);
+        });
+        
+        // Ensure minimum size
+        const width = Math.max(8000, maxX - minX);
+        const height = Math.max(8000, maxY - minY);
+        
+        return { width, height, minX, minY, maxX, maxY };
+    }
+    
     public setCanvasSize(_width: number, _height: number): void {
-        // Canvas is now infinite size - this method is kept for compatibility but does nothing
-        // The canvas is always 100000x100000, only the viewport (visible area) changes
+        // Legacy method - now updates dynamic bounds based on content
+        // Parameters are ignored as canvas size is now dynamic
+        this.updateCanvasSize();
     }
     
     public getCanvasSize(): { width: number; height: number } {
-        // Return infinite size
-        return { width: 100000, height: 100000 };
+        return { 
+            width: this.canvasBounds.width, 
+            height: this.canvasBounds.height 
+        };
     }
     
     /**
