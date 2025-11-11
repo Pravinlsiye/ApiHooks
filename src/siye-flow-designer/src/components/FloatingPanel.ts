@@ -1,8 +1,12 @@
+import { BaseComponent } from '../utils/BaseComponent';
+import { DOMUpdater } from '../utils/DOMUpdater';
+import { DOMDiff } from '../utils/DOMDiff';
+
 /**
  * FloatingPanel - A floating toolbar panel with action buttons
+ * Now extends BaseComponent for automatic cleanup and uses DOMDiff for efficient updates
  */
-export class FloatingPanel {
-    private container: HTMLElement;
+export class FloatingPanel extends BaseComponent {
     private panelElement: HTMLElement | null = null;
     private dropdownMenu: HTMLElement | null = null;
     private getStartBlocksCallback?: () => Array<{ id: string; name: string }>;
@@ -27,11 +31,8 @@ export class FloatingPanel {
         onZoomFitCallback?: () => void,
         onToolChangeCallback?: (tool: 'pointer' | 'hand') => void
     ) {
-        const container = document.getElementById(containerId);
-        if (!container) {
-            throw new Error(`Container element '${containerId}' not found`);
-        }
-        this.container = container;
+        super(containerId);
+        
         this.getStartBlocksCallback = getStartBlocksCallback;
         this.getProfilesCallback = getProfilesCallback;
         this.onRunCallback = onRunCallback;
@@ -237,7 +238,7 @@ export class FloatingPanel {
     }
 
     private updateDropdownArrow(isOpen: boolean): void {
-        const arrow = document.getElementById('floating-run-arrow');
+        const arrow = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-arrow');
         if (arrow) {
             // Down arrow: M6 9L1 4h10L6 9z
             // Up arrow: M6 3L1 8h10L6 3z
@@ -248,8 +249,8 @@ export class FloatingPanel {
     }
 
     private updateStartBlocks(): void {
-        const startBlocksContainer = document.getElementById('floating-run-start-blocks');
-        const startBlocksHeader = document.getElementById('floating-run-start-blocks-header');
+        const startBlocksContainer = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-start-blocks');
+        const startBlocksHeader = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-start-blocks-header');
         if (!startBlocksContainer) {
             console.warn('[FloatingPanel] Start blocks container not found');
             return;
@@ -263,8 +264,8 @@ export class FloatingPanel {
             startBlocksContainer.innerHTML = '<div class="floating-dropdown-item floating-dropdown-empty">No Start blocks available</div>';
             startBlocksContainer.style.display = 'block';
             // Hide profiles section
-            const profilesHeader = document.getElementById('floating-run-profiles-header');
-            const profilesContainer = document.getElementById('floating-run-profiles');
+            const profilesHeader = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-profiles-header');
+            const profilesContainer = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-profiles');
             if (profilesHeader) profilesHeader.style.display = 'none';
             if (profilesContainer) profilesContainer.style.display = 'none';
             if (startBlocksHeader) startBlocksHeader.style.display = 'block';
@@ -286,25 +287,32 @@ export class FloatingPanel {
         if (startBlocksHeader) startBlocksHeader.style.display = 'block';
         startBlocksContainer.style.display = 'block';
 
-        // Render start block items
-        startBlocksContainer.innerHTML = startBlocks.map(block => {
-            const isSelected = this.selectedStartBlockId === block.id;
-            return `
-                <div class="floating-dropdown-item ${isSelected ? 'selected' : ''}" data-start-block-id="${block.id}">
-                    ${block.name || block.id}
-                </div>
-            `;
-        }).join('');
-
-        // Add click handlers for start block items
-        startBlocksContainer.querySelectorAll('.floating-dropdown-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                const startBlockId = (e.currentTarget as HTMLElement).dataset.startBlockId;
-                if (startBlockId) {
-                    this.selectStartBlock(startBlockId);
-                }
-            });
-        });
+        // Use DOMDiff.updateList for efficient updates
+        const startBlocksMap = new Map(startBlocks.map(block => [block.id, block]));
+        DOMDiff.updateList(
+            startBlocksContainer,
+            startBlocksMap,
+            (block) => {
+                const isSelected = this.selectedStartBlockId === block.id;
+                const div = this.createElement('div', {
+                    className: `floating-dropdown-item ${isSelected ? 'selected' : ''}`,
+                    'data-start-block-id': block.id
+                });
+                div.textContent = block.name || block.id;
+                this.addEventListener(div, 'click', () => {
+                    this.selectStartBlock(block.id);
+                });
+                return div;
+            },
+            (element, block) => {
+                // Update existing element
+                const isSelected = this.selectedStartBlockId === block.id;
+                DOMUpdater.updateElement(element, {
+                    classes: ['floating-dropdown-item', ...(isSelected ? ['selected'] : [])]
+                });
+            },
+            (block) => block.id
+        );
 
         // Select first start block if none selected
         if (!this.selectedStartBlockId && startBlocks.length > 0) {
@@ -316,14 +324,14 @@ export class FloatingPanel {
         this.selectedStartBlockId = startBlockId;
         
         // Update UI to show selected start block (only if multiple blocks exist)
-        const startBlocksContainer = document.getElementById('floating-run-start-blocks');
+        const startBlocksContainer = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-start-blocks');
         if (startBlocksContainer && startBlocksContainer.style.display !== 'none') {
-            const items = startBlocksContainer.querySelectorAll('.floating-dropdown-item');
+            const items = DOMUpdater.queryAll<HTMLElement>(startBlocksContainer, '.floating-dropdown-item');
             items.forEach(item => {
-                if ((item as HTMLElement).dataset.startBlockId === startBlockId) {
-                    item.classList.add('selected');
+                if (item.dataset.startBlockId === startBlockId) {
+                    DOMUpdater.addClasses(item, 'selected');
                 } else {
-                    item.classList.remove('selected');
+                    DOMUpdater.removeClasses(item, 'selected');
                 }
             });
         }
@@ -335,8 +343,8 @@ export class FloatingPanel {
     }
 
     private updateProfiles(): void {
-        const profilesHeader = document.getElementById('floating-run-profiles-header');
-        const profilesContainer = document.getElementById('floating-run-profiles');
+        const profilesHeader = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-profiles-header');
+        const profilesContainer = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-profiles');
         
         if (!profilesContainer || !this.selectedStartBlockId) {
             console.warn('[FloatingPanel] Cannot update profiles - no container or no selected Start block');
@@ -359,27 +367,36 @@ export class FloatingPanel {
             return;
         }
 
-        // Render profile items
-        profilesContainer.innerHTML = profiles.map(profile => {
-            const isSelected = this.selectedProfile === profile.name;
-            const defaultBadge = profile.default ? ' (default)' : '';
-            return `
-                <div class="floating-dropdown-item ${isSelected ? 'selected' : ''}" data-profile="${profile.name}">
-                    ${profile.name}${defaultBadge}
-                </div>
-            `;
-        }).join('');
-
-        // Add click handlers for profile items
-        profilesContainer.querySelectorAll('.floating-dropdown-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                const profileName = (e.currentTarget as HTMLElement).dataset.profile;
-                if (profileName) {
-                    this.selectProfile(profileName);
+        // Use DOMDiff.updateList for efficient updates
+        const profilesMap = new Map(profiles.map(profile => [profile.name, profile]));
+        DOMDiff.updateList(
+            profilesContainer,
+            profilesMap,
+            (profile) => {
+                const isSelected = this.selectedProfile === profile.name;
+                const defaultBadge = profile.default ? ' (default)' : '';
+                const div = this.createElement('div', {
+                    className: `floating-dropdown-item ${isSelected ? 'selected' : ''}`,
+                    'data-profile': profile.name
+                });
+                div.textContent = `${profile.name}${defaultBadge}`;
+                this.addEventListener(div, 'click', () => {
+                    this.selectProfile(profile.name);
                     this.hideDropdown();
-                }
-            });
-        });
+                });
+                return div;
+            },
+            (element, profile) => {
+                // Update existing element
+                const isSelected = this.selectedProfile === profile.name;
+                const defaultBadge = profile.default ? ' (default)' : '';
+                DOMUpdater.updateElement(element, {
+                    classes: ['floating-dropdown-item', ...(isSelected ? ['selected'] : [])],
+                    text: `${profile.name}${defaultBadge}`
+                });
+            },
+            (profile) => profile.name
+        );
 
         // Select first profile if none selected
         if (!this.selectedProfile && profiles.length > 0) {
@@ -392,20 +409,23 @@ export class FloatingPanel {
         this.selectedProfile = profileName;
         
         // Update UI to show selected profile
-        const items = document.querySelectorAll('#floating-run-profiles .floating-dropdown-item');
-        items.forEach(item => {
-            if ((item as HTMLElement).dataset.profile === profileName) {
-                item.classList.add('selected');
-            } else {
-                item.classList.remove('selected');
-            }
-        });
-
+        const profilesContainer = DOMUpdater.query<HTMLElement>(this.panelElement!, '#floating-run-profiles');
+        if (profilesContainer) {
+            const items = DOMUpdater.queryAll<HTMLElement>(profilesContainer, '.floating-dropdown-item');
+            items.forEach(item => {
+                if (item.dataset.profile === profileName) {
+                    DOMUpdater.addClasses(item, 'selected');
+                } else {
+                    DOMUpdater.removeClasses(item, 'selected');
+                }
+            });
+        }
+        
         // Notify callback about profile change
         if (this.selectedStartBlockId && this.onProfileChangeCallback) {
             this.onProfileChangeCallback(this.selectedStartBlockId, profileName);
         }
-
+        
         console.log('[FloatingPanel] Profile selected:', profileName);
     }
     
@@ -447,15 +467,17 @@ export class FloatingPanel {
     }
 
     private setActiveTool(tool: 'pointer' | 'hand'): void {
-        const pointerBtn = document.getElementById('floating-pointer');
-        const handBtn = document.getElementById('floating-hand');
+        const pointerBtn = DOMUpdater.query<HTMLButtonElement>(this.panelElement!, '#floating-pointer');
+        const handBtn = DOMUpdater.query<HTMLButtonElement>(this.panelElement!, '#floating-hand');
         
-        if (tool === 'pointer') {
-            pointerBtn?.setAttribute('data-active', 'true');
-            handBtn?.setAttribute('data-active', 'false');
-        } else {
-            pointerBtn?.setAttribute('data-active', 'false');
-            handBtn?.setAttribute('data-active', 'true');
+        if (pointerBtn && handBtn) {
+            if (tool === 'pointer') {
+                pointerBtn.setAttribute('data-active', 'true');
+                handBtn.removeAttribute('data-active');
+            } else {
+                handBtn.setAttribute('data-active', 'true');
+                pointerBtn.removeAttribute('data-active');
+            }
         }
         
         // Notify callback
@@ -467,10 +489,8 @@ export class FloatingPanel {
     }
 
     public destroy(): void {
-        if (this.panelElement) {
-            this.panelElement.remove();
-            this.panelElement = null;
-        }
+        // Panel element will be cleaned up by super.destroy()
+        super.destroy();
     }
 }
 

@@ -481,6 +481,8 @@ body {
     background-size: 20px 20px;
     position: relative;
     overflow: visible;
+    /* Force GPU acceleration for smooth zoom - will be combined with scale in JS */
+    will-change: transform;
 }
 
 .canvas-wrapper.pan-mode {

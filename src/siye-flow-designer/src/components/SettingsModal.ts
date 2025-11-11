@@ -1,25 +1,28 @@
+import { BaseComponent } from '../utils/BaseComponent';
+import { DOMUpdater } from '../utils/DOMUpdater';
+
 /**
  * SettingsModal - A modal for workflow designer settings
+ * Now extends BaseComponent for automatic cleanup
  */
-export class SettingsModal {
-    private overlay: HTMLElement;
+export class SettingsModal extends BaseComponent {
     private modal: HTMLElement;
     private minimapEnabled: boolean = true;
-    private canvasWidth: number = 4000;
-    private canvasHeight: number = 4000;
     private onMinimapToggle?: (enabled: boolean) => void;
-    private onCanvasSizeChange?: (width: number, height: number) => void;
     
     constructor() {
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'settings-modal-overlay';
-        this.overlay.style.display = 'none';
+        // Create a unique container ID for the modal
+        const containerId = `settings-modal-${Date.now()}`;
+        const overlay = document.createElement('div');
+        overlay.id = containerId;
+        overlay.className = 'settings-modal-overlay';
+        overlay.style.display = 'none';
+        document.body.appendChild(overlay);
         
-        this.modal = document.createElement('div');
-        this.modal.className = 'settings-modal';
+        super(containerId);
         
-        this.overlay.appendChild(this.modal);
-        document.body.appendChild(this.overlay);
+        this.modal = this.createElement('div', { className: 'settings-modal' });
+        this.container.appendChild(this.modal);
         
         this.setupModal();
         this.setupEventHandlers();
@@ -48,27 +51,6 @@ export class SettingsModal {
                         </label>
                     </div>
                 </div>
-                <div class="settings-section">
-                    <h4 class="settings-section-title">Canvas Size</h4>
-                    <div class="settings-item">
-                        <label class="settings-label">
-                            <span>Width (px)</span>
-                            <input type="number" id="settings-canvas-width" class="settings-input" value="${this.canvasWidth}" min="1000" max="10000" step="1000">
-                        </label>
-                    </div>
-                    <div class="settings-item">
-                        <label class="settings-label">
-                            <span>Height (px)</span>
-                            <input type="number" id="settings-canvas-height" class="settings-input" value="${this.canvasHeight}" min="1000" max="10000" step="1000">
-                        </label>
-                    </div>
-                    <div class="settings-presets">
-                        <button class="settings-preset-btn" data-width="2000" data-height="2000">Small (2000x2000)</button>
-                        <button class="settings-preset-btn" data-width="4000" data-height="4000">Medium (4000x4000)</button>
-                        <button class="settings-preset-btn" data-width="6000" data-height="6000">Large (6000x6000)</button>
-                        <button class="settings-preset-btn" data-width="8000" data-height="8000">Extra Large (8000x8000)</button>
-                    </div>
-                </div>
             </div>
             <div class="settings-modal-footer">
                 <button class="settings-btn settings-btn-primary">Apply</button>
@@ -79,62 +61,53 @@ export class SettingsModal {
     
     private setupEventHandlers(): void {
         // Close button
-        this.modal.querySelector('.settings-modal-close')?.addEventListener('click', () => {
-            this.hide();
-        });
+        const closeBtn = DOMUpdater.query<HTMLButtonElement>(this.modal, '.settings-modal-close');
+        if (closeBtn) {
+            this.addEventListener(closeBtn, 'click', () => {
+                this.hide();
+            });
+        }
         
         // Cancel button
-        this.modal.querySelector('.settings-btn-cancel')?.addEventListener('click', () => {
-            this.hide();
-        });
+        const cancelBtn = DOMUpdater.query<HTMLButtonElement>(this.modal, '.settings-btn-cancel');
+        if (cancelBtn) {
+            this.addEventListener(cancelBtn, 'click', () => {
+                this.hide();
+            });
+        }
         
         // Apply button
-        this.modal.querySelector('.settings-btn-primary')?.addEventListener('click', () => {
-            this.applySettings();
-        });
+        const applyBtn = DOMUpdater.query<HTMLButtonElement>(this.modal, '.settings-btn-primary');
+        if (applyBtn) {
+            this.addEventListener(applyBtn, 'click', () => {
+                this.applySettings();
+            });
+        }
         
         // Overlay click to close
-        this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
+        this.addEventListener(this.container, 'click', (e) => {
+            if (e.target === this.container) {
                 this.hide();
             }
         });
         
-        // Preset buttons
-        this.modal.querySelectorAll('.settings-preset-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const width = parseInt((btn as HTMLElement).dataset.width || '4000');
-                const height = parseInt((btn as HTMLElement).dataset.height || '4000');
-                const widthInput = this.modal.querySelector('#settings-canvas-width') as HTMLInputElement;
-                const heightInput = this.modal.querySelector('#settings-canvas-height') as HTMLInputElement;
-                if (widthInput) widthInput.value = width.toString();
-                if (heightInput) heightInput.value = height.toString();
-            });
-        });
-        
-        // Escape key to close
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.overlay.style.display === 'flex') {
+        // ESC key to close
+        this.addEventListener(document, 'keydown', (e) => {
+            const keyEvent = e as KeyboardEvent;
+            if (keyEvent.key === 'Escape' && this.container.style.display !== 'none') {
                 this.hide();
             }
         });
     }
     
     private applySettings(): void {
-        const minimapToggle = this.modal.querySelector('#settings-minimap-toggle') as HTMLInputElement;
-        const widthInput = this.modal.querySelector('#settings-canvas-width') as HTMLInputElement;
-        const heightInput = this.modal.querySelector('#settings-canvas-height') as HTMLInputElement;
+        const minimapToggle = DOMUpdater.query<HTMLInputElement>(this.modal, '#settings-minimap-toggle');
         
-        const minimapEnabled = minimapToggle?.checked ?? true;
-        const width = parseInt(widthInput?.value || '4000');
-        const height = parseInt(heightInput?.value || '4000');
-        
-        if (this.onMinimapToggle) {
-            this.onMinimapToggle(minimapEnabled);
-        }
-        
-        if (this.onCanvasSizeChange) {
-            this.onCanvasSizeChange(width, height);
+        if (minimapToggle) {
+            this.minimapEnabled = minimapToggle.checked;
+            if (this.onMinimapToggle) {
+                this.onMinimapToggle(this.minimapEnabled);
+            }
         }
         
         this.hide();
@@ -142,31 +115,29 @@ export class SettingsModal {
     
     public show(
         minimapEnabled: boolean,
-        canvasWidth: number,
-        canvasHeight: number,
-        onMinimapToggle?: (enabled: boolean) => void,
-        onCanvasSizeChange?: (width: number, height: number) => void
+        onMinimapToggle?: (enabled: boolean) => void
     ): void {
         this.minimapEnabled = minimapEnabled;
-        this.canvasWidth = canvasWidth;
-        this.canvasHeight = canvasHeight;
         this.onMinimapToggle = onMinimapToggle;
-        this.onCanvasSizeChange = onCanvasSizeChange;
         
         // Update form values
-        const minimapToggle = this.modal.querySelector('#settings-minimap-toggle') as HTMLInputElement;
-        const widthInput = this.modal.querySelector('#settings-canvas-width') as HTMLInputElement;
-        const heightInput = this.modal.querySelector('#settings-canvas-height') as HTMLInputElement;
-        
+        const minimapToggle = DOMUpdater.query<HTMLInputElement>(this.modal, '#settings-minimap-toggle');
         if (minimapToggle) minimapToggle.checked = minimapEnabled;
-        if (widthInput) widthInput.value = canvasWidth.toString();
-        if (heightInput) heightInput.value = canvasHeight.toString();
         
-        this.overlay.style.display = 'flex';
+        this.container.style.display = 'flex';
     }
     
     public hide(): void {
-        this.overlay.style.display = 'none';
+        this.container.style.display = 'none';
+    }
+    
+    public destroy(): void {
+        // Remove modal container from body
+        if (this.container.parentElement) {
+            this.container.parentElement.removeChild(this.container);
+        }
+        // Call parent destroy to clean up event listeners
+        super.destroy();
     }
 }
 

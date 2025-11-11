@@ -1,6 +1,7 @@
 import { BlockRenderer } from './BlockRenderer';
 import { VisualBlock } from '../VisualModels';
-import { AnyWorkflowBlock, EndBlock } from '../../models/workflow-models';
+import { EndBlock } from '../../models/workflow-models';
+import { getIconSvg } from '../../utils/Icons';
 
 /**
  * Renderer for End blocks with editable outputs (mirroring Start block structure)
@@ -12,7 +13,7 @@ export class EndBlockRenderer extends BlockRenderer {
     }
     
     protected getIcon(): string {
-        return '🔴';
+        return getIconSvg('end');
     }
     
     protected getColor(): string {
@@ -205,7 +206,7 @@ export class EndBlockRenderer extends BlockRenderer {
                     <span class="block-name">${blockName}</span>
                     <span class="block-type">${this.block.type}</span>
                 </div>
-                <button class="block-delete-btn" data-block-id="${this.block.id}" title="Delete block">
+                <button class="block-delete-btn" data-block-id="${this.block.id}" data-testid="block-delete-btn" title="Delete block">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M11 3.5v-1A1.5 1.5 0 0 0 9.5 1h-3A1.5 1.5 0 0 0 5 2.5v1H2v1h1v9.5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5V4.5h1v-1H11zm-6 10V6h1v7.5H5zm2.5 0V6h1v7.5h-1zm2.5 0V6h1v7.5H10zM6 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1H6v-1z"/>
                     </svg>

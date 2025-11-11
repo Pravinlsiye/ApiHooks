@@ -2,16 +2,18 @@ import { SimpleEventEmitter } from '../../VisualModels';
 import { VisualBlock, VisualConnection, Position } from '../../VisualModels';
 import { AnyWorkflowBlock } from '../../../models/workflow-models';
 import { CanvasState } from './CanvasState';
+import { ReactiveState } from '../../../utils/ReactiveState';
 
 /**
- * Manages canvas state and emits events when state changes
+ * Manages canvas state using ReactiveState for automatic render triggers
+ * State changes automatically trigger subscribed render callbacks
  */
 export class CanvasStateManager extends SimpleEventEmitter {
-    private state: CanvasState;
+    private reactiveState: ReactiveState<CanvasState>;
     
     constructor() {
         super();
-        this.state = {
+        const initialState: CanvasState = {
             blocks: new Map(),
             connections: new Map(),
             blockDataMap: new Map(),
@@ -26,88 +28,106 @@ export class CanvasStateManager extends SimpleEventEmitter {
             mousePosition: { x: 0, y: 0 },
             hoveredConnection: null,
             deleteButtonElement: null,
-            canvasWidth: 4000,
-            canvasHeight: 4000,
+            canvasWidth: 100000, // Infinite canvas
+            canvasHeight: 100000, // Infinite canvas
             canvasWrapper: null
         };
+        
+        this.reactiveState = new ReactiveState(initialState);
+        
+        // Forward stateChanged events from ReactiveState
+        this.reactiveState.on('stateChanged', (data: { oldState: CanvasState; newState: CanvasState }) => {
+            this.emit('stateChanged', data);
+        });
     }
     
+    /**
+     * Get current state
+     */
     getState(): CanvasState {
-        return this.state;
+        return this.reactiveState.getState();
+    }
+    
+    /**
+     * Subscribe to state changes for automatic rendering
+     * @param callback Render callback function
+     * @returns Unsubscribe function
+     */
+    subscribe(callback: () => void): () => void {
+        return this.reactiveState.subscribe(callback);
     }
     
     getBlocks(): Map<string, VisualBlock> {
-        return this.state.blocks;
+        return this.reactiveState.getState().blocks;
     }
     
     getConnections(): Map<string, VisualConnection> {
-        return this.state.connections;
+        return this.reactiveState.getState().connections;
     }
     
     getBlockDataMap(): Map<string, AnyWorkflowBlock> {
-        return this.state.blockDataMap;
+        return this.reactiveState.getState().blockDataMap;
     }
     
     setBlocks(blocks: Map<string, VisualBlock>): void {
-        this.state.blocks = blocks;
-        this.emit('stateChanged', { type: 'blocksUpdated' });
+        this.reactiveState.setState({ blocks } as Partial<CanvasState>);
     }
     
     setConnections(connections: Map<string, VisualConnection>): void {
-        this.state.connections = connections;
-        this.emit('stateChanged', { type: 'connectionsUpdated' });
+        this.reactiveState.setState({ connections } as Partial<CanvasState>);
     }
     
     setBlockDataMap(blockDataMap: Map<string, AnyWorkflowBlock>): void {
-        this.state.blockDataMap = blockDataMap;
-        this.emit('stateChanged', { type: 'blockDataUpdated' });
+        this.reactiveState.setState({ blockDataMap } as Partial<CanvasState>);
     }
     
     setDragging(isDragging: boolean, blockId: string | null = null, offset: Position = { x: 0, y: 0 }): void {
-        this.state.isDragging = isDragging;
-        this.state.draggedBlockId = blockId;
-        this.state.dragOffset = offset;
-        this.emit('stateChanged', { type: 'draggingChanged', isDragging, blockId });
+        this.reactiveState.setState({
+            isDragging,
+            draggedBlockId: blockId,
+            dragOffset: offset
+        } as Partial<CanvasState>);
     }
     
     setPanning(isPanning: boolean, panStart: Position = { x: 0, y: 0 }): void {
-        this.state.isPanning = isPanning;
-        this.state.panStart = panStart;
-        this.emit('stateChanged', { type: 'panningChanged', isPanning });
+        this.reactiveState.setState({
+            isPanning,
+            panStart
+        } as Partial<CanvasState>);
     }
     
     setPanMode(panMode: boolean): void {
-        this.state.panMode = panMode;
-        this.emit('stateChanged', { type: 'panModeChanged', panMode });
+        this.reactiveState.setState({ panMode } as Partial<CanvasState>);
     }
     
     setConnecting(isConnecting: boolean, connectionStart: { blockId: string, portName: string, position: Position } | null = null): void {
-        this.state.isConnecting = isConnecting;
-        this.state.connectionStart = connectionStart;
-        this.emit('stateChanged', { type: 'connectingChanged', isConnecting });
+        this.reactiveState.setState({
+            isConnecting,
+            connectionStart
+        } as Partial<CanvasState>);
     }
     
     setMousePosition(position: Position): void {
-        this.state.mousePosition = position;
+        this.reactiveState.setState({ mousePosition: position } as Partial<CanvasState>);
     }
     
     setHoveredConnection(connectionId: string | null): void {
-        this.state.hoveredConnection = connectionId;
-        this.emit('stateChanged', { type: 'hoverChanged', connectionId });
+        this.reactiveState.setState({ hoveredConnection: connectionId } as Partial<CanvasState>);
     }
     
     setDeleteButtonElement(element: SVGForeignObjectElement | null): void {
-        this.state.deleteButtonElement = element;
+        this.reactiveState.setState({ deleteButtonElement: element } as Partial<CanvasState>);
     }
     
     setCanvasSize(width: number, height: number): void {
-        this.state.canvasWidth = width;
-        this.state.canvasHeight = height;
-        this.emit('stateChanged', { type: 'canvasSizeChanged', width, height });
+        this.reactiveState.setState({
+            canvasWidth: width,
+            canvasHeight: height
+        } as Partial<CanvasState>);
     }
     
     setCanvasWrapper(wrapper: HTMLElement | null): void {
-        this.state.canvasWrapper = wrapper;
+        this.reactiveState.setState({ canvasWrapper: wrapper } as Partial<CanvasState>);
     }
 }
 
