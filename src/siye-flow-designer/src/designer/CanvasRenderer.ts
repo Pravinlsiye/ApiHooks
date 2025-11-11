@@ -1214,9 +1214,9 @@ export class CanvasRenderer extends BaseComponent {
         this.updateTemporaryConnection();
     }
     
-    public zoomFitToScreen(): void {
+    public zoomFitToScreen(maxZoomLimit?: number): void {
         const state = this.stateManager.getState();
-        this.zoomPanManager.zoomFitToScreen(state.blocks);
+        this.zoomPanManager.zoomFitToScreen(state.blocks, maxZoomLimit);
         this.updateTemporaryConnection();
     }
     

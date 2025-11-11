@@ -120,8 +120,10 @@ export class ZoomPanManager extends SimpleEventEmitter {
     /**
      * Fit to screen (calculate zoom to fit all blocks and center them)
      * Rewritten from scratch with clear logic
+     * @param blocks Map of blocks to fit
+     * @param maxZoomLimit Optional maximum zoom limit (for initial renders to keep zoomed out)
      */
-    public zoomFitToScreen(blocks: Map<string, VisualBlock>): void {
+    public zoomFitToScreen(blocks: Map<string, VisualBlock>, maxZoomLimit?: number): void {
         // Early returns
         if (blocks.size === 0) {
             this.zoomReset();
@@ -183,7 +185,9 @@ export class ZoomPanManager extends SimpleEventEmitter {
         
         // Clamp zoom level
         newZoom = Math.max(newZoom, this.minZoom);
-        newZoom = Math.min(newZoom, this.maxZoom);
+        // Apply maxZoomLimit if provided (for initial renders to keep zoomed out)
+        const effectiveMaxZoom = maxZoomLimit !== undefined ? Math.min(maxZoomLimit, this.maxZoom) : this.maxZoom;
+        newZoom = Math.min(newZoom, effectiveMaxZoom);
         
         // Step 4: Calculate center point of blocks
         const centerX = (minX + maxX) / 2;

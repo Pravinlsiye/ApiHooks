@@ -143,6 +143,8 @@ export class WorkflowDesigner extends BaseComponent {
             const minimapContainer = this.createElement('div', { id: 'minimap-container' });
             canvasContainer.appendChild(minimapContainer);
             this.minimap = new Minimap('minimap-container', 'canvas-container', () => this.canvas.getZoomLevel());
+            // Hide minimap by default
+            this.minimap.hide();
         }
         this.floatingPanel = new FloatingPanel(
             'floating-panel-container',
@@ -411,6 +413,11 @@ export class WorkflowDesigner extends BaseComponent {
         this.addVisualBlock(endBlock, { x: DEFAULT_VIEW_X + 200, y: DEFAULT_VIEW_Y });
         
         this.renderWorkflow();
+        
+        // Center blocks after first render with limited zoom (keep zoomed out)
+        requestAnimationFrame(() => {
+            this.canvas.zoomFitToScreen(0.8); // Max 80% zoom for initial render
+        });
     }
     
     /**
@@ -1437,6 +1444,11 @@ export class WorkflowDesigner extends BaseComponent {
                     this.positionBlocks();
                     this.createVisualConnections();
                     this.renderWorkflow();
+                    
+                    // Center blocks after rendering with limited zoom (keep zoomed out)
+                    requestAnimationFrame(() => {
+                        this.canvas.zoomFitToScreen(0.8); // Max 80% zoom for initial render
+                    });
                     
                     this.alertModal.show('Workflow imported successfully', 'Import Success', 'success');
                 } catch (error) {
