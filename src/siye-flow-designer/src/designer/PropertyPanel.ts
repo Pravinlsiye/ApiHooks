@@ -632,7 +632,7 @@ export class PropertyPanel extends BaseComponent {
             if (this.currentBlock && (this.currentBlock as any).config) {
                 (this.currentBlock as any).config.selectedProfile = value;
             }
-            this.emit('blockUpdated', this.currentBlock.id, { ...this.currentBlock });
+            this.emit('blockUpdated', { blockId: this.currentBlock.id, block: { ...this.currentBlock } });
             // Re-render to show updated profile details
             this.renderProperties();
             return;

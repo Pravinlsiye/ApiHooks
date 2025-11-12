@@ -120,7 +120,7 @@ describe('DOMDiff', () => {
   describe('memoize', () => {
     it('should cache function results', () => {
       const fn = vi.fn((x: number) => x * 2);
-      const memoized = DOMDiff.memoize(fn);
+      const memoized = DOMDiff.memoize(fn, (x) => String(x));
 
       expect(memoized(5)).toBe(10);
       expect(memoized(5)).toBe(10);
@@ -141,7 +141,7 @@ describe('DOMDiff', () => {
 
     it('should respect cache size limit', () => {
       const fn = vi.fn((x: number) => x * 2);
-      const memoized = DOMDiff.memoize(fn, undefined, 2);
+      const memoized = DOMDiff.memoize(fn, (x) => String(x), 2);
 
       memoized(1);
       memoized(2);
@@ -153,7 +153,7 @@ describe('DOMDiff', () => {
 
     it('should handle different arguments', () => {
       const fn = vi.fn((x: number) => x * 2);
-      const memoized = DOMDiff.memoize(fn);
+      const memoized = DOMDiff.memoize(fn, (x) => String(x));
 
       expect(memoized(5)).toBe(10);
       expect(memoized(10)).toBe(20);

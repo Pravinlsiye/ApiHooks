@@ -44,6 +44,71 @@ export class WorkflowDesigner extends BaseComponent {
         return this.selectedBlockId;
     }
     
+    /**
+     * Export workflow as data object
+     */
+    public exportWorkflow(): any {
+        try {
+            const workflow = this.engine.getWorkflow();
+            const connections = this.getConnectionsData();
+            
+            return {
+                ...workflow,
+                connections: connections
+            };
+        } catch (error) {
+            console.error('Error exporting workflow:', error);
+            // Return a default workflow structure
+            return {
+                name: 'New Workflow',
+                blocks: [],
+                connections: []
+            };
+        }
+    }
+    
+    /**
+     * Import workflow from data object
+     */
+    public importWorkflow(workflowData: any): void {
+        const json = typeof workflowData === 'string' ? workflowData : JSON.stringify(workflowData);
+        this.engine.loadWorkflow(json);
+        this.visualBlocks.clear();
+        this.visualConnections.clear();
+        
+        // Position blocks
+        this.positionBlocks();
+        
+        // Restore connections if any
+        if (workflowData.connections) {
+            workflowData.connections.forEach((conn: any) => {
+                const connectionId = `${conn.fromBlock}_${conn.fromPort}_${conn.toBlock}_${conn.toPort}`;
+                const visualConnection: VisualConnection = {
+                    id: connectionId,
+                    sourceBlockId: conn.fromBlock,
+                    sourcePortName: conn.fromPort || 'output',
+                    targetBlockId: conn.toBlock,
+                    targetPortName: conn.toPort || 'input',
+                    path: ''
+                };
+                this.visualConnections.set(connectionId, visualConnection);
+            });
+        }
+        
+        this.renderWorkflow();
+    }
+    
+    /**
+     * Clear the workflow
+     */
+    public clearWorkflow(): void {
+        this.engine = new WorkflowEngine();
+        this.visualBlocks.clear();
+        this.visualConnections.clear();
+        this.initializeDefaultWorkflow();
+        this.renderWorkflow();
+    }
+    
     constructor(containerId: string, config?: DesignerConfig) {
         super(containerId);
         
@@ -174,16 +239,16 @@ export class WorkflowDesigner extends BaseComponent {
         const settingsBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#settings-btn');
         
         if (importBtn) {
-            this.addEventListener(importBtn, 'click', () => this.importWorkflow());
+            this.addEventListener(importBtn, 'click', () => this.importWorkflowFromFile());
         }
         if (exportBtn) {
-            this.addEventListener(exportBtn, 'click', () => this.exportWorkflow());
+            this.addEventListener(exportBtn, 'click', () => this.exportWorkflowToFile());
         }
         if (validateBtn) {
             this.addEventListener(validateBtn, 'click', () => this.validateWorkflow());
         }
         if (clearBtn) {
-            this.addEventListener(clearBtn, 'click', () => this.clearWorkflow());
+            this.addEventListener(clearBtn, 'click', () => this.clearWorkflowWithConfirm());
         }
         if (settingsBtn) {
             this.addEventListener(settingsBtn, 'click', () => this.openSettings());
@@ -387,7 +452,7 @@ export class WorkflowDesigner extends BaseComponent {
         // Register cleanup for all handlers
         this.registerCleanup(() => {
             canvasHandlers.forEach(({ event, handler }) => {
-                this.canvas.off(event, handler);
+                this.canvas.off(event, handler as any);
             });
             // Property panel cleanup is handled in setupPropertyPanelHandlers()
         });
@@ -1424,9 +1489,9 @@ export class WorkflowDesigner extends BaseComponent {
     }
     
     /**
-     * Import workflow from file
+     * Import workflow from file (private method)
      */
-    private importWorkflow(): void {
+    private importWorkflowFromFile(): void {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';
@@ -1461,9 +1526,9 @@ export class WorkflowDesigner extends BaseComponent {
     }
     
     /**
-     * Export workflow to file
+     * Export workflow to file (private method)
      */
-    private exportWorkflow(): void {
+    private exportWorkflowToFile(): void {
         const json = this.engine.saveWorkflow();
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -1491,9 +1556,9 @@ export class WorkflowDesigner extends BaseComponent {
     }
     
     /**
-     * Clear the workflow
+     * Clear the workflow (private method)
      */
-    private clearWorkflow(): void {
+    private clearWorkflowWithConfirm(): void {
         if (confirm('Are you sure you want to clear the workflow?')) {
             this.engine = new WorkflowEngine();
             this.visualBlocks.clear();
@@ -1551,7 +1616,23 @@ export class WorkflowDesigner extends BaseComponent {
         this.canvas.render(this.visualBlocks, this.visualConnections);
         
         // Update minimap
-        this.minimap.updateBlocks(this.visualBlocks);
+        this.minimap.updateBlocks(Array.from(this.visualBlocks.values()));
+    }
+    
+    /**
+     * Get connections data for export
+     */
+    private getConnectionsData(): any[] {
+        const connections: any[] = [];
+        this.visualConnections.forEach(conn => {
+            connections.push({
+                fromBlock: conn.sourceBlockId,
+                fromPort: conn.sourcePortName,
+                toBlock: conn.targetBlockId,
+                toPort: conn.targetPortName
+            });
+        });
+        return connections;
     }
     
     /**

@@ -2,6 +2,15 @@
 
 > **Port-Based Execution Model**: Blocks connect via named input/output ports for flexible, type-safe workflows.
 
+## Schema Source of Truth
+
+**The workflow schema is defined in TypeScript** at [`src/siye-flow-designer/src/models/workflow-models.ts`](../src/siye-flow-designer/src/models/workflow-models.ts). This file is the authoritative source for all workflow model definitions.
+
+- **Schema Changes**: Update `workflow-models.ts` directly when schema changes are needed
+- **Backward Compatibility**: Legacy properties (`onSuccess`, `onFailure`, `onComplete`) are maintained for compatibility
+- **Type Safety**: Full TypeScript type definitions ensure consistency across the codebase
+- **Future**: C# models can be regenerated from TypeScript when .NET CLI development resumes
+
 ## Overview
 
 SiyeFlow workflows are defined as JSON with typed blocks connected via ports. Each block performs a specific task (HTTP request, data transformation, condition check, etc.) and passes data through named ports to other blocks.

@@ -182,8 +182,13 @@ export class Minimap extends BaseComponent {
     /**
      * Update the blocks shown in the minimap
      */
-    public updateBlocks(blocks: Map<string, VisualBlock>): void {
-        this.blocks = blocks;
+    public updateBlocks(blocks: Map<string, VisualBlock> | VisualBlock[]): void {
+        // Handle both Map and Array inputs
+        if (Array.isArray(blocks)) {
+            this.blocks = new Map(blocks.map(block => [block.id, block]));
+        } else {
+            this.blocks = blocks;
+        }
         // Render blocks (which will update viewBox internally)
         this.renderBlocks();
         // Also update viewport indicator
@@ -228,6 +233,7 @@ export class Minimap extends BaseComponent {
                 // Create new rect
                 rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                 rect.setAttribute('data-block-id', block.id);
+                rect.setAttribute('class', 'minimap-block');
                 this.blocksContainer.appendChild(rect);
             }
             
@@ -501,7 +507,7 @@ export class Minimap extends BaseComponent {
      * Set canvas dimensions
      * Updates minimap when canvas size changes dynamically
      */
-    public setCanvasSize(width: number, height: number): void {
+    public setCanvasSize(_width: number, _height: number): void {
         // Update canvas wrapper reference in case it was recreated
         const newWrapper = DOMUpdater.query<HTMLElement>(this.canvasContainer, '.canvas-wrapper');
         if (newWrapper && newWrapper !== this.canvasWrapper) {

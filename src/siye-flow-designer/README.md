@@ -52,9 +52,10 @@ src/
 ```
 
 ### Single Source of Truth
-- **C# Models**: Defined in `SiyeFlow.Core`
-- **TypeScript Generation**: Auto-generated via `npm run type:generate`
+- **TypeScript Models**: Defined in `src/models/workflow-models.ts` (source of truth)
+- **Schema Changes**: Update `workflow-models.ts` directly when schema changes are needed
 - **Type Safety**: Full TypeScript support throughout
+- **Note**: C# models can be regenerated from TypeScript models later when .NET CLI development resumes
 
 ---
 
@@ -287,12 +288,14 @@ npm run preview       # Preview build
 npm run type:generate # Generate TypeScript models from C#
 ```
 
-### Model Generation
-```bash
-# Generate TypeScript models from C#
-cd ../SiyeFlow.Core.TypeGen
-dotnet run -- "../siye-flow-designer/src/models/workflow-models.ts"
-```
+### Schema Management
+The workflow schema is defined in `src/models/workflow-models.ts` as the source of truth. When schema changes are needed:
+
+1. Update `workflow-models.ts` directly
+2. Ensure backward compatibility (legacy properties like `onSuccess`, `onFailure`, `onComplete` are maintained)
+3. All changes are immediately available in the TypeScript designer
+
+**Note**: When .NET CLI development resumes, C# models can be regenerated from the TypeScript schema.
 
 ---
 
@@ -412,6 +415,9 @@ const memoized = DOMDiff.memoize(calc, keyFn);
 - ✅ Comprehensive testing
 - ✅ Zero memory leaks
 - ✅ 60fps performance
+- ✅ Auto-centering blocks on first render (80% max zoom)
+- ✅ SVG block icons with proper rendering
+- ✅ Minimap (disabled by default, can be enabled in settings)
 
 ---
 

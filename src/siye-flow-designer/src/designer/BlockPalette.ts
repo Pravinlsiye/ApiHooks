@@ -415,7 +415,7 @@ export class BlockPalette extends BaseComponent {
         const addApiBtn = DOMUpdater.query<HTMLButtonElement>(searchDiv, '.btn-add-api');
         if (addApiBtn) {
             this.addEventListener(addApiBtn, 'click', () => {
-                this.emit('addApiDefinition');
+                this.emit('addApiDefinition', {});
             });
         }
     }
