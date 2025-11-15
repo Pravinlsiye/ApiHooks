@@ -6,11 +6,23 @@ import { AnyWorkflowBlock } from '../../../models/workflow-models';
 /**
  * Helper class for setting up block-specific event handlers
  * This extracts the complex event handler setup logic from CanvasRenderer
+ * Tracks all event listeners for proper cleanup
  */
 export class BlockEventHandler extends SimpleEventEmitter {
     private addItemModal: AddItemModal;
     private confirmModal: ConfirmModal;
     private getBlockData: (blockId: string) => AnyWorkflowBlock | undefined;
+    
+    // Track event listeners for cleanup
+    private eventListeners: Map<string, Array<{
+        element: HTMLElement | Document;
+        event: string;
+        handler: EventListener;
+        options?: boolean | AddEventListenerOptions;
+    }>> = new Map();
+    
+    // Track setTimeout calls for cleanup
+    private timeoutIds: Set<number> = new Set();
     
     constructor(
         getBlockData: (blockId: string) => AnyWorkflowBlock | undefined
@@ -22,22 +34,81 @@ export class BlockEventHandler extends SimpleEventEmitter {
     }
     
     /**
+     * Track an event listener for cleanup
+     */
+    private trackEventListener(
+        blockId: string,
+        element: HTMLElement | Document,
+        event: string,
+        handler: EventListener,
+        options?: boolean | AddEventListenerOptions
+    ): void {
+        if (!this.eventListeners.has(blockId)) {
+            this.eventListeners.set(blockId, []);
+        }
+        this.eventListeners.get(blockId)!.push({ element, event, handler, options });
+    }
+    
+    /**
+     * Track a setTimeout call for cleanup
+     */
+    private trackTimeout(timeoutId: number): void {
+        this.timeoutIds.add(timeoutId);
+    }
+    
+    /**
+     * Clean up all event listeners for a specific block
+     */
+    public cleanupBlock(blockId: string): void {
+        const listeners = this.eventListeners.get(blockId);
+        if (listeners) {
+            listeners.forEach(({ element, event, handler, options }) => {
+                element.removeEventListener(event, handler, options);
+            });
+            this.eventListeners.delete(blockId);
+        }
+    }
+    
+    /**
+     * Clean up all event listeners and timeouts
+     */
+    public destroy(): void {
+        // Clean up all block listeners
+        this.eventListeners.forEach((listeners, _blockId) => {
+            listeners.forEach(({ element, event, handler, options }) => {
+                element.removeEventListener(event, handler, options);
+            });
+        });
+        this.eventListeners.clear();
+        
+        // Clean up all timeouts
+        this.timeoutIds.forEach(timeoutId => clearTimeout(timeoutId));
+        this.timeoutIds.clear();
+        
+        // Clean up modals
+        this.addItemModal.destroy();
+        this.confirmModal.destroy();
+    }
+    
+    /**
      * Setup event handlers for Start block editable inputs
      */
     public setupStartBlockInputHandlers(blockElement: HTMLElement, blockId: string): void {
         // Add input button (Start block) - add directly without popup
         blockElement.querySelectorAll('.btn-add-input-on-block, .btn-add-item-popup').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            const handler = (e: Event) => {
                 e.stopPropagation();
                 e.preventDefault();
                 this.emit('startBlockAddInput', { blockId });
-            });
+            };
+            btn.addEventListener('click', handler);
+            this.trackEventListener(blockId, btn as HTMLElement, 'click', handler);
         });
         
         // Edit button - open popup for editing
         blockElement.querySelectorAll('.btn-edit-input').forEach(btn => {
             const inputName = (btn as HTMLElement).dataset.inputName;
-            btn.addEventListener('click', (e) => {
+            const handler = (e: Event) => {
                 e.stopPropagation();
                 e.preventDefault();
                 
@@ -88,10 +159,12 @@ export class BlockEventHandler extends SimpleEventEmitter {
                                     
                                     if (name !== inputName) {
                                         this.emit('startBlockRenameInput', { blockId, oldName: inputName, newName: name });
-                                        setTimeout(() => {
+                                        const timeoutId = window.setTimeout(() => {
+                                            this.timeoutIds.delete(timeoutId);
                                             this.emit('startBlockInputTypeChange', { blockId, inputName: name, type });
                                             this.emit('startBlockInputValueChange', { blockId, inputName: name, value: finalValue });
                                         }, 100);
+                                        this.trackTimeout(timeoutId);
                                     } else {
                                         this.emit('startBlockInputTypeChange', { blockId, inputName, type });
                                         this.emit('startBlockInputValueChange', { blockId, inputName, value: finalValue });
@@ -104,40 +177,50 @@ export class BlockEventHandler extends SimpleEventEmitter {
                         }
                     }
                 }
-            });
+            };
+            btn.addEventListener('click', handler);
+            this.trackEventListener(blockId, btn as HTMLElement, 'click', handler);
         });
         
         // Delete input button
         blockElement.querySelectorAll('.btn-delete-input').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            const handler = (e: Event) => {
                 e.stopPropagation();
                 e.preventDefault();
                 const inputName = (btn as HTMLElement).dataset.inputName;
                 if (inputName) {
                     this.emit('startBlockDeleteInput', { blockId, inputName });
                 }
-            });
+            };
+            btn.addEventListener('click', handler);
+            this.trackEventListener(blockId, btn as HTMLElement, 'click', handler);
         });
         
         // Input name change
         blockElement.querySelectorAll('.block-input-name').forEach(input => {
-            input.addEventListener('blur', (e) => {
+            const handler = (e: Event) => {
                 const target = e.target as HTMLInputElement;
                 const originalName = target.dataset.originalName;
                 const newName = target.value.trim();
                 if (originalName && newName && newName !== originalName) {
                     this.emit('startBlockRenameInput', { blockId, oldName: originalName, newName });
                 }
-            });
+            };
+            input.addEventListener('blur', handler);
+            this.trackEventListener(blockId, input as HTMLElement, 'blur', handler);
         });
         
         // Input value change
         blockElement.querySelectorAll('.block-input-value, .block-input-name').forEach(input => {
-            input.addEventListener('mousedown', (e) => e.stopPropagation());
-            input.addEventListener('click', (e) => e.stopPropagation());
+            const mousedownHandler = (e: Event) => e.stopPropagation();
+            const clickHandler = (e: Event) => e.stopPropagation();
+            input.addEventListener('mousedown', mousedownHandler);
+            input.addEventListener('click', clickHandler);
+            this.trackEventListener(blockId, input as HTMLElement, 'mousedown', mousedownHandler);
+            this.trackEventListener(blockId, input as HTMLElement, 'click', clickHandler);
             
             if (input.classList.contains('block-input-value')) {
-                input.addEventListener('input', (e) => {
+                const inputHandler = (e: Event) => {
                     e.stopPropagation();
                     const target = e.target as HTMLInputElement;
                     const inputName = target.dataset.inputName;
@@ -145,8 +228,8 @@ export class BlockEventHandler extends SimpleEventEmitter {
                     if (inputName) {
                         this.emit('startBlockInputValueChange', { blockId, inputName, value });
                     }
-                });
-                input.addEventListener('blur', (e) => {
+                };
+                const blurHandler = (e: Event) => {
                     e.stopPropagation();
                     const target = e.target as HTMLInputElement;
                     const inputName = target.dataset.inputName;
@@ -154,13 +237,17 @@ export class BlockEventHandler extends SimpleEventEmitter {
                     if (inputName) {
                         this.emit('startBlockInputValueChange', { blockId, inputName, value });
                     }
-                });
+                };
+                input.addEventListener('input', inputHandler);
+                input.addEventListener('blur', blurHandler);
+                this.trackEventListener(blockId, input as HTMLElement, 'input', inputHandler);
+                this.trackEventListener(blockId, input as HTMLElement, 'blur', blurHandler);
             }
         });
         
         // Input type change
         blockElement.querySelectorAll('.input-type-option').forEach(option => {
-            option.addEventListener('click', (e) => {
+            const handler = (e: Event) => {
                 e.stopPropagation();
                 e.preventDefault();
                 const typeSelector = (option as HTMLElement).closest('.input-type-selector');
@@ -169,18 +256,22 @@ export class BlockEventHandler extends SimpleEventEmitter {
                 if (inputName && newType) {
                     this.emit('startBlockInputTypeChange', { blockId, inputName, type: newType });
                 }
-            });
+            };
+            option.addEventListener('click', handler);
+            this.trackEventListener(blockId, option as HTMLElement, 'click', handler);
         });
         
         // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
+        const documentClickHandler = (e: Event) => {
             const target = e.target as HTMLElement;
             if (!blockElement.contains(target)) {
                 blockElement.querySelectorAll('.input-type-dropdown').forEach(dropdown => {
                     (dropdown as HTMLElement).style.display = 'none';
                 });
             }
-        });
+        };
+        document.addEventListener('click', documentClickHandler);
+        this.trackEventListener(blockId, document, 'click', documentClickHandler);
     }
     
     /**
@@ -242,10 +333,12 @@ export class BlockEventHandler extends SimpleEventEmitter {
                                     
                                     if (name !== outputName) {
                                         this.emit('endBlockRenameOutput', { blockId, oldName: outputName, newName: name });
-                                        setTimeout(() => {
+                                        const timeoutId = window.setTimeout(() => {
+                                            this.timeoutIds.delete(timeoutId);
                                             this.emit('endBlockOutputTypeChange', { blockId, outputName: name, type });
                                             this.emit('endBlockOutputValueChange', { blockId, outputName: name, value: finalValue });
                                         }, 100);
+                                        this.trackTimeout(timeoutId);
                                     } else {
                                         this.emit('endBlockOutputTypeChange', { blockId, outputName, type });
                                         this.emit('endBlockOutputValueChange', { blockId, outputName, value: finalValue });
@@ -471,10 +564,12 @@ export class BlockEventHandler extends SimpleEventEmitter {
                                     
                                     if (name !== itemName) {
                                         this.emit('blockRenameKeyValue', { blockId, oldName: itemName, newName: name, itemType, portType });
-                                        setTimeout(() => {
+                                        const timeoutId = window.setTimeout(() => {
+                                            this.timeoutIds.delete(timeoutId);
                                             this.emit('blockKeyValueTypeChange', { blockId, itemName: name, type, itemType, portType });
                                             this.emit('blockKeyValueChange', { blockId, itemName: name, value: finalValue, itemType, portType });
                                         }, 100);
+                                        this.trackTimeout(timeoutId);
                                     } else {
                                         this.emit('blockKeyValueTypeChange', { blockId, itemName, type, itemType, portType });
                                         this.emit('blockKeyValueChange', { blockId, itemName, value: finalValue, itemType, portType });

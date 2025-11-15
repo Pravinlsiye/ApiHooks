@@ -1,22 +1,17 @@
 import { AnyWorkflowBlock, BlockType } from '../models/workflow-models';
-import { SimpleEventEmitter } from './VisualModels';
+import { BaseComponent } from '../utils/BaseComponent';
+import { DOMUpdater } from '../utils/DOMUpdater';
+import { DOMDiff } from '../utils/DOMDiff';
 
 /**
  * Property panel for editing block properties
+ * Now extends BaseComponent for automatic cleanup and uses DOMDiff for efficient updates
  */
-export class PropertyPanel extends SimpleEventEmitter {
-    private container: HTMLElement;
+export class PropertyPanel extends BaseComponent {
     private currentBlock: AnyWorkflowBlock | null = null;
     
     constructor(containerId: string) {
-        super();
-        
-        const element = document.getElementById(containerId);
-        if (!element) {
-            throw new Error(`Container element '${containerId}' not found`);
-        }
-        
-        this.container = element;
+        super(containerId);
         this.setupPanel();
     }
     
@@ -45,9 +40,11 @@ export class PropertyPanel extends SimpleEventEmitter {
      */
     public clear(): void {
         this.currentBlock = null;
-        const form = this.container.querySelector('.property-form');
+        const form = DOMUpdater.query<HTMLElement>(this.container, '.property-form');
         if (form) {
-            form.innerHTML = '<p class="no-selection">Select a block to view properties</p>';
+            DOMUpdater.updateElement(form, {
+                html: '<p class="no-selection">Select a block to view properties</p>'
+            });
         }
     }
     
@@ -55,7 +52,7 @@ export class PropertyPanel extends SimpleEventEmitter {
      * Render block properties
      */
     private renderProperties(): void {
-        const form = this.container.querySelector('.property-form');
+        const form = DOMUpdater.query<HTMLElement>(this.container, '.property-form');
         if (!form || !this.currentBlock) return;
         
         let html = '';
@@ -88,9 +85,9 @@ export class PropertyPanel extends SimpleEventEmitter {
         // Block-specific properties
         html += this.renderBlockSpecificProperties();
         
-        form.innerHTML = html;
+        DOMUpdater.updateElement(form, { html });
         
-        // Setup event handlers
+        // Setup event handlers with automatic cleanup tracking
         this.setupPropertyHandlers();
     }
     
@@ -402,17 +399,28 @@ export class PropertyPanel extends SimpleEventEmitter {
     }
     
     /**
-     * Setup event handlers for property inputs
+     * Setup property change handlers with debouncing for input events
      */
     private setupPropertyHandlers(): void {
-        const inputs = this.container.querySelectorAll('input[data-property], textarea[data-property], select[data-property]');
+        const inputs = DOMUpdater.queryAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+            this.container,
+            'input[data-property], textarea[data-property], select[data-property]'
+        );
+        
+        // Debounce input events for better performance
+        const debouncedPropertyChange = DOMDiff.debounce((e: Event) => {
+            this.onPropertyChange(e);
+        }, 300);
         
         inputs.forEach(input => {
-            input.addEventListener('change', (e) => this.onPropertyChange(e));
-            
-            // For text inputs, also handle input event for real-time updates
-            if (input.tagName === 'INPUT' || input.tagName === 'TEXTAREA') {
-                input.addEventListener('input', (e) => this.onPropertyChange(e));
+            // Use change event for selects and checkboxes
+            if (input.tagName === 'SELECT' || input.type === 'checkbox') {
+                this.addEventListener(input, 'change', (e) => this.onPropertyChange(e));
+            } else {
+                // Use debounced input event for text inputs
+                this.addEventListener(input, 'input', debouncedPropertyChange as EventListener);
+                // Also listen to blur for immediate update
+                this.addEventListener(input, 'blur', (e) => this.onPropertyChange(e));
             }
         });
         
@@ -423,48 +431,58 @@ export class PropertyPanel extends SimpleEventEmitter {
     }
     
     /**
-     * Setup event handlers for variable list
+     * Setup handlers for variable list with event delegation for automatic cleanup
      */
     private setupVariableListHandlers(): void {
-        const variableList = document.getElementById('variable-list');
-        const addButton = document.getElementById('btn-add-variable');
+        const variableList = DOMUpdater.query<HTMLElement>(this.container, '#variable-list');
+        const addButton = DOMUpdater.query<HTMLButtonElement>(this.container, '#btn-add-variable');
         
         if (!variableList || !addButton) return;
         
         // Add variable button
-        addButton.addEventListener('click', () => {
+        this.addEventListener(addButton, 'click', () => {
             this.addNewVariable();
         });
         
+        // Use event delegation for dynamically added elements
         // Delete variable buttons
-        variableList.querySelectorAll('.btn-delete-variable').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        this.addEventListener(variableList, 'click', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('btn-delete-variable')) {
                 e.stopPropagation();
-                const item = (e.target as HTMLElement).closest('.variable-item');
+                const item = target.closest('.variable-item') as HTMLElement;
                 if (item) {
                     const varName = item.getAttribute('data-variable-name');
                     if (varName) {
                         this.deleteVariable(varName);
                     }
                 }
-            });
+            }
         });
         
-        // Variable name and value inputs
-        variableList.querySelectorAll('.variable-name-input').forEach(input => {
-            input.addEventListener('blur', (e) => {
-                this.onVariableNameChange(e.target as HTMLInputElement);
-            });
-        });
+        // Variable name change handlers - use event delegation
+        this.addEventListener(variableList, 'blur', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('variable-name-input')) {
+                this.onVariableNameChange(target as HTMLInputElement);
+            }
+        }, true);
         
-        variableList.querySelectorAll('.variable-value-input').forEach(input => {
-            input.addEventListener('input', (e) => {
-                this.onVariableValueChange(e.target as HTMLInputElement);
-            });
-            input.addEventListener('blur', (e) => {
-                this.onVariableValueChange(e.target as HTMLInputElement);
-            });
-        });
+        // Variable value change handlers - debounced
+        const debouncedValueChange = DOMDiff.debounce((e: Event) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('variable-value-input')) {
+                this.onVariableValueChange(target as HTMLInputElement);
+            }
+        }, 300);
+        
+        this.addEventListener(variableList, 'input', debouncedValueChange as EventListener, true);
+        this.addEventListener(variableList, 'blur', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('variable-value-input')) {
+                this.onVariableValueChange(target as HTMLInputElement);
+            }
+        }, true);
     }
     
     /**
@@ -614,7 +632,7 @@ export class PropertyPanel extends SimpleEventEmitter {
             if (this.currentBlock && (this.currentBlock as any).config) {
                 (this.currentBlock as any).config.selectedProfile = value;
             }
-            this.emit('blockUpdated', this.currentBlock.id, { ...this.currentBlock });
+            this.emit('blockUpdated', { blockId: this.currentBlock.id, block: { ...this.currentBlock } });
             // Re-render to show updated profile details
             this.renderProperties();
             return;

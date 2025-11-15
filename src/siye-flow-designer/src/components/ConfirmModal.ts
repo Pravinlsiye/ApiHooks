@@ -1,22 +1,32 @@
+import { BaseComponent } from '../utils/BaseComponent';
+import { DOMUpdater } from '../utils/DOMUpdater';
+
 /**
  * ConfirmModal - A clean popup modal for confirmations
+ * Now extends BaseComponent for automatic cleanup
  */
-export class ConfirmModal {
+export class ConfirmModal extends BaseComponent {
     private overlay: HTMLElement;
     private modal: HTMLElement;
     private onConfirm?: () => void;
     private onCancel?: () => void;
     
     constructor() {
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'confirm-modal-overlay';
+        // Create a unique container ID for this modal instance
+        const containerId = `confirm-modal-${Date.now()}`;
+        const container = document.createElement('div');
+        container.id = containerId;
+        document.body.appendChild(container);
+        
+        super(containerId);
+        
+        this.overlay = this.createElement('div', { className: 'confirm-modal-overlay' });
         this.overlay.style.display = 'none';
         
-        this.modal = document.createElement('div');
-        this.modal.className = 'confirm-modal';
+        this.modal = this.createElement('div', { className: 'confirm-modal' });
         
         this.overlay.appendChild(this.modal);
-        document.body.appendChild(this.overlay);
+        this.container.appendChild(this.overlay);
         
         this.setupModal();
         this.setupEventHandlers();
@@ -31,36 +41,43 @@ export class ConfirmModal {
                 <p class="confirm-modal-message"></p>
             </div>
             <div class="confirm-modal-footer">
-                <button class="confirm-btn confirm-btn-cancel">Cancel</button>
-                <button class="confirm-btn confirm-btn-primary">Confirm</button>
+                <button class="confirm-btn confirm-btn-cancel" data-testid="confirm-modal-cancel">Cancel</button>
+                <button class="confirm-btn confirm-btn-primary" data-testid="confirm-modal-confirm">Confirm</button>
             </div>
         `;
     }
     
     private setupEventHandlers(): void {
         // Cancel button
-        this.modal.querySelector('.confirm-btn-cancel')?.addEventListener('click', () => {
-            this.hide();
-        });
+        const cancelBtn = DOMUpdater.query<HTMLButtonElement>(this.modal, '.confirm-btn-cancel');
+        if (cancelBtn) {
+            this.addEventListener(cancelBtn, 'click', () => {
+                this.hide();
+            });
+        }
         
         // Confirm button
-        this.modal.querySelector('.confirm-btn-primary')?.addEventListener('click', () => {
-            if (this.onConfirm) {
-                this.onConfirm();
-            }
-            this.hide();
-        });
+        const confirmBtn = DOMUpdater.query<HTMLButtonElement>(this.modal, '.confirm-btn-primary');
+        if (confirmBtn) {
+            this.addEventListener(confirmBtn, 'click', () => {
+                if (this.onConfirm) {
+                    this.onConfirm();
+                }
+                this.hide();
+            });
+        }
         
         // Overlay click to close
-        this.overlay.addEventListener('click', (e) => {
+        this.addEventListener(this.overlay, 'click', (e) => {
             if (e.target === this.overlay) {
                 this.hide();
             }
         });
         
         // Escape key to close
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.overlay.style.display === 'flex') {
+        this.addEventListener(document, 'keydown', (e) => {
+            const keyEvent = e as KeyboardEvent;
+            if (keyEvent.key === 'Escape' && this.overlay.style.display === 'flex') {
                 this.hide();
             }
         });
@@ -77,11 +94,11 @@ export class ConfirmModal {
         this.onConfirm = onConfirm;
         this.onCancel = onCancel;
         
-        // Update content
-        const titleElement = this.modal.querySelector('.confirm-modal-title');
-        const messageElement = this.modal.querySelector('.confirm-modal-message');
-        const confirmBtn = this.modal.querySelector('.confirm-btn-primary') as HTMLButtonElement;
-        const cancelBtn = this.modal.querySelector('.confirm-btn-cancel') as HTMLButtonElement;
+        // Update content using DOMUpdater
+        const titleElement = DOMUpdater.query<HTMLElement>(this.modal, '.confirm-modal-title');
+        const messageElement = DOMUpdater.query<HTMLElement>(this.modal, '.confirm-modal-message');
+        const confirmBtn = DOMUpdater.query<HTMLButtonElement>(this.modal, '.confirm-btn-primary');
+        const cancelBtn = DOMUpdater.query<HTMLButtonElement>(this.modal, '.confirm-btn-cancel');
         
         if (titleElement) titleElement.textContent = title;
         if (messageElement) messageElement.textContent = message;
@@ -91,10 +108,15 @@ export class ConfirmModal {
         // Show modal
         this.overlay.style.display = 'flex';
         
-        // Focus confirm button
-        setTimeout(() => {
+        // Focus confirm button with timeout cleanup tracking
+        const timeoutId = setTimeout(() => {
             confirmBtn?.focus();
         }, 100);
+        
+        // Register cleanup for timeout
+        this.registerCleanup(() => {
+            clearTimeout(timeoutId);
+        });
     }
     
     public hide(): void {
@@ -102,6 +124,14 @@ export class ConfirmModal {
         if (this.onCancel) {
             this.onCancel();
         }
+    }
+    
+    destroy(): void {
+        // Remove overlay from body before calling super.destroy()
+        if (this.overlay.parentElement) {
+            this.overlay.parentElement.removeChild(this.overlay);
+        }
+        super.destroy();
     }
 }
 

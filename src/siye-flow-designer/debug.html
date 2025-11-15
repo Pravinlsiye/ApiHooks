@@ -73,8 +73,8 @@
             display: flex;
         }
         
-        /* Three column layout */
-        .three-column {
+        /* Four column layout */
+        .four-column {
             display: flex;
             flex: 1;
             height: 100%;
@@ -86,6 +86,11 @@
             flex-direction: column;
             border-right: 1px solid #30363d;
             overflow: hidden;
+            min-width: 250px;
+        }
+        
+        .column:nth-child(3) {
+            flex: 1.2; /* Slightly wider for TypeScript model */
         }
         
         .column:last-child {
@@ -215,6 +220,37 @@
             border-radius: 12px;
             font-size: 11px;
             margin-left: 8px;
+        }
+        
+        /* TypeScript model display */
+        .typescript-model {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 16px;
+            font-family: 'Courier New', Consolas, Monaco, monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #c9d1d9;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        
+        .ts-keyword {
+            color: #ff7b72;
+        }
+        
+        .ts-type {
+            color: #79c0ff;
+        }
+        
+        .ts-property {
+            color: #7ee787;
+        }
+        
+        .ts-comment {
+            color: #8b949e;
+            font-style: italic;
         }
     </style>
 </head>
@@ -428,7 +464,7 @@
         
         function createTabContent(blockType, index) {
             return `
-                <div class="three-column">
+                <div class="four-column">
                     <div class="column">
                         <div class="column-header">📄 Schema (Editable JSON)</div>
                         <div class="column-content schema-content">
@@ -449,6 +485,11 @@
                     </div>
                     
                     <div class="column">
+                        <div class="column-header">📐 TypeScript Model</div>
+                        <div class="column-content" id="typescript-${index}"></div>
+                    </div>
+                    
+                    <div class="column">
                         <div class="column-header">⚙️ Properties</div>
                         <div class="column-content" id="properties-${index}"></div>
                     </div>
@@ -458,6 +499,117 @@
         
         // Store original schemas for reset
         const originalSchemas = blockTypes.map(bt => JSON.parse(JSON.stringify(bt.schema)));
+        
+        // Generate TypeScript model from schema
+        function generateTypeScriptModel(schema) {
+            let tsModel = '';
+            
+            // Generate main interface
+            tsModel += `<span class="ts-keyword">interface</span> <span class="ts-type">${schema.type}Block</span> {\n`;
+            tsModel += `  <span class="ts-property">id</span>: <span class="ts-type">string</span>;\n`;
+            tsModel += `  <span class="ts-property">type</span>: <span class="ts-type">BlockType.${schema.type}</span>;\n`;
+            tsModel += `  <span class="ts-property">name</span>: <span class="ts-type">string</span>;\n`;
+            tsModel += `  <span class="ts-property">description</span>?: <span class="ts-type">string</span>;\n`;
+            
+            // Generate config interface based on type
+            if (schema.config) {
+                tsModel += `  <span class="ts-property">config</span>: <span class="ts-type">${schema.type}Config</span>;\n`;
+            }
+            
+            // Add input/output ports
+            if (schema.inputPorts) {
+                tsModel += `  <span class="ts-property">inputPorts</span>: <span class="ts-type">InputPort[]</span>;\n`;
+            }
+            if (schema.outputPorts) {
+                tsModel += `  <span class="ts-property">outputPorts</span>: <span class="ts-type">OutputPort[]</span>;\n`;
+            }
+            
+            tsModel += `}\n\n`;
+            
+            // Generate config interface
+            if (schema.config) {
+                tsModel += `<span class="ts-keyword">interface</span> <span class="ts-type">${schema.type}Config</span> {\n`;
+                
+                switch (schema.type) {
+                    case 'Start':
+                        if (schema.config.profiles) {
+                            tsModel += `  <span class="ts-property">profiles</span>: <span class="ts-type">Profile[]</span>;\n`;
+                            tsModel += `  <span class="ts-property">selectedProfile</span>: <span class="ts-type">string</span>;\n`;
+                        }
+                        break;
+                    case 'HttpRequest':
+                        tsModel += `  <span class="ts-property">method</span>: <span class="ts-type">'GET' | 'POST' | 'PUT' | 'DELETE'</span>;\n`;
+                        tsModel += `  <span class="ts-property">url</span>: <span class="ts-type">string</span>;\n`;
+                        tsModel += `  <span class="ts-property">headers</span>?: <span class="ts-type">Record&lt;string, string&gt;</span>;\n`;
+                        tsModel += `  <span class="ts-property">body</span>?: <span class="ts-type">any</span>;\n`;
+                        break;
+                    case 'Variable':
+                        tsModel += `  <span class="ts-property">operation</span>: <span class="ts-type">'set' | 'get' | 'delete'</span>;\n`;
+                        tsModel += `  <span class="ts-property">variables</span>: <span class="ts-type">Record&lt;string, any&gt;</span>;\n`;
+                        break;
+                    case 'Condition':
+                        tsModel += `  <span class="ts-property">expression</span>: <span class="ts-type">string</span>;\n`;
+                        break;
+                    case 'Log':
+                        tsModel += `  <span class="ts-property">message</span>: <span class="ts-type">string</span>;\n`;
+                        tsModel += `  <span class="ts-property">level</span>: <span class="ts-type">'info' | 'warn' | 'error' | 'debug'</span>;\n`;
+                        break;
+                    case 'Delay':
+                        tsModel += `  <span class="ts-property">milliseconds</span>: <span class="ts-type">number</span>;\n`;
+                        break;
+                    case 'End':
+                        tsModel += `  <span class="ts-property">outputs</span>: <span class="ts-type">Record&lt;string, OutputDefinition&gt;</span>;\n`;
+                        break;
+                    default:
+                        // Generic config properties
+                        for (const key in schema.config) {
+                            const value = schema.config[key];
+                            const type = typeof value === 'object' ? 'any' : typeof value;
+                            tsModel += `  <span class="ts-property">${key}</span>: <span class="ts-type">${type}</span>;\n`;
+                        }
+                }
+                
+                tsModel += `}\n\n`;
+            }
+            
+            // Add additional interfaces based on block type
+            if (schema.type === 'Start' && schema.config?.profiles) {
+                tsModel += `<span class="ts-comment">// Profile definition for Start block</span>\n`;
+                tsModel += `<span class="ts-keyword">interface</span> <span class="ts-type">Profile</span> {\n`;
+                tsModel += `  <span class="ts-property">name</span>: <span class="ts-type">string</span>;\n`;
+                tsModel += `  <span class="ts-property">description</span>?: <span class="ts-type">string</span>;\n`;
+                tsModel += `  <span class="ts-property">default</span>?: <span class="ts-type">boolean</span>;\n`;
+                tsModel += `  <span class="ts-property">inputs</span>: <span class="ts-type">Record&lt;string, InputDefinition&gt;</span>;\n`;
+                tsModel += `}\n\n`;
+                tsModel += `<span class="ts-keyword">interface</span> <span class="ts-type">InputDefinition</span> {\n`;
+                tsModel += `  <span class="ts-property">type</span>: <span class="ts-type">'string' | 'number' | 'boolean' | 'object' | 'array'</span>;\n`;
+                tsModel += `  <span class="ts-property">value</span>: <span class="ts-type">any</span>;\n`;
+                tsModel += `}\n\n`;
+            }
+            
+            if (schema.type === 'End' && schema.config?.outputs) {
+                tsModel += `<span class="ts-comment">// Output definition for End block</span>\n`;
+                tsModel += `<span class="ts-keyword">interface</span> <span class="ts-type">OutputDefinition</span> {\n`;
+                tsModel += `  <span class="ts-property">type</span>: <span class="ts-type">'string' | 'number' | 'boolean' | 'object' | 'array'</span>;\n`;
+                tsModel += `  <span class="ts-property">value</span>: <span class="ts-type">any</span>;\n`;
+                tsModel += `}\n\n`;
+            }
+            
+            // Add port interfaces if needed
+            if (schema.inputPorts || schema.outputPorts) {
+                tsModel += `<span class="ts-comment">// Port definitions</span>\n`;
+                tsModel += `<span class="ts-keyword">interface</span> <span class="ts-type">Port</span> {\n`;
+                tsModel += `  <span class="ts-property">name</span>: <span class="ts-type">string</span>;\n`;
+                tsModel += `  <span class="ts-property">type</span>: <span class="ts-type">string</span>;\n`;
+                tsModel += `  <span class="ts-property">required</span>?: <span class="ts-type">boolean</span>;\n`;
+                tsModel += `  <span class="ts-property">multiple</span>?: <span class="ts-type">boolean</span>;\n`;
+                tsModel += `}\n\n`;
+                tsModel += `<span class="ts-keyword">type</span> <span class="ts-type">InputPort</span> = <span class="ts-type">Port</span>;\n`;
+                tsModel += `<span class="ts-keyword">type</span> <span class="ts-type">OutputPort</span> = <span class="ts-type">Port</span>;\n`;
+            }
+            
+            return tsModel;
+        }
         
         function renderBlock(index, schema) {
             const blockType = blockTypes[index];
@@ -482,6 +634,10 @@
                         ${html}
                     </div>
                 `;
+                
+                // Update TypeScript model
+                const typescriptEl = document.getElementById(`typescript-${index}`);
+                typescriptEl.innerHTML = `<div class="typescript-model">${generateTypeScriptModel(schema)}</div>`;
                 
                 // Update properties
                 const properties = document.getElementById(`properties-${index}`);

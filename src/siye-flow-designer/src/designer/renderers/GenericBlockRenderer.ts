@@ -1,6 +1,7 @@
 import { BlockRenderer } from './BlockRenderer';
 import { VisualBlock } from '../VisualModels';
 import { AnyWorkflowBlock, BlockType } from '../../models/workflow-models';
+import { getIconSvg, IconType } from '../../utils/Icons';
 
 /**
  * Generic renderer for standard blocks
@@ -12,19 +13,20 @@ export class GenericBlockRenderer extends BlockRenderer {
     }
     
     protected getIcon(): string {
-        const iconMap: Record<string, string> = {
-            'end': '🔴',
-            'http-request': '🌐',
-            'variable': '📦',
-            'condition': '❓',
-            'delay': '⏰',
-            'log': '📝',
-            'evaluate': '🧮',
-            'loop': '🔄',
-            'try-catch': '⚠️'
+        const iconMap: Record<string, IconType> = {
+            'end': 'end',
+            'http-request': 'http',
+            'variable': 'variable',
+            'condition': 'condition',
+            'delay': 'delay',
+            'log': 'log',
+            'evaluate': 'evaluate',
+            'loop': 'loop',
+            'try-catch': 'trycatch'
         };
         
-        return iconMap[this.block.type] || '📄';
+        const iconType = iconMap[this.block.type];
+        return iconType ? getIconSvg(iconType) : '<svg viewBox="0 0 24 24"><rect fill="#666" width="24" height="24"/></svg>';
     }
     
     protected getColor(): string {
@@ -152,9 +154,13 @@ export class GenericBlockRenderer extends BlockRenderer {
                                 </small>
                             </div>
                         </div>
-                        <div class="block-ports-area" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(48, 54, 61, 0.5);">
-                            ${this.renderPort({ name: 'success', type: 'any', position: { x: 0, y: 0 }, connected: false }, 'output')}
-                            ${this.renderPort({ name: 'fail', type: 'any', position: { x: 0, y: 0 }, connected: false }, 'output')}
+                        <div class="block-variables-section">
+                            <div class="block-section-label">Outputs</div>
+                            <div class="block-ports-area">
+                                ${this.block.outputPorts ? this.block.outputPorts.map(port => 
+                                    this.renderPort(port, 'output')
+                                ).join('') : ''}
+                            </div>
                         </div>
                     `;
                 break;
@@ -207,7 +213,7 @@ export class GenericBlockRenderer extends BlockRenderer {
                     <span class="block-name">${blockName}</span>
                     <span class="block-type">${this.block.type}</span>
                 </div>
-                <button class="block-delete-btn" data-block-id="${this.block.id}" title="Delete block">
+                <button class="block-delete-btn" data-block-id="${this.block.id}" data-testid="block-delete-btn" title="Delete block">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M11 3.5v-1A1.5 1.5 0 0 0 9.5 1h-3A1.5 1.5 0 0 0 5 2.5v1H2v1h1v9.5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5V4.5h1v-1H11zm-6 10V6h1v7.5H5zm2.5 0V6h1v7.5h-1zm2.5 0V6h1v7.5H10zM6 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1H6v-1z"/>
                     </svg>
@@ -336,53 +342,79 @@ export class GenericBlockRenderer extends BlockRenderer {
                 });
             });
             
+            // Move to output ports section
             currentYOffset += SECTION_LABEL_HEIGHT + ((urlVars.length + inputs.length) * this.ROW_HEIGHT) + 8;
             
-            // Add success/fail output ports after custom outputs
-            currentYOffset += 8;
-            const successPortY = currentYOffset + this.PORT_CENTER_OFFSET;
-            const failPortY = currentYOffset + this.ROW_HEIGHT + this.PORT_CENTER_OFFSET;
-            
-            this.block.outputPorts!.push({
-                name: 'success',
-                type: 'any',
-                position: { x: this.block.width + 14, y: successPortY },
-                connected: false
-            });
-            
-            this.block.outputPorts!.push({
-                name: 'fail',
-                type: 'any',
-                position: { x: this.block.width + 14, y: failPortY },
-                connected: false
-            });
-            
-            portIndex = urlVars.length + inputs.length + 2; // +2 for success/fail
-        }
-        
-        // Also add ports from block definition (for blocks that have explicit inputPorts/outputPorts)
-        if (blockData.inputPorts && blockData.inputPorts.length > 0) {
-            blockData.inputPorts.forEach((port: any, idx: number) => {
-                const y = this.calculatePortY(portIndex + idx, 0);
-                this.block.inputPorts!.push({
-                    name: port.name,
-                    type: port.type,
-                    position: { x: -14, y },
-                    connected: false
+            // Add output ports from block definition if available
+            if (blockData.outputPorts && blockData.outputPorts.length > 0) {
+                blockData.outputPorts.forEach((port: any, idx: number) => {
+                    const portY = currentYOffset + (idx * this.ROW_HEIGHT) + this.ROW_PADDING + this.PORT_CENTER_OFFSET;
+                    this.block.outputPorts!.push({
+                        name: port.name,
+                        type: port.type || 'any',
+                        position: { x: this.block.width + 14, y: portY },
+                        connected: false
+                    });
                 });
-            });
-        }
-        
-        if (blockData.outputPorts && blockData.outputPorts.length > 0) {
-            blockData.outputPorts.forEach((port: any, idx: number) => {
-                const y = this.calculatePortY(portIndex + idx, 0);
+                portIndex = urlVars.length + inputs.length + blockData.outputPorts.length;
+            } else {
+                // Fallback: Add default success/fail output ports if not defined
+                currentYOffset += 8;
+                const successPortY = currentYOffset + this.PORT_CENTER_OFFSET;
+                const failPortY = currentYOffset + this.ROW_HEIGHT + this.PORT_CENTER_OFFSET;
+                
                 this.block.outputPorts!.push({
-                    name: port.name,
-                    type: port.type,
-                    position: { x: this.block.width + 14, y },
+                    name: 'success',
+                    type: 'any',
+                    position: { x: this.block.width + 14, y: successPortY },
                     connected: false
                 });
-            });
+                
+                this.block.outputPorts!.push({
+                    name: 'fail',
+                    type: 'any',
+                    position: { x: this.block.width + 14, y: failPortY },
+                    connected: false
+                });
+                
+                portIndex = urlVars.length + inputs.length + 2; // +2 for success/fail
+            }
+        }
+        
+        // Also add ports from block definition for other block types
+        // (Skip for Variable and HttpRequest blocks which handle their ports above)
+        if (blockData.type !== BlockType.Variable && blockData.type !== BlockType.HttpRequest) {
+            if (blockData.inputPorts && blockData.inputPorts.length > 0) {
+                // Check if ports already exist to avoid duplicates
+                const existingInputNames = new Set(this.block.inputPorts?.map(p => p.name));
+                blockData.inputPorts.forEach((port: any, idx: number) => {
+                    if (!existingInputNames.has(port.name)) {
+                        const y = this.calculatePortY(portIndex + idx, 0);
+                        this.block.inputPorts!.push({
+                            name: port.name,
+                            type: port.type,
+                            position: { x: -14, y },
+                            connected: false
+                        });
+                    }
+                });
+            }
+            
+            if (blockData.outputPorts && blockData.outputPorts.length > 0) {
+                // Check if ports already exist to avoid duplicates
+                const existingOutputNames = new Set(this.block.outputPorts?.map(p => p.name));
+                blockData.outputPorts.forEach((port: any, idx: number) => {
+                    if (!existingOutputNames.has(port.name)) {
+                        const y = this.calculatePortY(portIndex + idx, 0);
+                        this.block.outputPorts!.push({
+                            name: port.name,
+                            type: port.type,
+                            position: { x: this.block.width + 14, y },
+                            connected: false
+                        });
+                    }
+                });
+            }
         }
     }
     

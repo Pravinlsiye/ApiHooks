@@ -143,12 +143,15 @@ export class WorkflowEngine {
      * Create a new block instance by type
      */
     public createBlock(type: BlockType): AnyWorkflowBlock {
+        let block: AnyWorkflowBlock;
+        
         switch (type) {
             case BlockType.Start:
-                const startBlock = new StartBlock();
+                block = new StartBlock();
                 // Ensure Start blocks always have at least one profile
-                if (!startBlock.config.profiles || startBlock.config.profiles.length === 0) {
-                    startBlock.config.profiles = [{
+                const startConfig = block.config as any;
+                if (!startConfig.profiles || startConfig.profiles.length === 0) {
+                    startConfig.profiles = [{
                         name: 'Default',
                         description: 'Default configuration',
                         default: true,
@@ -161,49 +164,61 @@ export class WorkflowEngine {
                             }
                         }
                     }];
-                    startBlock.config.selectedProfile = 'Default';
+                    startConfig.selectedProfile = 'Default';
                 }
-                return startBlock;
+                break;
             case BlockType.End:
-                const endBlock = new EndBlock();
-                if (!endBlock.config.outputs) {
-                    endBlock.config.outputs = {};
+                block = new EndBlock();
+                const endConfig = block.config as any;
+                if (!endConfig.outputs) {
+                    endConfig.outputs = {};
                 }
-                return endBlock;
-                case BlockType.HttpRequest:
-                    const httpBlock = new HttpRequestBlock();
-                    if (!httpBlock.config.headers) {
-                        httpBlock.config.headers = {};
-                    }
-                    // Ensure HTTP Request blocks have success/fail output ports
-                    if (!httpBlock.outputPorts) {
-                        httpBlock.outputPorts = [];
-                    }
-                    // Add success/fail ports if not already present
-                    const hasSuccessPort = httpBlock.outputPorts.some(p => p.name === 'success');
-                    const hasFailPort = httpBlock.outputPorts.some(p => p.name === 'fail');
-                    if (!hasSuccessPort) {
-                        httpBlock.outputPorts.push({ name: 'success', type: 'any', description: 'Success response', required: false, multiple: false });
-                    }
-                    if (!hasFailPort) {
-                        httpBlock.outputPorts.push({ name: 'fail', type: 'any', description: 'Failure response', required: false, multiple: false });
-                    }
-                    return httpBlock;
+                break;
+            case BlockType.HttpRequest:
+                block = new HttpRequestBlock();
+                const httpConfig = block.config as any;
+                if (!httpConfig.headers) {
+                    httpConfig.headers = {};
+                }
+                // Ensure HTTP Request blocks have success/fail output ports
+                if (!block.outputPorts) {
+                    block.outputPorts = [];
+                }
+                // Add success/fail ports if not already present
+                const hasSuccessPort = block.outputPorts.some(p => p.name === 'success');
+                const hasFailPort = block.outputPorts.some(p => p.name === 'fail');
+                if (!hasSuccessPort) {
+                    block.outputPorts.push({ name: 'success', type: 'any', description: 'Success response', required: false, multiple: false });
+                }
+                if (!hasFailPort) {
+                    block.outputPorts.push({ name: 'fail', type: 'any', description: 'Failure response', required: false, multiple: false });
+                }
+                break;
             case BlockType.Variable:
-                const varBlock = new VariableBlock();
-                if (!varBlock.config.variables) {
-                    varBlock.config.variables = {};
+                block = new VariableBlock();
+                const varConfig = block.config as any;
+                if (!varConfig.variables) {
+                    varConfig.variables = {};
                 }
-                return varBlock;
+                break;
             case BlockType.Condition:
-                return new ConditionBlock();
+                block = new ConditionBlock();
+                break;
             case BlockType.Delay:
-                return new DelayBlock();
+                block = new DelayBlock();
+                break;
             case BlockType.Log:
-                return new LogBlock();
+                block = new LogBlock();
+                break;
             default:
                 throw new Error(`Unknown block type: ${type}`);
         }
+        
+        // Generate ID for the block
+        block.id = this.generateBlockId(type);
+        block.name = block.name || type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' ');
+        
+        return block;
     }
     
     /**

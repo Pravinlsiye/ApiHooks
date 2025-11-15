@@ -31,8 +31,11 @@ if (typeof document !== 'undefined') {
                 const designer = new WorkflowDesigner('designer-container', config);
                 console.log(`SiyeFlow Designer initialized in ${config.mode} mode`);
                 
-                // Expose designer instance for debugging
-                (window as any).siyeFlowDesigner = designer;
+                // Expose designer instance for debugging (dev mode only)
+                if (process.env.NODE_ENV !== 'production') {
+                    (window as any).siyeFlowDesigner = designer;
+                    console.log('Designer instance exposed as window.siyeFlowDesigner (dev mode)');
+                }
             } catch (error) {
                 console.error('Failed to initialize SiyeFlow Designer:', error);
             }

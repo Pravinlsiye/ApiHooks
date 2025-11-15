@@ -2,30 +2,36 @@ import { WorkflowEngine } from '../core/WorkflowEngine';
 import { BlockType, AnyWorkflowBlock, StartBlock } from '../models/workflow-models';
 import { VisualBlock, VisualConnection, Position } from './VisualModels';
 import { CanvasRenderer } from './CanvasRenderer';
-import { PropertyPanel } from './PropertyPanel';
 import { BlockPalette } from './BlockPalette';
 import { ApiDefinitionLoader } from '../api/ApiDefinitionLoader';
 import { DesignerConfig, DEFAULT_CONFIG } from './DesignerConfig';
 import { FloatingPanel } from '../components/FloatingPanel';
 import { AlertModal } from '../components/AlertModal';
 import { Minimap } from '../components/Minimap';
-import { SettingsModal } from '../components/SettingsModal';
+import { BaseComponent } from '../utils/BaseComponent';
+import { DOMUpdater } from '../utils/DOMUpdater';
+
+// Type imports for lazy loading
+import type { PropertyPanel } from './PropertyPanel';
+import type { SettingsModal } from '../components/SettingsModal';
 
 /**
  * Main workflow designer class that manages the visual design experience
  * This is the TypeScript equivalent of the UI functionality
+ * Now extends BaseComponent for automatic cleanup and event management
  */
-export class WorkflowDesigner {
-    private container: HTMLElement;
+export class WorkflowDesigner extends BaseComponent {
     private config: DesignerConfig;
     private engine: WorkflowEngine;
     private canvas!: CanvasRenderer;
     private propertyPanel!: PropertyPanel;
+    private propertyPanelLoaded: boolean = false;
     private floatingPanel!: FloatingPanel;
     private alertModal!: AlertModal;
     private blockPalette!: BlockPalette;
     private minimap!: Minimap;
     private settingsModal!: SettingsModal;
+    private settingsModalLoaded: boolean = false;
     
     private visualBlocks: Map<string, VisualBlock>;
     private visualConnections: Map<string, VisualConnection>;
@@ -38,13 +44,77 @@ export class WorkflowDesigner {
         return this.selectedBlockId;
     }
     
-    constructor(containerId: string, config?: DesignerConfig) {
-        const element = document.getElementById(containerId);
-        if (!element) {
-            throw new Error(`Container element '${containerId}' not found`);
+    /**
+     * Export workflow as data object
+     */
+    public exportWorkflow(): any {
+        try {
+            const workflow = this.engine.getWorkflow();
+            const connections = this.getConnectionsData();
+            
+            return {
+                ...workflow,
+                connections: connections
+            };
+        } catch (error) {
+            console.error('Error exporting workflow:', error);
+            // Return a default workflow structure
+            return {
+                name: 'New Workflow',
+                blocks: [],
+                connections: []
+            };
+        }
+    }
+    
+    /**
+     * Import workflow from data object
+     */
+    public importWorkflow(workflowData: any): void {
+        const json = typeof workflowData === 'string' ? workflowData : JSON.stringify(workflowData);
+        this.engine.loadWorkflow(json);
+        this.visualBlocks.clear();
+        this.visualConnections.clear();
+        
+        // Position blocks
+        this.positionBlocks();
+        
+        // Create connections from block data (handles both block-level and root-level connections)
+        this.createVisualConnections();
+        
+        // Also restore root-level connections if any
+        if (workflowData.connections) {
+            workflowData.connections.forEach((conn: any) => {
+                const connectionId = `${conn.fromBlock}_${conn.fromPort}_${conn.toBlock}_${conn.toPort}`;
+                const visualConnection: VisualConnection = {
+                    id: connectionId,
+                    sourceBlockId: conn.fromBlock,
+                    sourcePortName: conn.fromPort || 'output',
+                    targetBlockId: conn.toBlock,
+                    targetPortName: conn.toPort || 'input',
+                    path: ''
+                };
+                this.visualConnections.set(connectionId, visualConnection);
+            });
         }
         
-        this.container = element;
+        this.renderWorkflow();
+    }
+    
+    /**
+     * Clear the workflow
+     */
+    public clearWorkflow(): void {
+        this.engine = new WorkflowEngine();
+        this.visualBlocks.clear();
+        this.visualConnections.clear();
+        this.initializeDefaultWorkflow();
+        this.renderWorkflow();
+    }
+    
+    constructor(containerId: string, config?: DesignerConfig) {
+        super(containerId);
+        
         this.config = config || DEFAULT_CONFIG;
         this.engine = new WorkflowEngine();
         this.visualBlocks = new Map();
@@ -94,11 +164,11 @@ export class WorkflowDesigner {
                 <div class="designer-header">
                     <h2>SiyeFlow Designer</h2>
                     <div class="toolbar">
-                        <button id="import-btn">Import</button>
-                        <button id="export-btn">Export</button>
-                        <button id="validate-btn">Validate</button>
-                        <button id="clear-btn">Clear</button>
-                        <button id="settings-btn" class="toolbar-settings-btn" title="Settings">
+                        <button id="import-btn" data-testid="toolbar-import">Import</button>
+                        <button id="export-btn" data-testid="toolbar-export">Export</button>
+                        <button id="validate-btn" data-testid="toolbar-validate">Validate</button>
+                        <button id="clear-btn" data-testid="toolbar-clear">Clear</button>
+                        <button id="settings-btn" class="toolbar-settings-btn" data-testid="toolbar-settings" title="Settings">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
                                 <circle cx="8" cy="8" r="2.5"/>
                                 <path d="M8 2.5V1M8 15v-1.5M13.5 8H15M1 8h1.5M12.364 3.636l1.06-1.06M2.576 13.424l-1.06-1.06M12.364 12.364l1.06 1.06M2.576 2.576l-1.06 1.06"/>
@@ -115,20 +185,34 @@ export class WorkflowDesigner {
             </div>
         `;
         
-        // Initialize components
+        // Initialize components (AlertModal needed early for BlockPalette)
         this.alertModal = new AlertModal();
-        this.settingsModal = new SettingsModal();
         this.blockPalette = new BlockPalette('block-palette', this.alertModal);
         this.canvas = new CanvasRenderer('canvas-container');
-        this.propertyPanel = new PropertyPanel('property-panel');
+        
+        // Set default viewport position to reasonable area
+        // This ensures blocks appear in a visible area when first added
+        const canvasContainer = DOMUpdater.query<HTMLElement>(this.container, '#canvas-container');
+        if (canvasContainer) {
+            // Default viewport: start at a reasonable position
+            const DEFAULT_VIEW_X = 1000; // Give some padding from edge
+            const DEFAULT_VIEW_Y = 1000; // Give some padding from edge
+            requestAnimationFrame(() => {
+                canvasContainer.scrollLeft = DEFAULT_VIEW_X;
+                canvasContainer.scrollTop = DEFAULT_VIEW_Y;
+            });
+        }
+        
+        // PropertyPanel and SettingsModal will be lazy-loaded on first use
+        // This reduces initial bundle size
         
         // Add minimap container after canvas is initialized (since canvas replaces innerHTML)
-        const canvasContainer = document.getElementById('canvas-container');
         if (canvasContainer) {
-            const minimapContainer = document.createElement('div');
-            minimapContainer.id = 'minimap-container';
+            const minimapContainer = this.createElement('div', { id: 'minimap-container' });
             canvasContainer.appendChild(minimapContainer);
             this.minimap = new Minimap('minimap-container', 'canvas-container', () => this.canvas.getZoomLevel());
+            // Hide minimap by default
+            this.minimap.hide();
         }
         this.floatingPanel = new FloatingPanel(
             'floating-panel-container',
@@ -147,172 +231,233 @@ export class WorkflowDesigner {
     }
     
     /**
-     * Setup event handlers
+     * Setup event handlers with automatic cleanup tracking
      */
     private setupEventHandlers(): void {
-        // Toolbar buttons
-        document.getElementById('import-btn')?.addEventListener('click', () => this.importWorkflow());
-        document.getElementById('export-btn')?.addEventListener('click', () => this.exportWorkflow());
-        document.getElementById('validate-btn')?.addEventListener('click', () => this.validateWorkflow());
-        document.getElementById('clear-btn')?.addEventListener('click', () => this.clearWorkflow());
-        document.getElementById('settings-btn')?.addEventListener('click', () => this.openSettings());
+        // Toolbar buttons - use DOMUpdater and BaseComponent's addEventListener
+        const importBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#import-btn');
+        const exportBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#export-btn');
+        const validateBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#validate-btn');
+        const clearBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#clear-btn');
+        const settingsBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#settings-btn');
         
-        // Block palette events
-        this.blockPalette.on('blockDragStart', (type: BlockType) => {
-            // Store the block type being dragged
+        if (importBtn) {
+            this.addEventListener(importBtn, 'click', () => this.importWorkflowFromFile());
+        }
+        if (exportBtn) {
+            this.addEventListener(exportBtn, 'click', () => this.exportWorkflowToFile());
+        }
+        if (validateBtn) {
+            this.addEventListener(validateBtn, 'click', () => this.validateWorkflow());
+        }
+        if (clearBtn) {
+            this.addEventListener(clearBtn, 'click', () => this.clearWorkflowWithConfirm());
+        }
+        if (settingsBtn) {
+            this.addEventListener(settingsBtn, 'click', () => this.openSettings());
+        }
+        
+        // Block palette events - register cleanup
+        const blockDragStartHandler = (type: BlockType) => {
             (window as any).__draggedBlockType = type;
+        };
+        this.blockPalette.on('blockDragStart', blockDragStartHandler);
+        this.registerCleanup(() => {
+            this.blockPalette.off('blockDragStart', blockDragStartHandler);
         });
         
-        this.blockPalette.on('loadApiDefinition', async (data: { url: string }) => {
+        const loadApiHandler = async (data: { url: string }) => {
             await this.loadApiDefinition(data.url);
+        };
+        this.blockPalette.on('loadApiDefinition', loadApiHandler);
+        this.registerCleanup(() => {
+            this.blockPalette.off('loadApiDefinition', loadApiHandler);
         });
         
-        // Canvas events
-        this.canvas.on('drop', (position: Position) => {
+        // Canvas events - register cleanup for all handlers
+        const canvasHandlers: Array<{ event: string; handler: Function }> = [];
+        
+        const dropHandler = (position: Position) => {
             const type = (window as any).__draggedBlockType;
             if (type) {
                 this.addBlock(type, position);
                 delete (window as any).__draggedBlockType;
             }
-        });
+        };
+        this.canvas.on('drop', dropHandler);
+        canvasHandlers.push({ event: 'drop', handler: dropHandler });
         
-        this.canvas.on('blockSelect', (blockId: string) => {
-            this.selectBlock(blockId);
-        });
+        const blockSelectHandler = async (blockId: string) => {
+            await this.selectBlock(blockId);
+        };
+        this.canvas.on('blockSelect', blockSelectHandler);
+        canvasHandlers.push({ event: 'blockSelect', handler: blockSelectHandler });
         
-        this.canvas.on('blockMove', (data: { blockId: string, position: Position }) => {
+        const blockMoveHandler = (data: { blockId: string, position: Position }) => {
             this.moveBlock(data.blockId, data.position);
-        });
+        };
+        this.canvas.on('blockMove', blockMoveHandler);
+        canvasHandlers.push({ event: 'blockMove', handler: blockMoveHandler });
         
-        this.canvas.on('connectionCreate', (data: { sourceBlockId: string, sourcePortName: string, targetBlockId: string, targetPortName: string }) => {
+        const connectionCreateHandler = (data: { sourceBlockId: string, sourcePortName: string, targetBlockId: string, targetPortName: string }) => {
             this.onConnectionCreated(data.sourceBlockId, data.targetBlockId, data.sourcePortName, data.targetPortName);
-        });
+        };
+        this.canvas.on('connectionCreate', connectionCreateHandler);
+        canvasHandlers.push({ event: 'connectionCreate', handler: connectionCreateHandler });
         
-        this.canvas.on('profileChange', (data: { blockId: string, profile: string }) => {
+        const profileChangeHandler = (data: { blockId: string, profile: string }) => {
             this.onProfileChange(data.blockId, data.profile);
-        });
+        };
+        this.canvas.on('profileChange', profileChangeHandler);
+        canvasHandlers.push({ event: 'profileChange', handler: profileChangeHandler });
         
-        // Start block events
-        this.canvas.on('startBlockAddInput', (data: { blockId: string, name?: string, type?: string, value?: any }) => {
+        // Start block events - add to cleanup array
+        const startBlockAddInputHandler = (data: { blockId: string, name?: string, type?: string, value?: any }) => {
             if (data.name && data.type !== undefined) {
-                // Direct add with name, type, and value
                 this.onStartBlockAddInputDirect(data.blockId, data.name, data.type, data.value);
             } else {
-                // Legacy: generate name
                 this.onStartBlockAddInput(data.blockId);
             }
-        });
+        };
+        this.canvas.on('startBlockAddInput', startBlockAddInputHandler);
+        canvasHandlers.push({ event: 'startBlockAddInput', handler: startBlockAddInputHandler });
         
-        this.canvas.on('startBlockDeleteInput', (data: { blockId: string, inputName: string }) => {
+        const startBlockDeleteInputHandler = (data: { blockId: string, inputName: string }) => {
             this.onStartBlockDeleteInput(data.blockId, data.inputName);
-        });
+        };
+        this.canvas.on('startBlockDeleteInput', startBlockDeleteInputHandler);
+        canvasHandlers.push({ event: 'startBlockDeleteInput', handler: startBlockDeleteInputHandler });
         
-        this.canvas.on('startBlockRenameInput', (data: { blockId: string, oldName: string, newName: string }) => {
+        const startBlockRenameInputHandler = (data: { blockId: string, oldName: string, newName: string }) => {
             this.onStartBlockRenameInput(data.blockId, data.oldName, data.newName);
-        });
+        };
+        this.canvas.on('startBlockRenameInput', startBlockRenameInputHandler);
+        canvasHandlers.push({ event: 'startBlockRenameInput', handler: startBlockRenameInputHandler });
         
-        this.canvas.on('startBlockInputValueChange', (data: { blockId: string, inputName: string, value: string }) => {
+        const startBlockInputValueChangeHandler = (data: { blockId: string, inputName: string, value: string }) => {
             this.onStartBlockInputValueChange(data.blockId, data.inputName, data.value);
-        });
+        };
+        this.canvas.on('startBlockInputValueChange', startBlockInputValueChangeHandler);
+        canvasHandlers.push({ event: 'startBlockInputValueChange', handler: startBlockInputValueChangeHandler });
         
-        this.canvas.on('startBlockInputTypeChange', (data: { blockId: string, inputName: string, type: string }) => {
+        const startBlockInputTypeChangeHandler = (data: { blockId: string, inputName: string, type: string }) => {
             this.onStartBlockInputTypeChange(data.blockId, data.inputName, data.type);
-        });
+        };
+        this.canvas.on('startBlockInputTypeChange', startBlockInputTypeChangeHandler);
+        canvasHandlers.push({ event: 'startBlockInputTypeChange', handler: startBlockInputTypeChangeHandler });
         
         // Start block profile management events
-        this.canvas.on('startBlockAddProfile', (data: { blockId: string }) => {
+        const startBlockAddProfileHandler = (data: { blockId: string }) => {
             this.onStartBlockAddProfile(data.blockId);
-        });
+        };
+        this.canvas.on('startBlockAddProfile', startBlockAddProfileHandler);
+        canvasHandlers.push({ event: 'startBlockAddProfile', handler: startBlockAddProfileHandler });
         
-        this.canvas.on('startBlockDeleteProfile', (data: { blockId: string, profileName: string }) => {
+        const startBlockDeleteProfileHandler = (data: { blockId: string, profileName: string }) => {
             this.onStartBlockDeleteProfile(data.blockId, data.profileName);
-        });
+        };
+        this.canvas.on('startBlockDeleteProfile', startBlockDeleteProfileHandler);
+        canvasHandlers.push({ event: 'startBlockDeleteProfile', handler: startBlockDeleteProfileHandler });
         
-        this.canvas.on('startBlockSetDefaultProfile', (data: { blockId: string, profileName: string }) => {
+        const startBlockSetDefaultProfileHandler = (data: { blockId: string, profileName: string }) => {
             this.onStartBlockSetDefaultProfile(data.blockId, data.profileName);
-        });
+        };
+        this.canvas.on('startBlockSetDefaultProfile', startBlockSetDefaultProfileHandler);
+        canvasHandlers.push({ event: 'startBlockSetDefaultProfile', handler: startBlockSetDefaultProfileHandler });
         
         // End block events
-        this.canvas.on('endBlockAddOutput', (data: { blockId: string }) => {
+        const endBlockAddOutputHandler = (data: { blockId: string }) => {
             this.onEndBlockAddOutput(data.blockId);
-        });
+        };
+        this.canvas.on('endBlockAddOutput', endBlockAddOutputHandler);
+        canvasHandlers.push({ event: 'endBlockAddOutput', handler: endBlockAddOutputHandler });
         
-        this.canvas.on('endBlockDeleteOutput', (data: { blockId: string, outputName: string }) => {
+        const endBlockDeleteOutputHandler = (data: { blockId: string, outputName: string }) => {
             this.onEndBlockDeleteOutput(data.blockId, data.outputName);
-        });
+        };
+        this.canvas.on('endBlockDeleteOutput', endBlockDeleteOutputHandler);
+        canvasHandlers.push({ event: 'endBlockDeleteOutput', handler: endBlockDeleteOutputHandler });
         
-        this.canvas.on('endBlockRenameOutput', (data: { blockId: string, oldName: string, newName: string }) => {
+        const endBlockRenameOutputHandler = (data: { blockId: string, oldName: string, newName: string }) => {
             this.onEndBlockRenameOutput(data.blockId, data.oldName, data.newName);
-        });
+        };
+        this.canvas.on('endBlockRenameOutput', endBlockRenameOutputHandler);
+        canvasHandlers.push({ event: 'endBlockRenameOutput', handler: endBlockRenameOutputHandler });
         
-        this.canvas.on('endBlockOutputValueChange', (data: { blockId: string, outputName: string, value: string }) => {
+        const endBlockOutputValueChangeHandler = (data: { blockId: string, outputName: string, value: string }) => {
             this.onEndBlockOutputValueChange(data.blockId, data.outputName, data.value);
-        });
+        };
+        this.canvas.on('endBlockOutputValueChange', endBlockOutputValueChangeHandler);
+        canvasHandlers.push({ event: 'endBlockOutputValueChange', handler: endBlockOutputValueChangeHandler });
         
-        this.canvas.on('endBlockOutputTypeChange', (data: { blockId: string, outputName: string, type: string }) => {
+        const endBlockOutputTypeChangeHandler = (data: { blockId: string, outputName: string, type: string }) => {
             this.onEndBlockOutputTypeChange(data.blockId, data.outputName, data.type);
-        });
+        };
+        this.canvas.on('endBlockOutputTypeChange', endBlockOutputTypeChangeHandler);
+        canvasHandlers.push({ event: 'endBlockOutputTypeChange', handler: endBlockOutputTypeChangeHandler });
         
-        // Block key-value management events (variables, headers, outputs)
-        this.canvas.on('blockAddKeyValue', (data: { blockId: string, itemType: string, portType?: string, name?: string, type?: string, value?: any }) => {
-            // Ensure portType is provided and valid
+        // Block key-value management events
+        const blockAddKeyValueHandler = (data: { blockId: string, itemType: string, portType?: string, name?: string, type?: string, value?: any }) => {
             const portType = (data.portType === 'input' || data.portType === 'output') ? data.portType : 'output';
-            
             if (data.name && data.type !== undefined) {
-                // Direct add with name, type, and value
                 this.onBlockAddKeyValueDirect(data.blockId, data.itemType, portType, data.name, data.type, data.value);
             } else {
-                // Legacy: generate name
                 this.onBlockAddKeyValue(data.blockId, data.itemType, portType);
             }
-        });
+        };
+        this.canvas.on('blockAddKeyValue', blockAddKeyValueHandler);
+        canvasHandlers.push({ event: 'blockAddKeyValue', handler: blockAddKeyValueHandler });
         
-        this.canvas.on('blockDeleteKeyValue', (data: { blockId: string, itemName: string, itemType: string, portType?: string }) => {
+        const blockDeleteKeyValueHandler = (data: { blockId: string, itemName: string, itemType: string, portType?: string }) => {
             this.onBlockDeleteKeyValue(data.blockId, data.itemName, data.itemType, data.portType);
-        });
+        };
+        this.canvas.on('blockDeleteKeyValue', blockDeleteKeyValueHandler);
+        canvasHandlers.push({ event: 'blockDeleteKeyValue', handler: blockDeleteKeyValueHandler });
         
-        this.canvas.on('blockRenameKeyValue', (data: { blockId: string, oldName: string, newName: string, itemType: string, portType?: string }) => {
+        const blockRenameKeyValueHandler = (data: { blockId: string, oldName: string, newName: string, itemType: string, portType?: string }) => {
             this.onBlockRenameKeyValue(data.blockId, data.oldName, data.newName, data.itemType, data.portType);
-        });
+        };
+        this.canvas.on('blockRenameKeyValue', blockRenameKeyValueHandler);
+        canvasHandlers.push({ event: 'blockRenameKeyValue', handler: blockRenameKeyValueHandler });
         
-        this.canvas.on('blockKeyValueChange', (data: { blockId: string, itemName: string, value: string, itemType: string, portType?: string }) => {
+        const blockKeyValueChangeHandler = (data: { blockId: string, itemName: string, value: string, itemType: string, portType?: string }) => {
             this.onBlockKeyValueChange(data.blockId, data.itemName, data.value, data.itemType, data.portType);
-        });
+        };
+        this.canvas.on('blockKeyValueChange', blockKeyValueChangeHandler);
+        canvasHandlers.push({ event: 'blockKeyValueChange', handler: blockKeyValueChangeHandler });
         
-        this.canvas.on('blockKeyValueTypeChange', (data: { blockId: string, itemName: string, type: string, itemType: string, portType?: string }) => {
+        const blockKeyValueTypeChangeHandler = (data: { blockId: string, itemName: string, type: string, itemType: string, portType?: string }) => {
             this.onBlockKeyValueTypeChange(data.blockId, data.itemName, data.type, data.itemType, data.portType);
-        });
+        };
+        this.canvas.on('blockKeyValueTypeChange', blockKeyValueTypeChangeHandler);
+        canvasHandlers.push({ event: 'blockKeyValueTypeChange', handler: blockKeyValueTypeChangeHandler });
         
-        this.canvas.on('connectionDelete', (data: { connectionId: string }) => {
+        const connectionDeleteHandler = (data: { connectionId: string }) => {
             this.onConnectionDeleted(data.connectionId);
-        });
+        };
+        this.canvas.on('connectionDelete', connectionDeleteHandler);
+        canvasHandlers.push({ event: 'connectionDelete', handler: connectionDeleteHandler });
         
-        this.canvas.on('blockDelete', (data: { blockId: string }) => {
+        const blockDeleteHandler = (data: { blockId: string }) => {
             this.onBlockDeleted(data.blockId);
-        });
+        };
+        this.canvas.on('blockDelete', blockDeleteHandler);
+        canvasHandlers.push({ event: 'blockDelete', handler: blockDeleteHandler });
         
-        // Property panel events
-        // Accept property changes from both PropertyPanel and inline Canvas editors
-        this.canvas.on('propertyChange', (data: { blockId: string, property: string, value: any }) => {
+        const canvasPropertyChangeHandler = (data: { blockId: string, property: string, value: any }) => {
             this.updateBlockProperty(data.blockId, data.property, data.value);
-        });
-        this.propertyPanel.on('propertyChange', (data: { blockId: string, property: string, value: any }) => {
-            this.updateBlockProperty(data.blockId, data.property, data.value);
-        });
+        };
+        this.canvas.on('propertyChange', canvasPropertyChangeHandler);
+        canvasHandlers.push({ event: 'propertyChange', handler: canvasPropertyChangeHandler });
         
-        // Listen for profile changes from property panel (special case for config.selectedProfile)
-        this.propertyPanel.on('blockUpdated', (blockId: string, block: any) => {
-            if (block.type === BlockType.Start && block.config?.selectedProfile) {
-                // Update the block in engine to ensure consistency
-                const engineBlock = this.engine.getBlock(blockId);
-                if (engineBlock && engineBlock.type === BlockType.Start) {
-                    (engineBlock as any).config.selectedProfile = block.config.selectedProfile;
-                }
-                // Sync FloatingPanel when profile changes in PropertyPanel
-                this.syncFloatingPanelProfile(blockId, block.config.selectedProfile);
-                // Re-render workflow
-                this.renderWorkflow();
-            }
+        // Property panel events will be set up after lazy loading in setupPropertyPanelHandlers()
+        
+        // Register cleanup for all handlers
+        this.registerCleanup(() => {
+            canvasHandlers.forEach(({ event, handler }) => {
+                this.canvas.off(event, handler as any);
+            });
+            // Property panel cleanup is handled in setupPropertyPanelHandlers()
         });
     }
     
@@ -320,19 +465,27 @@ export class WorkflowDesigner {
      * Initialize with a default workflow
      */
     private initializeDefaultWorkflow(): void {
-        // Add start block
+        // Create default start and end blocks at visible area
+        const DEFAULT_VIEW_X = 2000;
+        const DEFAULT_VIEW_Y = 2000;
+        
         const startBlock = this.engine.createBlock(BlockType.Start);
         startBlock.name = 'Start';
         this.engine.addBlock(startBlock);
-        this.addVisualBlock(startBlock, { x: 100, y: 200 });
+        this.addVisualBlock(startBlock, { x: DEFAULT_VIEW_X - 200, y: DEFAULT_VIEW_Y });
         
         // Add end block
         const endBlock = this.engine.createBlock(BlockType.End);
         endBlock.name = 'End';
         this.engine.addBlock(endBlock);
-        this.addVisualBlock(endBlock, { x: 500, y: 200 });
+        this.addVisualBlock(endBlock, { x: DEFAULT_VIEW_X + 200, y: DEFAULT_VIEW_Y });
         
         this.renderWorkflow();
+        
+        // Center blocks after first render with limited zoom (keep zoomed out)
+        requestAnimationFrame(() => {
+            this.canvas.zoomFitToScreen(0.8); // Max 80% zoom for initial render
+        });
     }
     
     /**
@@ -345,7 +498,9 @@ export class WorkflowDesigner {
         this.engine.addBlock(block);
         this.addVisualBlock(block, position);
         this.renderWorkflow();
-        this.selectBlock(block.id);
+        this.selectBlock(block.id).catch(err => 
+            console.error('Failed to select block:', err)
+        );
     }
     
     /**
@@ -376,9 +531,99 @@ export class WorkflowDesigner {
     }
     
     /**
+     * Lazy load PropertyPanel on first use
+     */
+    private async ensurePropertyPanelLoaded(): Promise<void> {
+        if (this.propertyPanelLoaded) {
+            return;
+        }
+        
+        try {
+            const PropertyPanelModule = await import('./PropertyPanel');
+            // PropertyPanel is a named export, access it directly
+            const PropertyPanelClass = PropertyPanelModule.PropertyPanel;
+            if (!PropertyPanelClass) {
+                throw new Error('PropertyPanel export not found');
+            }
+            this.propertyPanel = new PropertyPanelClass('property-panel');
+            this.propertyPanelLoaded = true;
+            
+            // Setup event handlers for property panel
+            this.setupPropertyPanelHandlers();
+        } catch (error) {
+            console.error('Failed to load PropertyPanel:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Lazy load SettingsModal on first use
+     */
+    private async ensureSettingsModalLoaded(): Promise<void> {
+        if (this.settingsModalLoaded) {
+            return;
+        }
+        
+        try {
+            const SettingsModalModule = await import('../components/SettingsModal');
+            // SettingsModal is a named export, access it directly
+            const SettingsModalClass = SettingsModalModule.SettingsModal;
+            if (!SettingsModalClass) {
+                throw new Error('SettingsModal export not found');
+            }
+            this.settingsModal = new SettingsModalClass();
+            this.settingsModalLoaded = true;
+        } catch (error) {
+            console.error('Failed to load SettingsModal:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Setup event handlers for property panel (called after lazy loading)
+     */
+    private setupPropertyPanelHandlers(): void {
+        const propertyPanelPropertyChangeHandler = (data: { blockId: string, property: string, value: any }) => {
+            this.updateBlockProperty(data.blockId, data.property, data.value);
+        };
+        this.propertyPanel.on('propertyChange', propertyPanelPropertyChangeHandler);
+        
+        const propertyPanelBlockUpdatedHandler = (data: { blockId: string, block?: any }) => {
+            const blockId = typeof data === 'string' ? data : data.blockId;
+            const block = typeof data === 'object' && data.block ? data.block : this.engine.getBlock(blockId);
+            
+            if (block && block.type === BlockType.Start && block.config?.selectedProfile) {
+                const engineBlock = this.engine.getBlock(blockId);
+                if (engineBlock && engineBlock.type === BlockType.Start) {
+                    (engineBlock as any).config.selectedProfile = block.config.selectedProfile;
+                }
+                this.syncFloatingPanelProfile(blockId, block.config.selectedProfile);
+                this.renderWorkflow();
+            } else {
+                this.renderWorkflow();
+            }
+        };
+        this.propertyPanel.on('blockUpdated', propertyPanelBlockUpdatedHandler);
+        
+        this.registerCleanup(() => {
+            this.propertyPanel.off('propertyChange', propertyPanelPropertyChangeHandler);
+            this.propertyPanel.off('blockUpdated', propertyPanelBlockUpdatedHandler);
+        });
+    }
+    
+    /**
+     * Ensure PropertyPanel is loaded and execute callback
+     * Handles lazy loading transparently
+     */
+    private async withPropertyPanel<T>(callback: (panel: PropertyPanel) => T | Promise<T>): Promise<T> {
+        await this.ensurePropertyPanelLoaded();
+        return callback(this.propertyPanel);
+    }
+    
+    /**
      * Select a block
      */
-    private selectBlock(blockId: string | null): void {
+    private async selectBlock(blockId: string | null): Promise<void> {
         // Deselect all blocks
         this.visualBlocks.forEach(vb => vb.selected = false);
         
@@ -388,15 +633,18 @@ export class WorkflowDesigner {
                 visualBlock.selected = true;
                 this.selectedBlockId = blockId;
                 
-                // Update property panel
+                // Lazy load PropertyPanel if needed and show block
                 const block = this.engine.getBlock(blockId);
                 if (block) {
-                    this.propertyPanel.showBlock(block);
+                    await this.withPropertyPanel(panel => panel.showBlock(block));
                 }
             }
         } else {
             this.selectedBlockId = null;
-            this.propertyPanel.clear();
+            // Only clear if PropertyPanel is loaded
+            if (this.propertyPanelLoaded) {
+                await this.withPropertyPanel(panel => panel.clear());
+            }
         }
         
         this.renderWorkflow();
@@ -508,7 +756,10 @@ export class WorkflowDesigner {
         
         this.renderWorkflow();
         if (this.selectedBlockId === blockId) {
-            this.propertyPanel.showBlock(block);
+            // Fire-and-forget: ensure PropertyPanel is loaded and show block
+            this.withPropertyPanel(panel => panel.showBlock(block)).catch(err => 
+                console.error('Failed to show block in property panel:', err)
+            );
         }
     }
     
@@ -555,7 +806,10 @@ export class WorkflowDesigner {
         
         this.renderWorkflow();
         if (this.selectedBlockId === blockId) {
-            this.propertyPanel.showBlock(block);
+            // Fire-and-forget: ensure PropertyPanel is loaded and show block
+            this.withPropertyPanel(panel => panel.showBlock(block)).catch(err => 
+                console.error('Failed to show block in property panel:', err)
+            );
         }
     }
     
@@ -673,7 +927,10 @@ export class WorkflowDesigner {
         
         this.renderWorkflow();
         if (this.selectedBlockId === blockId) {
-            this.propertyPanel.showBlock(block);
+            // Fire-and-forget: ensure PropertyPanel is loaded and show block
+            this.withPropertyPanel(panel => panel.showBlock(block)).catch(err => 
+                console.error('Failed to show block in property panel:', err)
+            );
         }
     }
     
@@ -806,7 +1063,10 @@ export class WorkflowDesigner {
         
         this.renderWorkflow();
         if (this.selectedBlockId === blockId) {
-            this.propertyPanel.showBlock(block);
+            // Fire-and-forget: ensure PropertyPanel is loaded and show block
+            this.withPropertyPanel(panel => panel.showBlock(block)).catch(err => 
+                console.error('Failed to show block in property panel:', err)
+            );
         }
     }
     
@@ -878,7 +1138,10 @@ export class WorkflowDesigner {
         
         this.renderWorkflow();
         if (this.selectedBlockId === blockId) {
-            this.propertyPanel.showBlock(block);
+            // Fire-and-forget: ensure PropertyPanel is loaded and show block
+            this.withPropertyPanel(panel => panel.showBlock(block)).catch(err => 
+                console.error('Failed to show block in property panel:', err)
+            );
         }
     }
     
@@ -1122,7 +1385,9 @@ export class WorkflowDesigner {
                 
                 // If this is the selected block, update property panel
                 if (this.selectedBlockId === blockId) {
-                    this.selectBlock(blockId);
+                    this.selectBlock(blockId).catch(err => 
+                        console.error('Failed to select block:', err)
+                    );
                 }
             }
         }
@@ -1193,7 +1458,12 @@ export class WorkflowDesigner {
         // Clear selection if this was the selected block
         if (this.selectedBlockId === blockId) {
             this.selectedBlockId = null;
-            this.propertyPanel.clear();
+            // Fire-and-forget: clear property panel if loaded
+            if (this.propertyPanelLoaded) {
+                this.withPropertyPanel(panel => panel.clear()).catch(err => 
+                    console.error('Failed to clear property panel:', err)
+                );
+            }
         }
         
         // Re-render
@@ -1222,9 +1492,9 @@ export class WorkflowDesigner {
     }
     
     /**
-     * Import workflow from file
+     * Import workflow from file (private method)
      */
-    private importWorkflow(): void {
+    private importWorkflowFromFile(): void {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';
@@ -1243,6 +1513,11 @@ export class WorkflowDesigner {
                     this.createVisualConnections();
                     this.renderWorkflow();
                     
+                    // Center blocks after rendering with limited zoom (keep zoomed out)
+                    requestAnimationFrame(() => {
+                        this.canvas.zoomFitToScreen(0.8); // Max 80% zoom for initial render
+                    });
+                    
                     this.alertModal.show('Workflow imported successfully', 'Import Success', 'success');
                 } catch (error) {
                     this.alertModal.show(`Failed to import workflow: ${error}`, 'Import Failed', 'error');
@@ -1254,9 +1529,9 @@ export class WorkflowDesigner {
     }
     
     /**
-     * Export workflow to file
+     * Export workflow to file (private method)
      */
-    private exportWorkflow(): void {
+    private exportWorkflowToFile(): void {
         const json = this.engine.saveWorkflow();
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -1284,9 +1559,9 @@ export class WorkflowDesigner {
     }
     
     /**
-     * Clear the workflow
+     * Clear the workflow (private method)
      */
-    private clearWorkflow(): void {
+    private clearWorkflowWithConfirm(): void {
         if (confirm('Are you sure you want to clear the workflow?')) {
             this.engine = new WorkflowEngine();
             this.visualBlocks.clear();
@@ -1297,26 +1572,22 @@ export class WorkflowDesigner {
     }
     
     /**
-     * Open settings modal
+     * Open settings modal (lazy loaded)
      */
-    private openSettings(): void {
-        const canvasSize = this.canvas.getCanvasSize();
+    private async openSettings(): Promise<void> {
+        // Lazy load SettingsModal if needed
+        await this.ensureSettingsModalLoaded();
+        
         const minimapEnabled = this.minimap.isVisible();
         
         this.settingsModal.show(
             minimapEnabled,
-            canvasSize.width,
-            canvasSize.height,
             (enabled: boolean) => {
                 if (enabled) {
                     this.minimap.show();
                 } else {
                     this.minimap.hide();
                 }
-            },
-            (width: number, height: number) => {
-                this.canvas.setCanvasSize(width, height);
-                this.minimap.setCanvasSize(width, height);
             }
         );
     }
@@ -1348,24 +1619,45 @@ export class WorkflowDesigner {
         this.canvas.render(this.visualBlocks, this.visualConnections);
         
         // Update minimap
-        this.minimap.updateBlocks(this.visualBlocks);
+        this.minimap.updateBlocks(Array.from(this.visualBlocks.values()));
+    }
+    
+    /**
+     * Get connections data for export
+     */
+    private getConnectionsData(): any[] {
+        const connections: any[] = [];
+        this.visualConnections.forEach(conn => {
+            connections.push({
+                fromBlock: conn.sourceBlockId,
+                fromPort: conn.sourcePortName,
+                toBlock: conn.targetBlockId,
+                toPort: conn.targetPortName
+            });
+        });
+        return connections;
     }
     
     /**
      * Position blocks when importing
+     * Positions blocks in a visible area with proper spacing
      */
     private positionBlocks(): void {
         const blocks = this.engine.getBlocks();
         const spacing = 150;
-        let x = 100;
-        let y = 100;
+        // Start from a reasonable visible position
+        const DEFAULT_VIEW_X = 2000;
+        const DEFAULT_VIEW_Y = 2000;
+        let x = DEFAULT_VIEW_X - 400; // Offset to left of center
+        let y = DEFAULT_VIEW_Y - 100; // Offset above center
         
         blocks.forEach((block) => {
             this.addVisualBlock(block, { x, y });
             x += spacing;
             
-            if (x > 800) {
-                x = 100;
+            // Wrap to next row if too far right
+            if (x > DEFAULT_VIEW_X + 400) {
+                x = DEFAULT_VIEW_X - 400;
                 y += spacing;
             }
         });
@@ -1521,7 +1813,10 @@ export class WorkflowDesigner {
         
         this.renderWorkflow();
         if (this.selectedBlockId === blockId) {
-            this.propertyPanel.showBlock(block);
+            // Fire-and-forget: ensure PropertyPanel is loaded and show block
+            this.withPropertyPanel(panel => panel.showBlock(block)).catch(err => 
+                console.error('Failed to show block in property panel:', err)
+            );
         }
     }
     
@@ -1601,5 +1896,38 @@ export class WorkflowDesigner {
         } else {
             this.canvas.disablePanMode();
         }
+    }
+    
+    /**
+     * Cleanup method - destroys all child components
+     */
+    destroy(): void {
+        // Destroy child components (using optional chaining for components that may not have destroy)
+        this.canvas?.destroy();
+        
+        // Destroy PropertyPanel if loaded
+        if (this.propertyPanelLoaded && typeof (this.propertyPanel as any).destroy === 'function') {
+            (this.propertyPanel as any).destroy();
+        }
+        
+        this.floatingPanel?.destroy?.();
+        
+        if (typeof (this.minimap as any).destroy === 'function') {
+            (this.minimap as any).destroy();
+        }
+        
+        if (typeof (this.blockPalette as any).destroy === 'function') {
+            (this.blockPalette as any).destroy();
+        }
+        
+        this.alertModal?.destroy?.();
+        
+        // Destroy SettingsModal if loaded
+        if (this.settingsModalLoaded && typeof (this.settingsModal as any).destroy === 'function') {
+            (this.settingsModal as any).destroy();
+        }
+        
+        // Call parent destroy to clean up event listeners
+        super.destroy();
     }
 }

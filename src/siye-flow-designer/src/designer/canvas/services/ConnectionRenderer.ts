@@ -1,17 +1,28 @@
 import { VisualBlock, VisualConnection, VisualPort, Position } from '../../VisualModels';
+import { DOMDiff } from '../../../utils/DOMDiff';
 
 /**
  * Service for rendering connections between blocks
+ * Optimized with memoization for path calculations
  */
 export class ConnectionRenderer {
     private svg: SVGElement;
     
+    // Memoized path calculation
+    private memoizedGetPathData: (start: Position, end: Position) => string;
+    
     constructor(svg: SVGElement) {
         this.svg = svg;
+        
+        // Memoize expensive path calculation
+        this.memoizedGetPathData = DOMDiff.memoize(
+            (start: Position, end: Position) => this.calculatePathData(start, end),
+            (start, end) => `${start.x},${start.y}-${end.x},${end.y}`
+        );
     }
     
     /**
-     * Render all connections
+     * Render all connections - optimized to only update changed connections
      */
     public renderConnections(
         connections: Map<string, VisualConnection>,
@@ -21,25 +32,88 @@ export class ConnectionRenderer {
         mousePosition: Position,
         getPortTabPosition: (block: VisualBlock, port: VisualPort) => Position
     ): void {
-        // Clear existing connections
-        const existingConnections = this.svg.querySelectorAll('.edge-group, path.connection');
-        existingConnections.forEach(el => el.remove());
-        
-        // Render each connection
-        connections.forEach(connection => {
-            const element = this.createConnectionPath(connection, blocks, getPortTabPosition);
-            if (element) {
-                this.svg.appendChild(element);
+        // Get existing connection elements
+        const existingConnections = new Map<string, SVGPathElement>();
+        const existingElements = this.svg.querySelectorAll('path.connection-line');
+        existingElements.forEach(el => {
+            const connectionId = el.getAttribute('data-connection-id');
+            if (connectionId) {
+                existingConnections.set(connectionId, el as SVGPathElement);
             }
         });
         
-        // Render connection being drawn
-        if (isConnecting && connectionStart) {
-            const tempPath = this.createTempConnectionPath(connectionStart.position, mousePosition);
-            if (tempPath) {
-                this.svg.appendChild(tempPath);
+        const newConnectionIds = new Set(connections.keys());
+        
+        // Remove deleted connections
+        existingConnections.forEach((element, connectionId) => {
+            if (!newConnectionIds.has(connectionId)) {
+                element.remove();
             }
+        });
+        
+        // Update or add connections
+        connections.forEach(connection => {
+            const existing = existingConnections.get(connection.id);
+            if (existing) {
+                // Update existing connection path if positions changed
+                this.updateConnectionPath(existing, connection, blocks, getPortTabPosition);
+            } else {
+                // Create new connection
+                const element = this.createConnectionPath(connection, blocks, getPortTabPosition);
+                if (element) {
+                    this.svg.appendChild(element);
+                }
+            }
+        });
+        
+        // Handle temporary connection being drawn
+        const tempConnection = this.svg.querySelector('path.temp-connection');
+        if (isConnecting && connectionStart) {
+            if (tempConnection) {
+                // Update existing temp connection
+                tempConnection.setAttribute('d', this.memoizedGetPathData(connectionStart.position, mousePosition));
+            } else {
+                // Create new temp connection
+                const tempPath = this.createTempConnectionPath(connectionStart.position, mousePosition);
+                if (tempPath) {
+                    this.svg.appendChild(tempPath);
+                }
+            }
+        } else if (tempConnection) {
+            // Remove temp connection if not connecting
+            tempConnection.remove();
         }
+    }
+    
+    /**
+     * Update an existing connection path element
+     */
+    private updateConnectionPath(
+        pathElement: SVGPathElement,
+        connection: VisualConnection,
+        blocks: Map<string, VisualBlock>,
+        getPortTabPosition: (block: VisualBlock, port: VisualPort) => Position
+    ): void {
+        const sourceBlock = blocks.get(connection.sourceBlockId);
+        const targetBlock = blocks.get(connection.targetBlockId);
+        
+        if (!sourceBlock || !targetBlock) {
+            pathElement.remove();
+            return;
+        }
+        
+        const sourcePort = sourceBlock.outputPorts?.find(p => p.name === connection.sourcePortName);
+        const targetPort = targetBlock.inputPorts?.find(p => p.name === connection.targetPortName);
+        
+        if (!sourcePort || !targetPort) {
+            pathElement.remove();
+            return;
+        }
+        
+        // Update path data if positions changed
+        const start = getPortTabPosition(sourceBlock, sourcePort);
+        const end = getPortTabPosition(targetBlock, targetPort);
+        pathElement.setAttribute('d', this.memoizedGetPathData(start, end));
     }
     
     /**
@@ -68,7 +142,7 @@ export class ConnectionRenderer {
         // Create path
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('class', `connection connection-line`);
-        path.setAttribute('d', this.getPathData(start, end));
+        path.setAttribute('d', this.memoizedGetPathData(start, end));
         path.setAttribute('data-connection-id', connection.id);
         path.setAttribute('stroke', '#58a6ff');
         path.setAttribute('stroke-width', '2.5');
@@ -84,16 +158,16 @@ export class ConnectionRenderer {
     private createTempConnectionPath(start: Position, end: Position): SVGPathElement | null {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('class', 'connection temp-connection');
-        path.setAttribute('d', this.getPathData(start, end));
+        path.setAttribute('d', this.memoizedGetPathData(start, end));
         path.setAttribute('stroke-dasharray', '5,5');
         
         return path;
     }
     
     /**
-     * Get SVG path data with straight segments and curve
+     * Calculate SVG path data with straight segments and curve (actual calculation)
      */
-    private getPathData(start: Position, end: Position): string {
+    private calculatePathData(start: Position, end: Position): string {
         // Fixed constant straight lengths
         const outputStraight = 60; // Always 60px straight from output port
         const inputStraight = 60;  // Always 60px straight to input port
