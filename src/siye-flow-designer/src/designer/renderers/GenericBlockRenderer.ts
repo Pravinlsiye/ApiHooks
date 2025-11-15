@@ -154,9 +154,13 @@ export class GenericBlockRenderer extends BlockRenderer {
                                 </small>
                             </div>
                         </div>
-                        <div class="block-ports-area" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(48, 54, 61, 0.5);">
-                            ${this.renderPort({ name: 'success', type: 'any', position: { x: 0, y: 0 }, connected: false }, 'output')}
-                            ${this.renderPort({ name: 'fail', type: 'any', position: { x: 0, y: 0 }, connected: false }, 'output')}
+                        <div class="block-variables-section">
+                            <div class="block-section-label">Outputs</div>
+                            <div class="block-ports-area">
+                                ${this.block.outputPorts ? this.block.outputPorts.map(port => 
+                                    this.renderPort(port, 'output')
+                                ).join('') : ''}
+                            </div>
                         </div>
                     `;
                 break;
@@ -338,53 +342,79 @@ export class GenericBlockRenderer extends BlockRenderer {
                 });
             });
             
+            // Move to output ports section
             currentYOffset += SECTION_LABEL_HEIGHT + ((urlVars.length + inputs.length) * this.ROW_HEIGHT) + 8;
             
-            // Add success/fail output ports after custom outputs
-            currentYOffset += 8;
-            const successPortY = currentYOffset + this.PORT_CENTER_OFFSET;
-            const failPortY = currentYOffset + this.ROW_HEIGHT + this.PORT_CENTER_OFFSET;
-            
-            this.block.outputPorts!.push({
-                name: 'success',
-                type: 'any',
-                position: { x: this.block.width + 14, y: successPortY },
-                connected: false
-            });
-            
-            this.block.outputPorts!.push({
-                name: 'fail',
-                type: 'any',
-                position: { x: this.block.width + 14, y: failPortY },
-                connected: false
-            });
-            
-            portIndex = urlVars.length + inputs.length + 2; // +2 for success/fail
-        }
-        
-        // Also add ports from block definition (for blocks that have explicit inputPorts/outputPorts)
-        if (blockData.inputPorts && blockData.inputPorts.length > 0) {
-            blockData.inputPorts.forEach((port: any, idx: number) => {
-                const y = this.calculatePortY(portIndex + idx, 0);
-                this.block.inputPorts!.push({
-                    name: port.name,
-                    type: port.type,
-                    position: { x: -14, y },
-                    connected: false
+            // Add output ports from block definition if available
+            if (blockData.outputPorts && blockData.outputPorts.length > 0) {
+                blockData.outputPorts.forEach((port: any, idx: number) => {
+                    const portY = currentYOffset + (idx * this.ROW_HEIGHT) + this.ROW_PADDING + this.PORT_CENTER_OFFSET;
+                    this.block.outputPorts!.push({
+                        name: port.name,
+                        type: port.type || 'any',
+                        position: { x: this.block.width + 14, y: portY },
+                        connected: false
+                    });
                 });
-            });
-        }
-        
-        if (blockData.outputPorts && blockData.outputPorts.length > 0) {
-            blockData.outputPorts.forEach((port: any, idx: number) => {
-                const y = this.calculatePortY(portIndex + idx, 0);
+                portIndex = urlVars.length + inputs.length + blockData.outputPorts.length;
+            } else {
+                // Fallback: Add default success/fail output ports if not defined
+                currentYOffset += 8;
+                const successPortY = currentYOffset + this.PORT_CENTER_OFFSET;
+                const failPortY = currentYOffset + this.ROW_HEIGHT + this.PORT_CENTER_OFFSET;
+                
                 this.block.outputPorts!.push({
-                    name: port.name,
-                    type: port.type,
-                    position: { x: this.block.width + 14, y },
+                    name: 'success',
+                    type: 'any',
+                    position: { x: this.block.width + 14, y: successPortY },
                     connected: false
                 });
-            });
+                
+                this.block.outputPorts!.push({
+                    name: 'fail',
+                    type: 'any',
+                    position: { x: this.block.width + 14, y: failPortY },
+                    connected: false
+                });
+                
+                portIndex = urlVars.length + inputs.length + 2; // +2 for success/fail
+            }
+        }
+        
+        // Also add ports from block definition for other block types
+        // (Skip for Variable and HttpRequest blocks which handle their ports above)
+        if (blockData.type !== BlockType.Variable && blockData.type !== BlockType.HttpRequest) {
+            if (blockData.inputPorts && blockData.inputPorts.length > 0) {
+                // Check if ports already exist to avoid duplicates
+                const existingInputNames = new Set(this.block.inputPorts?.map(p => p.name));
+                blockData.inputPorts.forEach((port: any, idx: number) => {
+                    if (!existingInputNames.has(port.name)) {
+                        const y = this.calculatePortY(portIndex + idx, 0);
+                        this.block.inputPorts!.push({
+                            name: port.name,
+                            type: port.type,
+                            position: { x: -14, y },
+                            connected: false
+                        });
+                    }
+                });
+            }
+            
+            if (blockData.outputPorts && blockData.outputPorts.length > 0) {
+                // Check if ports already exist to avoid duplicates
+                const existingOutputNames = new Set(this.block.outputPorts?.map(p => p.name));
+                blockData.outputPorts.forEach((port: any, idx: number) => {
+                    if (!existingOutputNames.has(port.name)) {
+                        const y = this.calculatePortY(portIndex + idx, 0);
+                        this.block.outputPorts!.push({
+                            name: port.name,
+                            type: port.type,
+                            position: { x: this.block.width + 14, y },
+                            connected: false
+                        });
+                    }
+                });
+            }
         }
     }
     

@@ -79,7 +79,10 @@ export class WorkflowDesigner extends BaseComponent {
         // Position blocks
         this.positionBlocks();
         
-        // Restore connections if any
+        // Create connections from block data (handles both block-level and root-level connections)
+        this.createVisualConnections();
+        
+        // Also restore root-level connections if any
         if (workflowData.connections) {
             workflowData.connections.forEach((conn: any) => {
                 const connectionId = `${conn.fromBlock}_${conn.fromPort}_${conn.toBlock}_${conn.toPort}`;
