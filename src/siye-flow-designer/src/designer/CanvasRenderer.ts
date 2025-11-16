@@ -4,7 +4,7 @@ import { BlockRendererFactory } from './renderers/BlockRendererFactory';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { CanvasStateManager } from './canvas/state/CanvasStateManager';
 import { ZoomPanManager } from './canvas/managers/ZoomPanManager';
-import { ConnectionRenderer } from './canvas/services/ConnectionRenderer';
+import { HTMLConnectionRenderer } from './canvas/services/HTMLConnectionRenderer';
 import { BlockEventHandler } from './canvas/handlers/BlockEventHandler';
 import { BaseComponent } from '../utils/BaseComponent';
 import { DOMDiff } from '../utils/DOMDiff';
@@ -17,11 +17,9 @@ import { DevTools } from '../utils/DevTools';
  * Now extends BaseComponent for automatic cleanup and event management
  */
 export class CanvasRenderer extends BaseComponent {
-    private svg!: SVGElement;
-    
     private stateManager: CanvasStateManager;
     private zoomPanManager: ZoomPanManager;
-    private connectionRenderer: ConnectionRenderer;
+    private connectionRenderer: HTMLConnectionRenderer;
     private blockEventHandler: BlockEventHandler;
     private confirmModal: ConfirmModal;
     private devTools?: DevTools;
@@ -51,8 +49,19 @@ export class CanvasRenderer extends BaseComponent {
         // Setup canvas
         this.setupCanvas();
         
-        // Initialize connection renderer after SVG is created
-        this.connectionRenderer = new ConnectionRenderer(this.svg);
+        // Initialize HTML connection renderer after canvas wrapper is created
+        const canvasWrapper = DOMUpdater.query<HTMLElement>(this.container, '.canvas-wrapper');
+        if (!canvasWrapper) {
+            throw new Error('Canvas wrapper not found');
+        }
+        this.connectionRenderer = new HTMLConnectionRenderer(
+            canvasWrapper,
+            (connectionId: string) => this.emit('connectionDelete', { connectionId })
+        );
+        
+        // Set canvas wrapper for state manager and zoom pan manager
+        this.stateManager.setCanvasWrapper(canvasWrapper);
+        this.zoomPanManager.setCanvasWrapper(canvasWrapper);
         
         // Initialize block event handler
         this.blockEventHandler = new BlockEventHandler((blockId: string) => this.getBlockData(blockId));
@@ -73,14 +82,6 @@ export class CanvasRenderer extends BaseComponent {
         this.blockEventHandler.on('blockRenameKeyValue', (data: any) => this.emit('blockRenameKeyValue', data));
         this.blockEventHandler.on('blockKeyValueChange', (data: any) => this.emit('blockKeyValueChange', data));
         this.blockEventHandler.on('blockKeyValueTypeChange', (data: any) => this.emit('blockKeyValueTypeChange', data));
-        
-        // Get canvas wrapper reference after setupCanvas
-        const canvasWrapper = DOMUpdater.query<HTMLElement>(this.container, '.canvas-wrapper');
-        if (canvasWrapper) {
-            this.stateManager.setCanvasWrapper(canvasWrapper);
-            this.zoomPanManager.setCanvasWrapper(canvasWrapper);
-            // Canvas is infinite size - no need to set size
-        }
         
         // Initialize DevTools in development mode only
         if (enableDevTools || (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development')) {
@@ -174,7 +175,7 @@ export class CanvasRenderer extends BaseComponent {
         // When zoom changes, force a re-render to ensure blocks are properly displayed
         // BUT: Skip this during initial render to avoid interfering with setup
         let skipNextZoomChange = true; // Skip the initial zoom change from setCanvasWrapper
-        this.zoomPanManager.on('zoomChanged', (zoomLevel: number) => {
+        const zoomChangedHandler = (zoomLevel: number) => {
             if (skipNextZoomChange) {
                 skipNextZoomChange = false;
                 return; // Skip initial zoom change
@@ -225,6 +226,13 @@ export class CanvasRenderer extends BaseComponent {
                     });
                 });
             });
+        };
+        
+        this.zoomPanManager.on('zoomChanged', zoomChangedHandler);
+        
+        // Register cleanup to remove zoom event listener
+        this.registerCleanup(() => {
+            this.zoomPanManager.off('zoomChanged', zoomChangedHandler);
         });
     }
     
@@ -240,8 +248,9 @@ export class CanvasRenderer extends BaseComponent {
     private readonly CANVAS_PADDING = 2000;
     
     /**
-     * Setup the canvas and SVG elements
+     * Setup the canvas elements
      * Canvas uses dynamic sizing based on content
+     * Connections container will be created by HTMLConnectionRenderer
      */
     private setupCanvas(): void {
         // Preserve minimap container if it exists (it's appended to canvas-container)
@@ -255,15 +264,9 @@ export class CanvasRenderer extends BaseComponent {
         }
         
         // Start with reasonable default size
+        // HTMLConnectionRenderer will create the connections-container
         this.container.innerHTML = `
             <div class="canvas-wrapper" style="position: relative; width: ${this.canvasBounds.width}px; height: ${this.canvasBounds.height}px;">
-                <svg class="connections-svg" style="position: absolute; top: 0; left: 0; width: ${this.canvasBounds.width}px; height: ${this.canvasBounds.height}px; z-index: 0;">
-                    <defs>
-                        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
-                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff" />
-                        </marker>
-                    </defs>
-                </svg>
                 <div class="blocks-layer" style="position: relative; width: ${this.canvasBounds.width}px; height: ${this.canvasBounds.height}px;"></div>
             </div>
         `;
@@ -271,11 +274,6 @@ export class CanvasRenderer extends BaseComponent {
         // Restore minimap container if it existed
         if (minimapContainer) {
             this.container.appendChild(minimapContainer);
-        }
-        
-        this.svg = this.container.querySelector('.connections-svg') as SVGElement;
-        if (!this.svg) {
-            throw new Error('SVG element not found');
         }
         
         // Setup event handlers with automatic cleanup tracking
@@ -1028,76 +1026,12 @@ export class CanvasRenderer extends BaseComponent {
         }
         
         // Handle connection preview - render connections when mouse moves during connection
-        if (state.isConnecting && state.connectionStart) {
-            // Trigger render to update preview line
-            this.renderConnections();
-        }
+        // The subscription system will handle rendering via renderConnections()
+        // which calls HTMLConnectionRenderer.renderConnections() which handles temp connection
         
-        // Handle connection hover (rendering is automatic via subscription)
-        if (!state.isConnecting) {
-            this.checkConnectionHover();
-        }
+        // Connection hover is now handled internally by HTMLConnectionRenderer
     }
     
-    /**
-     * Check if mouse is near any connection and show delete button
-     */
-    private checkConnectionHover(): void {
-        const HOVER_DISTANCE = 10;
-        let nearestConnection: { id: string; distance: number } | null = null;
-        const state = this.stateManager.getState();
-        
-        for (const [id, connection] of state.connections.entries()) {
-            const sourceBlock = state.blocks.get(connection.sourceBlockId);
-            const targetBlock = state.blocks.get(connection.targetBlockId);
-            
-            if (!sourceBlock || !targetBlock) continue;
-            
-            const sourcePort = sourceBlock.outputPorts?.find(p => p.name === connection.sourcePortName);
-            const targetPort = targetBlock.inputPorts?.find(p => p.name === connection.targetPortName);
-            
-            if (!sourcePort || !targetPort) continue;
-            
-            const start = this.getPortTabPosition(sourceBlock, sourcePort);
-            const end = this.getPortTabPosition(targetBlock, targetPort);
-            
-            const midX = (start.x + end.x) / 2;
-            const midY = (start.y + end.y) / 2;
-            
-            const distance = Math.sqrt(
-                Math.pow(state.mousePosition.x - midX, 2) + 
-                Math.pow(state.mousePosition.y - midY, 2)
-            );
-            
-            if (distance < HOVER_DISTANCE && (!nearestConnection || distance < nearestConnection.distance)) {
-                nearestConnection = { id, distance };
-            }
-        }
-        
-        if (nearestConnection) {
-            const connectionId = nearestConnection.id;
-            const state = this.stateManager.getState();
-            if (connectionId !== state.hoveredConnection) {
-                this.stateManager.setHoveredConnection(connectionId);
-                const deleteButton = this.connectionRenderer.showDeleteButton(
-                    state.mousePosition,
-                    connectionId,
-                    (id) => this.emit('connectionDelete', { connectionId: id })
-                );
-                this.stateManager.setDeleteButtonElement(deleteButton);
-            } else if (state.deleteButtonElement) {
-                state.deleteButtonElement.setAttribute('x', String(state.mousePosition.x - 12));
-                state.deleteButtonElement.setAttribute('y', String(state.mousePosition.y - 12));
-            }
-        } else {
-            const state = this.stateManager.getState();
-            if (state.hoveredConnection) {
-                this.stateManager.setHoveredConnection(null);
-                this.connectionRenderer.hideDeleteButton(state.deleteButtonElement);
-                this.stateManager.setDeleteButtonElement(null);
-            }
-        }
-    }
     
     private onMouseUp(e: MouseEvent): void {
         const state = this.stateManager.getState();
@@ -1171,7 +1105,14 @@ export class CanvasRenderer extends BaseComponent {
         e.stopPropagation();
         e.preventDefault();
         
-        const portElement = e.currentTarget as HTMLElement;
+        // Get the port element from the event target (not currentTarget since we're using delegation)
+        const target = e.target as HTMLElement;
+        const portElement = target.closest('.port-input-tab, .port-output-tab, .port-row') as HTMLElement;
+        
+        if (!portElement) {
+            return;
+        }
+        
         const portType = portElement.dataset.portType;
         
         if (portType === 'output') {
@@ -1227,15 +1168,8 @@ export class CanvasRenderer extends BaseComponent {
     private updateTemporaryConnection(): void {
         const state = this.stateManager.getState();
         if (state.isConnecting && state.connectionStart) {
-            // Only update the temporary connection path, not all connections
-            this.connectionRenderer.renderConnections(
-                state.connections,
-                state.blocks,
-                state.isConnecting,
-                state.connectionStart,
-                state.mousePosition,
-                (block, port) => this.getPortTabPosition(block, port)
-            );
+            // Trigger renderConnections which handles temp connection
+            this.renderConnections();
         }
     }
     
@@ -1275,21 +1209,21 @@ export class CanvasRenderer extends BaseComponent {
         if (sizeChanged) {
             this.canvasBounds = bounds;
             
-            // Update canvas wrapper and SVG sizes
+            // Update canvas wrapper sizes
             const wrapper = this.container.querySelector('.canvas-wrapper') as HTMLElement;
-            const svg = this.svg;
             
-            if (wrapper && svg) {
+            if (wrapper) {
                 wrapper.style.width = `${bounds.width}px`;
                 wrapper.style.height = `${bounds.height}px`;
-                svg.style.width = `${bounds.width}px`;
-                svg.style.height = `${bounds.height}px`;
                 
                 const blocksLayer = wrapper.querySelector('.blocks-layer') as HTMLElement;
                 if (blocksLayer) {
                     blocksLayer.style.width = `${bounds.width}px`;
                     blocksLayer.style.height = `${bounds.height}px`;
                 }
+                
+                // Update connections container size via renderer
+                this.connectionRenderer.updateSize(bounds.width, bounds.height);
             }
             
             // Notify state manager of new size
@@ -1352,6 +1286,9 @@ export class CanvasRenderer extends BaseComponent {
     destroy(): void {
         // Clean up all block event handlers
         this.blockEventHandler.destroy();
+        
+        // Destroy connection renderer
+        this.connectionRenderer.destroy();
         
         // Destroy DevTools if initialized
         this.devTools?.destroy();

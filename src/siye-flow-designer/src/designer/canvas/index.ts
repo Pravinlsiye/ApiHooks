@@ -2,6 +2,6 @@
 export * from './state/CanvasState';
 export * from './state/CanvasStateManager';
 export * from './managers/ZoomPanManager';
-export * from './services/ConnectionRenderer';
+export * from './services/HTMLConnectionRenderer';
 export * from './handlers/BlockEventHandler';
 
