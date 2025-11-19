@@ -1,5 +1,6 @@
 import { BaseComponent } from '../utils/BaseComponent';
 import { DOMUpdater } from '../utils/DOMUpdater';
+import { ThemeManager } from '../utils/ThemeManager';
 
 /**
  * SettingsModal - A modal for workflow designer settings
@@ -8,6 +9,7 @@ import { DOMUpdater } from '../utils/DOMUpdater';
 export class SettingsModal extends BaseComponent {
     private modal: HTMLElement;
     private minimapEnabled: boolean = true;
+    private currentTheme: string = ThemeManager.getCurrentTheme();
     private onMinimapToggle?: (enabled: boolean) => void;
     
     constructor() {
@@ -48,6 +50,15 @@ export class SettingsModal extends BaseComponent {
                                 <input type="checkbox" id="settings-minimap-toggle" ${this.minimapEnabled ? 'checked' : ''}>
                                 <span class="settings-toggle-slider"></span>
                             </div>
+                        </label>
+                    </div>
+                    <div class="settings-item">
+                        <label class="settings-label">
+                            <span>Theme</span>
+                            <select id="settings-theme-select" class="settings-select">
+                                <option value="light" ${this.currentTheme === 'light' ? 'selected' : ''}>Light</option>
+                                <option value="dark" ${this.currentTheme === 'dark' ? 'selected' : ''}>Dark</option>
+                            </select>
                         </label>
                     </div>
                 </div>
@@ -102,11 +113,20 @@ export class SettingsModal extends BaseComponent {
     
     private applySettings(): void {
         const minimapToggle = DOMUpdater.query<HTMLInputElement>(this.modal, '#settings-minimap-toggle');
+        const themeSelect = DOMUpdater.query<HTMLSelectElement>(this.modal, '#settings-theme-select');
         
         if (minimapToggle) {
             this.minimapEnabled = minimapToggle.checked;
             if (this.onMinimapToggle) {
                 this.onMinimapToggle(this.minimapEnabled);
+            }
+        }
+        
+        if (themeSelect) {
+            const newTheme = themeSelect.value;
+            if (newTheme !== this.currentTheme) {
+                ThemeManager.setTheme(newTheme);
+                this.currentTheme = newTheme;
             }
         }
         
@@ -119,10 +139,14 @@ export class SettingsModal extends BaseComponent {
     ): void {
         this.minimapEnabled = minimapEnabled;
         this.onMinimapToggle = onMinimapToggle;
+        this.currentTheme = ThemeManager.getCurrentTheme();
         
         // Update form values
         const minimapToggle = DOMUpdater.query<HTMLInputElement>(this.modal, '#settings-minimap-toggle');
         if (minimapToggle) minimapToggle.checked = minimapEnabled;
+        
+        const themeSelect = DOMUpdater.query<HTMLSelectElement>(this.modal, '#settings-theme-select');
+        if (themeSelect) themeSelect.value = this.currentTheme;
         
         this.container.style.display = 'flex';
     }

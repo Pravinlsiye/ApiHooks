@@ -1,6 +1,12 @@
 import './styles.css';
 import { WorkflowDesigner } from './designer/WorkflowDesigner';
 import { DEFAULT_CONFIG, createEmbeddedConfig } from './designer/DesignerConfig';
+import { ThemeManager } from './utils/ThemeManager';
+
+// Initialize theme immediately to prevent flash
+if (typeof document !== 'undefined') {
+    ThemeManager.initializeTheme();
+}
 
 // Export for library usage
 export { WorkflowDesigner } from './designer/WorkflowDesigner';
@@ -9,6 +15,7 @@ export * from './models/workflow-models';
 export { DEFAULT_CONFIG, createEmbeddedConfig } from './designer/DesignerConfig';
 export { ApiDefinitionLoader } from './api/ApiDefinitionLoader';
 export { ApiDefinitionManager } from './api/ApiDefinitionManager';
+export { ThemeManager } from './utils/ThemeManager';
 
 // Re-export types (TypeScript only, stripped at runtime)
 export type { DesignerConfig, HostApiConfig } from './designer/DesignerConfig';
