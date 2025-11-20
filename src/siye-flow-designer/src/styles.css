@@ -1222,21 +1222,64 @@ body {
     transform: translateY(-50%);
 }
 
-/* Connections */
-.connection {
-    stroke-width: 2.5;
-    fill: none;
+/* HTML Connection Styles */
+.connections-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 5;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.html-connection {
+    position: absolute;
     pointer-events: none;
 }
 
-.connection-line {
-    stroke: var(--accent-primary);
+.connection-segment {
+    position: absolute;
+    background-color: var(--accent-primary);
+    pointer-events: all;
+    cursor: pointer;
+    border-radius: 1.5px;
+    transition: background-color 0.2s, left 0.15s ease-out, top 0.15s ease-out, transform 0.15s ease-out, width 0.15s ease-out;
 }
 
-.connection.temp-connection {
-    stroke: var(--accent-primary);
-    opacity: 0.6;
-    stroke-dasharray: 8, 4;
+.connection-segment:hover {
+    background-color: var(--accent-primary-light);
+}
+
+.connection-segment.temp-segment {
+    background-color: transparent;
+    border-top: 3px dashed var(--accent-primary);
+    opacity: 0.7;
+    transition: left 0.05s linear, top 0.05s linear, transform 0.05s linear, width 0.05s linear;
+}
+
+.connection-delete {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--error-base);
+    border: 2px solid var(--error-hover);
+    color: var(--text-inverse);
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    display: none;
+    z-index: 20;
+    pointer-events: all;
+    padding: 0;
+    line-height: 1;
+    transition: left 0.15s ease-out, top 0.15s ease-out, background 0.2s;
+    align-items: center;
+    justify-content: center;
+}
+
+.connection-delete:hover {
+    background: var(--error-hover);
 }
 
 /* Property panel */

@@ -102,11 +102,17 @@ export class CanvasRenderer extends BaseComponent {
             const state = this.stateManager.getState();
             
             // Create hash including positions to detect position changes
-            // Round positions to avoid micro-movements triggering renders (optimization)
+            // During dragging, use more precise positions (no rounding) for smooth updates
+            // Otherwise round to avoid micro-movements triggering renders (optimization)
             let blocksHash = '';
             if (state.blocks.size > 0) {
+                const precision = state.isDragging ? 1 : 0; // More precise during drag
                 blocksHash = Array.from(state.blocks.entries())
-                    .map(([id, block]) => `${id}:${Math.round(block.position.x)},${Math.round(block.position.y)}`)
+                    .map(([id, block]) => {
+                        const x = precision === 0 ? Math.round(block.position.x) : Math.round(block.position.x * 10) / 10;
+                        const y = precision === 0 ? Math.round(block.position.y) : Math.round(block.position.y * 10) / 10;
+                        return `${id}:${x},${y}`;
+                    })
                     .sort()
                     .join('|');
             }
@@ -124,10 +130,9 @@ export class CanvasRenderer extends BaseComponent {
                 Math.abs(state.mousePosition.y - lastMousePosition.y) > 1
             );
             
-            // Render if blocks/connections changed OR if dragging/connecting state changed
-            // OR if mouse moved during connection (for preview line updates)
-            // OR if dragging just ended (to catch final position adjustments)
-            const shouldRender = blocksChanged || connectionsChanged || draggingChanged || connectingChanged || mouseMovedDuringConnection;
+            // During dragging, always render connections on every position change
+            const isDragging = state.isDragging;
+            const shouldRender = blocksChanged || connectionsChanged || draggingChanged || connectingChanged || mouseMovedDuringConnection || isDragging;
             
             if (shouldRender) {
                 lastBlocksHash = blocksHash;
@@ -136,32 +141,51 @@ export class CanvasRenderer extends BaseComponent {
                 lastIsConnecting = state.isConnecting;
                 lastMousePosition = { ...state.mousePosition };
                 
-                // Use requestAnimationFrame for smooth rendering
-                if (!renderScheduled) {
-                    renderScheduled = true;
+                // During dragging, render more aggressively for smooth updates
+                if (isDragging) {
+                    // Render immediately during drag for responsive updates
                     requestAnimationFrame(() => {
-                        renderScheduled = false;
                         const currentState = this.stateManager.getState();
-                        if (currentState.blocks.size > 0 || currentState.connections.size > 0 || currentState.isConnecting) {
+                        if (currentState.blocks.size > 0 || currentState.connections.size > 0) {
                             // Render blocks first
                             this.renderBlocks();
                             
-                            // Then render connections after blocks are updated in DOM
-                            // Use double RAF to ensure DOM has reflowed and port positions are accurate
-                            requestAnimationFrame(() => {
-                                // Force recalculation of port positions by clearing memoization cache
-                                // This ensures we get fresh positions after block updates
-                                this.renderConnections();
-                                
-                                // If dragging just ended, render again after a short delay to catch any final adjustments
-                                if (draggingChanged && !currentState.isDragging) {
-                                    requestAnimationFrame(() => {
-                                        this.renderConnections();
-                                    });
-                                }
-                            });
+                            // Force DOM reflow to ensure block positions are updated
+                            // This ensures port positions are calculated from updated DOM
+                            void this.container.offsetHeight;
+                            
+                            // Render connections immediately after reflow
+                            this.renderConnections();
                         }
                     });
+                } else {
+                    // Use requestAnimationFrame for smooth rendering (non-drag case)
+                    if (!renderScheduled) {
+                        renderScheduled = true;
+                        requestAnimationFrame(() => {
+                            renderScheduled = false;
+                            const currentState = this.stateManager.getState();
+                            if (currentState.blocks.size > 0 || currentState.connections.size > 0 || currentState.isConnecting) {
+                                // Render blocks first
+                                this.renderBlocks();
+                                
+                                // Then render connections after blocks are updated in DOM
+                                // Use double RAF to ensure DOM has reflowed and port positions are accurate
+                                requestAnimationFrame(() => {
+                                    // Force recalculation of port positions by clearing memoization cache
+                                    // This ensures we get fresh positions after block updates
+                                    this.renderConnections();
+                                    
+                                    // If dragging just ended, render again after a short delay to catch any final adjustments
+                                    if (draggingChanged && !currentState.isDragging) {
+                                        requestAnimationFrame(() => {
+                                            this.renderConnections();
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    }
                 }
             }
         });
@@ -805,7 +829,8 @@ export class CanvasRenderer extends BaseComponent {
             state.isConnecting,
             state.connectionStart,
             state.mousePosition,
-            (block: VisualBlock, port: VisualPort) => this.getPortTabPosition(block, port)
+            (block: VisualBlock, port: VisualPort) => this.getPortTabPosition(block, port),
+            state.isDragging
         );
     }
     
@@ -818,13 +843,20 @@ export class CanvasRenderer extends BaseComponent {
     
     /**
      * Get port tab position (memoized wrapper)
+     * During drag, bypasses memoization to ensure fresh positions
      */
     private getPortTabPosition(block: VisualBlock, port: VisualPort): Position {
+        const state = this.stateManager.getState();
+        // During drag, calculate directly to avoid stale cached positions
+        if (state.isDragging) {
+            return this.calculatePortTabPosition(block, port);
+        }
         return this.memoizedGetPortTabPosition(block, port);
     }
     
     /**
      * Calculate port tab position (actual calculation - memoized)
+     * Always returns the exact center of the port tab element
      */
     private calculatePortTabPosition(block: VisualBlock, port: VisualPort): Position {
         const blockElement = DOMUpdater.query<HTMLElement>(document, `#block-${block.id}`);
@@ -849,20 +881,43 @@ export class CanvasRenderer extends BaseComponent {
             }
             
             if (portElement) {
-                // Find the actual port-tab element (the circular connection point)
-                const tabElement = portElement.querySelector('.port-tab') || portElement;
+                // Always find the actual port-tab element (the visual connection point)
+                const tabElement = portElement.querySelector('.port-tab') as HTMLElement;
                 
                 if (tabElement) {
-                    const rect = tabElement.getBoundingClientRect();
+                    // Get the exact bounding rect of the port tab
+                    const tabRect = tabElement.getBoundingClientRect();
                     const containerRect = this.container.getBoundingClientRect();
                     const scale = this.zoomPanManager.getZoomLevel();
                     
-                    // Calculate position in canvas coordinates
-                    // Account for container scroll and zoom transform
-                    const viewportX = rect.left + (rect.width / 2) - containerRect.left;
-                    const viewportY = rect.top + (rect.height / 2) - containerRect.top;
+                    // Calculate the exact center of the port tab
+                    const tabCenterX = tabRect.left + (tabRect.width / 2);
+                    const tabCenterY = tabRect.top + (tabRect.height / 2);
+                    
+                    // Convert to viewport coordinates relative to container
+                    const viewportX = tabCenterX - containerRect.left;
+                    const viewportY = tabCenterY - containerRect.top;
                     
                     // Convert viewport coordinates to canvas coordinates
+                    // Account for scroll and zoom
+                    const x = (viewportX + this.container.scrollLeft) / scale;
+                    const y = (viewportY + this.container.scrollTop) / scale;
+                    
+                    return { x, y };
+                } else {
+                    // If no .port-tab found, use the port element itself
+                    const portRect = (portElement as HTMLElement).getBoundingClientRect();
+                    const containerRect = this.container.getBoundingClientRect();
+                    const scale = this.zoomPanManager.getZoomLevel();
+                    
+                    // For input ports, use left center; for output ports, use right center
+                    const isInput = portType === 'input';
+                    const portCenterX = isInput ? portRect.left : portRect.right;
+                    const portCenterY = portRect.top + (portRect.height / 2);
+                    
+                    const viewportX = portCenterX - containerRect.left;
+                    const viewportY = portCenterY - containerRect.top;
+                    
                     const x = (viewportX + this.container.scrollLeft) / scale;
                     const y = (viewportY + this.container.scrollTop) / scale;
                     
@@ -1022,6 +1077,16 @@ export class CanvasRenderer extends BaseComponent {
             this.emit('blockMove', {
                 blockId: state.draggedBlockId,
                 position
+            });
+            
+            // Force immediate render during drag for smooth visual feedback
+            // Use RAF but render connections in same frame after forcing reflow
+            requestAnimationFrame(() => {
+                this.renderBlocks();
+                // Force DOM reflow to ensure block positions are updated
+                void this.container.offsetHeight;
+                // Render connections immediately after reflow
+                this.renderConnections();
             });
         }
         

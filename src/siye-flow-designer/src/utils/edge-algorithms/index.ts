@@ -7,7 +7,7 @@ export * from './smoothstep';
 export * from './edge-utilities';
 
 // Re-export commonly used functions for convenience
-export { connectionPathToHTMLSegments, Position } from './connection-path';
+export { connectionPathToHTMLSegments, connectionPathToSVG, Position } from './connection-path';
 export { getSmoothStepPath, smoothStepToHTMLSegments, getEdgeCenter } from './smoothstep';
 export { 
   addEdge, 

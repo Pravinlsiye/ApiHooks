@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SiyeFlow HTML Canvas Debug</title>
+    <link rel="stylesheet" href="src/styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-base);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        .debug-header {
+            padding: 16px;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .debug-title {
+            color: var(--text-primary);
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .debug-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            background: var(--accent-primary);
+            color: var(--text-inverse);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: var(--accent-primary-light);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border-default);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--bg-overlay);
+        }
+        
+        .canvas-container {
+            width: 100vw;
+            height: calc(100vh - 60px);
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-base);
+        }
+        
+        .canvas-wrapper {
+            position: absolute;
+            width: 8000px;
+            height: 8000px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+        }
+        
+        .canvas-wrapper.panning {
+            cursor: grabbing;
+        }
+        
+        /* Combined layer for both connections and blocks */
+        .canvas-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            pointer-events: none; /* Layer itself doesn't capture events */
+        }
+        
+        /* SVG lines can receive events even when parent layer has pointer-events: none */
+        .canvas-layer svg {
+            pointer-events: all !important;
+        }
+        
+        /* Keep old class names for compatibility */
+        .connections-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            pointer-events: none;
+        }
+        
+        .connections-layer svg {
+            pointer-events: all !important;
+        }
+        
+        .blocks-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+        
+        .html-connection {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .connection-line {
+            position: absolute;
+            pointer-events: all !important;
+            cursor: pointer;
+            overflow: visible;
+        }
+        
+        /* Make SVG path receive events */
+        .connection-line path {
+            pointer-events: all;
+        }
+        
+        /* Ensure delete button can receive clicks */
+        .html-connection .connection-delete {
+            pointer-events: all !important;
+        }
+        
+        .connection-segment {
+            position: absolute;
+            pointer-events: all !important; /* Force pointer events to work */
+            cursor: pointer;
+            height: 15px; /* Larger hit area */
+            transform-origin: 0 50%;
+            transition: background-color 0.2s, left 0.15s ease-out, top 0.15s ease-out, transform 0.15s ease-out, width 0.15s ease-out;
+            /* Center the visual line within the larger hit area */
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        
+        /* Visual line inside the larger hit area */
+        .connection-segment::before {
+            content: '';
+            display: block;
+            height: 3px;
+            width: 100%;
+            background-color: var(--segment-color, var(--accent-primary));
+            border-radius: 1.5px;
+            transition: background-color 0.2s;
+        }
+        
+        .connection-segment:hover {
+            background-color: var(--accent-primary-light);
+        }
+        
+        .connection-delete {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--error-base);
+            border: 2px solid var(--error-hover);
+            color: var(--text-inverse);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: none;
+            z-index: 5; /* Above connections but below blocks */
+            pointer-events: all;
+            padding: 0;
+            line-height: 1;
+            transition: left 0.15s ease-out, top 0.15s ease-out, background 0.2s;
+        }
+        
+        .connection-delete:hover {
+            background: var(--error-hover);
+        }
+        
+        .workflow-block {
+            position: absolute;
+            border-radius: 8px;
+            border: 2px solid;
+            background: var(--bg-elevated);
+            pointer-events: none; /* Block body doesn't capture events - allows connections behind to receive events */
+            z-index: 10; /* Blocks appear above connections */
+            min-width: 200px;
+            transition: box-shadow 0.2s, border-color 0.2s;
+        }
+        
+        /* Only interactive parts of blocks capture events */
+        .workflow-block .block-header {
+            pointer-events: all;
+            cursor: move;
+        }
+        
+        .workflow-block .block-content,
+        .workflow-block .block-content * {
+            pointer-events: all;
+        }
+        
+        .workflow-block .port-tab {
+            pointer-events: all;
+        }
+        
+        .workflow-block:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .workflow-block.selected {
+            border-width: 3px;
+            box-shadow: 0 0 0 2px var(--accent-primary-light);
+        }
+        
+        .block-header {
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid var(--border-default);
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .block-content {
+            padding: 12px;
+        }
+        
+        .block-field {
+            margin-bottom: 12px;
+        }
+        
+        .block-field label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        
+        .block-field input,
+        .block-field select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border-default);
+            border-radius: 4px;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+        
+        .block-ports {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-top: 1px solid var(--border-default);
+        }
+        
+        .port-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .port {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        
+        .port-tab {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            border: 2px solid var(--bg-elevated);
+            cursor: crosshair;
+            transition: transform 0.2s, background 0.2s;
+        }
+        
+        .port-tab:hover {
+            transform: scale(1.2);
+            background: var(--accent-primary-light);
+        }
+        
+        .port-tab.input {
+            margin-left: -7px;
+        }
+        
+        .port-tab.output {
+            margin-right: -7px;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            max-width: 250px;
+            z-index: 100;
+        }
+        
+        .info-item {
+            margin-bottom: 8px;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-header">
+        <h1 class="debug-title">🔍 HTML Canvas Debug - Blocks & Connections</h1>
+        <div class="debug-controls">
+            <button class="btn" onclick="addRandomBlock()">Add Block</button>
+            <button class="btn" onclick="addRandomConnection()">Add Connection</button>
+            <button class="btn btn-secondary" onclick="clearCanvas()">Clear</button>
+        </div>
+    </div>
+    
+    <div class="canvas-container">
+        <div class="canvas-wrapper">
+            <div class="canvas-layer" id="canvas-layer"></div>
+        </div>
+        
+        <div class="info-panel">
+            <div class="info-item">
+                <span class="info-label">Blocks:</span>
+                <span id="block-count">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Connections:</span>
+                <span id="connection-count">0</span>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { BlockType } from './src/models/workflow-models.ts';
+        import { connectionPathToHTMLSegments } from './src/utils/edge-algorithms/index.ts';
+        
+        // Initialize theme
+        if (typeof document !== 'undefined') {
+            const theme = localStorage.getItem('siyeflow-theme') || 'light';
+            document.body.setAttribute('data-theme', theme);
+        }
+        
+        const canvasLayer = document.getElementById('canvas-layer');
+        // Use same layer for both - connections rendered first, then blocks
+        const connectionsLayer = canvasLayer;
+        const blocksLayer = canvasLayer;
+        
+        let blocks = new Map();
+        let connections = new Map();
+        let blockCounter = 0;
+        let connectionCounter = 0;
+        
+        // Block colors
+        const blockColors = {
+            [BlockType.Start]: '#4CAF50',
+            [BlockType.End]: '#f44336',
+            [BlockType.HttpRequest]: '#2196F3',
+            [BlockType.Variable]: '#FF9800',
+            [BlockType.Condition]: '#9C27B0',
+            [BlockType.Delay]: '#00BCD4',
+            [BlockType.Log]: '#607D8B'
+        };
+        
+        // Drag state
+        let isDragging = false;
+        let draggedBlock = null;
+        let dragOffset = { x: 0, y: 0 };
+        
+        // Connection creation state
+        let isCreatingConnection = false;
+        let connectionStart = null;
+        let previewConnection = null;
+        
+        // Pan state
+        let isPanning = false;
+        let panStart = { x: 0, y: 0 };
+        let panOffset = { x: 0, y: 0 };
+        
+        // HTML Block Renderer
+        class HTMLBlockRenderer {
+            static render(block) {
+                const blockEl = document.createElement('div');
+                blockEl.className = `workflow-block block-type-${block.type}`;
+                blockEl.dataset.blockId = block.id;
+                blockEl.style.left = `${block.position.x}px`;
+                blockEl.style.top = `${block.position.y}px`;
+                blockEl.style.width = `${block.width}px`;
+                blockEl.style.minHeight = `${block.height}px`;
+                blockEl.style.borderColor = blockColors[block.type] || '#666';
+                
+                // Header
+                const header = document.createElement('div');
+                header.className = 'block-header';
+                header.textContent = block.name || block.type;
+                blockEl.appendChild(header);
+                
+                // Content
+                const content = document.createElement('div');
+                content.className = 'block-content';
+                
+                // Fields
+                if (block.fields && block.fields.length > 0) {
+                    block.fields.forEach(field => {
+                        const fieldDiv = document.createElement('div');
+                        fieldDiv.className = 'block-field';
+                        
+                        const label = document.createElement('label');
+                        label.textContent = field.label || field.name;
+                        fieldDiv.appendChild(label);
+                        
+                        if (field.type === 'select' || field.type === 'dropdown') {
+                            const select = document.createElement('select');
+                            const options = field.options || [];
+                            options.forEach(option => {
+                                const optionEl = document.createElement('option');
+                                optionEl.value = typeof option === 'string' ? option : option.value;
+                                optionEl.textContent = typeof option === 'string' ? option : option.label;
+                                if (field.value === optionEl.value) {
+                                    optionEl.selected = true;
+                                }
+                                select.appendChild(optionEl);
+                            });
+                            select.addEventListener('change', (e) => {
+                                if (!block.fieldValues) block.fieldValues = {};
+                                block.fieldValues[field.name] = e.target.value;
+                            });
+                            fieldDiv.appendChild(select);
+                        } else {
+                            const input = document.createElement('input');
+                            input.type = field.type || 'text';
+                            input.placeholder = field.placeholder || '';
+                            input.value = field.value || '';
+                            input.addEventListener('input', (e) => {
+                                if (!block.fieldValues) block.fieldValues = {};
+                                block.fieldValues[field.name] = e.target.value;
+                            });
+                            fieldDiv.appendChild(input);
+                        }
+                        
+                        content.appendChild(fieldDiv);
+                    });
+                }
+                
+                blockEl.appendChild(content);
+                
+                // Ports
+                const portsDiv = document.createElement('div');
+                portsDiv.className = 'block-ports';
+                
+                // Input ports
+                const inputPortsDiv = document.createElement('div');
+                inputPortsDiv.className = 'port-group';
+                if (block.inputPorts) {
+                    block.inputPorts.forEach(port => {
+                        const portDiv = document.createElement('div');
+                        portDiv.className = 'port';
+                        
+                        const portTab = document.createElement('div');
+                        portTab.className = 'port-tab input';
+                        portTab.dataset.portType = 'input';
+                        portTab.dataset.portName = port.name;
+                        portTab.dataset.blockId = block.id;
+                        portTab.addEventListener('mouseup', (e) => handlePortMouseUp(e, block.id, port.name, 'input'));
+                        
+                        const portLabel = document.createElement('span');
+                        portLabel.textContent = port.name;
+                        
+                        portDiv.appendChild(portTab);
+                        portDiv.appendChild(portLabel);
+                        inputPortsDiv.appendChild(portDiv);
+                    });
+                }
+                
+                // Output ports
+                const outputPortsDiv = document.createElement('div');
+                outputPortsDiv.className = 'port-group';
+                if (block.outputPorts) {
+                    block.outputPorts.forEach(port => {
+                        const portDiv = document.createElement('div');
+                        portDiv.className = 'port';
+                        
+                        const portLabel = document.createElement('span');
+                        portLabel.textContent = port.name;
+                        
+                        const portTab = document.createElement('div');
+                        portTab.className = 'port-tab output';
+                        portTab.dataset.portType = 'output';
+                        portTab.dataset.portName = port.name;
+                        portTab.dataset.blockId = block.id;
+                        portTab.addEventListener('mousedown', (e) => handlePortMouseDown(e, block.id, port.name, 'output'));
+                        
+                        portDiv.appendChild(portLabel);
+                        portDiv.appendChild(portTab);
+                        outputPortsDiv.appendChild(portDiv);
+                    });
+                }
+                
+                portsDiv.appendChild(inputPortsDiv);
+                portsDiv.appendChild(outputPortsDiv);
+                blockEl.appendChild(portsDiv);
+                
+                return blockEl;
+            }
+            
+            static update(block, element) {
+                if (!element) return;
+                element.style.left = `${block.position.x}px`;
+                element.style.top = `${block.position.y}px`;
+            }
+        }
+        
+        // Simple Connection Renderer - Fresh Start
+        class HTMLConnectionRenderer {
+            static render(connection) {
+                const sourceBlock = blocks.get(connection.sourceBlockId);
+                const targetBlock = blocks.get(connection.targetBlockId);
+                
+                if (!sourceBlock || !targetBlock) return null;
+                
+                const sourcePort = sourceBlock.outputPorts?.find(p => p.name === connection.sourcePortName);
+                const targetPort = targetBlock.inputPorts?.find(p => p.name === connection.targetPortName);
+                
+                if (!sourcePort || !targetPort) return null;
+                
+                const start = getPortPosition(sourceBlock, sourcePort.name, 'output');
+                const end = getPortPosition(targetBlock, targetPort.name, 'input');
+                
+                if (!start || !end) return null;
+                
+                // Create connection wrapper - NO pointer-events: none!
+                const connectionEl = document.createElement('div');
+                connectionEl.className = 'html-connection';
+                connectionEl.dataset.connectionId = connection.id;
+                connectionEl.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                `;
+                
+                // Create smooth bezier curve path
+                const outputStraight = 60;
+                const inputStraight = 60;
+                const outEndX = start.x + outputStraight;
+                const outEndY = start.y;
+                const inStartX = end.x - inputStraight;
+                const inStartY = end.y;
+                const horizontalGap = inStartX - outEndX;
+                const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
+                
+                const cp1x = outEndX + curveDistance;
+                const cp1y = outEndY;
+                const cp2x = inStartX - curveDistance;
+                const cp2y = inStartY;
+                
+                // Calculate bounding box for SVG
+                const minX = Math.min(start.x, outEndX, inStartX, end.x) - 10;
+                const maxX = Math.max(start.x, outEndX, inStartX, end.x) + 10;
+                const minY = Math.min(start.y, outEndY, inStartY, end.y) - 10;
+                const maxY = Math.max(start.y, outEndY, inStartY, end.y) + 10;
+                const svgWidth = maxX - minX;
+                const svgHeight = maxY - minY;
+                
+                // Create SVG element for smooth line
+                const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svgEl.setAttribute('class', 'connection-line');
+                svgEl.setAttribute('data-connection-id', connection.id);
+                svgEl.style.cssText = `
+                    position: absolute;
+                    left: ${minX}px;
+                    top: ${minY}px;
+                    width: ${svgWidth}px;
+                    height: ${svgHeight}px;
+                    pointer-events: all;
+                    cursor: pointer;
+                    overflow: visible;
+                `;
+                
+                // Create invisible hit area path (smaller hit area)
+                const hitPathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const pathData = `M ${start.x - minX} ${start.y - minY} L ${outEndX - minX} ${outEndY - minY} C ${cp1x - minX} ${cp1y - minY}, ${cp2x - minX} ${cp2y - minY}, ${inStartX - minX} ${inStartY - minY} L ${end.x - minX} ${end.y - minY}`;
+                hitPathEl.setAttribute('d', pathData);
+                hitPathEl.setAttribute('stroke', 'transparent');
+                hitPathEl.setAttribute('stroke-width', '8'); // Smaller hit area
+                hitPathEl.setAttribute('fill', 'none');
+                hitPathEl.setAttribute('stroke-linecap', 'round');
+                hitPathEl.style.pointerEvents = 'all';
+                hitPathEl.style.cursor = 'pointer';
+                
+                // Create visible path element
+                const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('d', pathData);
+                pathEl.setAttribute('stroke', 'var(--accent-primary)');
+                pathEl.setAttribute('stroke-width', '3');
+                pathEl.setAttribute('fill', 'none');
+                pathEl.setAttribute('stroke-linecap', 'round');
+                pathEl.style.pointerEvents = 'none'; /* Let hit path handle events */
+                
+                // Add hit path first (behind), then visible path (on top)
+                svgEl.appendChild(hitPathEl);
+                svgEl.appendChild(pathEl);
+                
+                // Calculate midpoint of bezier curve (t = 0.5)
+                const t = 0.5;
+                const midX = Math.pow(1 - t, 3) * start.x + 
+                           3 * Math.pow(1 - t, 2) * t * outEndX +
+                           3 * (1 - t) * Math.pow(t, 2) * inStartX +
+                           Math.pow(t, 3) * end.x;
+                const midY = Math.pow(1 - t, 3) * start.y + 
+                           3 * Math.pow(1 - t, 2) * t * outEndY +
+                           3 * (1 - t) * Math.pow(t, 2) * inStartY +
+                           Math.pow(t, 3) * end.y;
+                
+                // Create delete button - hidden by default
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'connection-delete';
+                deleteBtn.innerHTML = '×';
+                deleteBtn.type = 'button';
+                deleteBtn.style.cssText = `
+                    position: absolute;
+                    left: ${midX - 12}px;
+                    top: ${midY - 12}px;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background: var(--error-base);
+                    border: 2px solid var(--error-hover);
+                    color: var(--text-inverse);
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    display: none;
+                    z-index: 5;
+                    pointer-events: all;
+                    padding: 0;
+                    line-height: 1;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                deleteBtn.setAttribute('data-connection-id', connection.id);
+                
+                // Delete button click handler
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    deleteConnection(connection.id);
+                });
+                
+                // Show/hide delete button on line hover
+                let hideTimeout = null;
+                
+                hitPathEl.addEventListener('mouseenter', () => {
+                    if (hideTimeout) {
+                        clearTimeout(hideTimeout);
+                        hideTimeout = null;
+                    }
+                    deleteBtn.style.display = 'flex';
+                });
+                
+                hitPathEl.addEventListener('mouseleave', (e) => {
+                    if (e.relatedTarget === deleteBtn || deleteBtn.contains(e.relatedTarget)) {
+                        return;
+                    }
+                    hideTimeout = setTimeout(() => {
+                        deleteBtn.style.display = 'none';
+                    }, 200);
+                });
+                
+                // Keep button visible when hovering over it
+                deleteBtn.addEventListener('mouseenter', () => {
+                    if (hideTimeout) {
+                        clearTimeout(hideTimeout);
+                        hideTimeout = null;
+                    }
+                    deleteBtn.style.display = 'flex';
+                });
+                
+                deleteBtn.addEventListener('mouseleave', (e) => {
+                    if (e.relatedTarget === hitPathEl || e.relatedTarget === svgEl || svgEl.contains(e.relatedTarget)) {
+                        return;
+                    }
+                    hideTimeout = setTimeout(() => {
+                        deleteBtn.style.display = 'none';
+                    }, 200);
+                });
+                
+                connectionEl.appendChild(svgEl);
+                connectionEl.appendChild(deleteBtn);
+                
+                return connectionEl;
+            }
+            
+            static update(connection, element, isDragging = false) {
+                if (!element) return;
+                
+                const sourceBlock = blocks.get(connection.sourceBlockId);
+                const targetBlock = blocks.get(connection.targetBlockId);
+                
+                if (!sourceBlock || !targetBlock) return;
+                
+                const sourcePort = sourceBlock.outputPorts?.find(p => p.name === connection.sourcePortName);
+                const targetPort = targetBlock.inputPorts?.find(p => p.name === connection.targetPortName);
+                
+                if (!sourcePort || !targetPort) return;
+                
+                const start = getPortPosition(sourceBlock, sourcePort.name, 'output');
+                const end = getPortPosition(targetBlock, targetPort.name, 'input');
+                
+                if (!start || !end) return;
+                
+                const svgEl = element.querySelector('.connection-line');
+                const hitPathEl = svgEl?.querySelector('path[stroke="transparent"]');
+                const pathEl = svgEl?.querySelector('path:not([stroke="transparent"])');
+                const deleteBtn = element.querySelector('.connection-delete');
+                
+                if (!svgEl || !hitPathEl || !pathEl || !deleteBtn) return;
+                
+                // Recalculate smooth bezier curve path
+                const outputStraight = 60;
+                const inputStraight = 60;
+                const outEndX = start.x + outputStraight;
+                const outEndY = start.y;
+                const inStartX = end.x - inputStraight;
+                const inStartY = end.y;
+                const horizontalGap = inStartX - outEndX;
+                const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
+                
+                const cp1x = outEndX + curveDistance;
+                const cp1y = outEndY;
+                const cp2x = inStartX - curveDistance;
+                const cp2y = inStartY;
+                
+                // Calculate bounding box for SVG
+                const minX = Math.min(start.x, outEndX, inStartX, end.x) - 10;
+                const maxX = Math.max(start.x, outEndX, inStartX, end.x) + 10;
+                const minY = Math.min(start.y, outEndY, inStartY, end.y) - 10;
+                const maxY = Math.max(start.y, outEndY, inStartY, end.y) + 10;
+                const svgWidth = maxX - minX;
+                const svgHeight = maxY - minY;
+                
+                // Update SVG position and size
+                if (isDragging) {
+                    svgEl.style.transition = 'none';
+                } else {
+                    svgEl.style.transition = 'left 0.15s ease-out, top 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out';
+                }
+                
+                svgEl.style.left = `${minX}px`;
+                svgEl.style.top = `${minY}px`;
+                svgEl.setAttribute('width', svgWidth.toString());
+                svgEl.setAttribute('height', svgHeight.toString());
+                
+                // Update both paths
+                const pathData = `M ${start.x - minX} ${start.y - minY} L ${outEndX - minX} ${outEndY - minY} C ${cp1x - minX} ${cp1y - minY}, ${cp2x - minX} ${cp2y - minY}, ${inStartX - minX} ${inStartY - minY} L ${end.x - minX} ${end.y - minY}`;
+                hitPathEl.setAttribute('d', pathData);
+                pathEl.setAttribute('d', pathData);
+                
+                // Recalculate midpoint of bezier curve for delete button
+                const btnOutputStraight = 60;
+                const btnInputStraight = 60;
+                const btnOutEndX = start.x + btnOutputStraight;
+                const btnOutEndY = start.y;
+                const btnInStartX = end.x - btnInputStraight;
+                const btnInStartY = end.y;
+                
+                const btnT = 0.5;
+                const btnMidX = Math.pow(1 - btnT, 3) * start.x + 
+                               3 * Math.pow(1 - btnT, 2) * btnT * btnOutEndX +
+                               3 * (1 - btnT) * Math.pow(btnT, 2) * btnInStartX +
+                               Math.pow(btnT, 3) * end.x;
+                const btnMidY = Math.pow(1 - btnT, 3) * start.y + 
+                               3 * Math.pow(1 - btnT, 2) * btnT * btnOutEndY +
+                               3 * (1 - btnT) * Math.pow(btnT, 2) * btnInStartY +
+                               Math.pow(btnT, 3) * end.y;
+                
+                // Update delete button position
+                deleteBtn.style.left = `${btnMidX - 12}px`;
+                deleteBtn.style.top = `${btnMidY - 12}px`;
+            }
+        }
+        
+        // Helper to get port position
+        function getPortPosition(block, portName, portType) {
+            const blockEl = document.querySelector(`[data-block-id="${block.id}"]`);
+            if (!blockEl) return null;
+            
+            const portTab = blockEl.querySelector(`[data-port-type="${portType}"][data-port-name="${portName}"]`);
+            if (!portTab) return null;
+            
+            const rect = portTab.getBoundingClientRect();
+            const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
+            
+            return {
+                x: rect.left - wrapperRect.left + rect.width / 2,
+                y: rect.top - wrapperRect.top + rect.height / 2
+            };
+        }
+        
+        
+        // Block dragging handlers
+        function handleBlockMouseDown(e, blockId) {
+            e.stopPropagation();
+            const block = blocks.get(blockId);
+            if (!block) return;
+            
+            const blockEl = document.querySelector(`[data-block-id="${blockId}"]`);
+            if (!blockEl) return;
+            
+            const rect = blockEl.getBoundingClientRect();
+            const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
+            
+            isDragging = true;
+            draggedBlock = block;
+            dragOffset = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            
+            blockEl.classList.add('selected');
+        }
+        
+        function handleMouseMove(e) {
+            if (isPanning) {
+                const deltaX = e.clientX - panStart.x;
+                const deltaY = e.clientY - panStart.y;
+                panOffset.x += deltaX;
+                panOffset.y += deltaY;
+                panStart.x = e.clientX;
+                panStart.y = e.clientY;
+                
+                const canvasWrapper = document.querySelector('.canvas-wrapper');
+                canvasWrapper.style.transform = `translate(calc(-50% + ${panOffset.x}px), calc(-50% + ${panOffset.y}px))`;
+            } else if (isDragging && draggedBlock) {
+                const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
+                draggedBlock.position.x = e.clientX - wrapperRect.left - dragOffset.x;
+                draggedBlock.position.y = e.clientY - wrapperRect.top - dragOffset.y;
+                
+                const blockEl = document.querySelector(`[data-block-id="${draggedBlock.id}"]`);
+                if (blockEl) {
+                    HTMLBlockRenderer.update(draggedBlock, blockEl);
+                }
+                
+                updateConnectionsForBlock(draggedBlock.id, true);
+            } else if (isCreatingConnection && connectionStart) {
+                const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
+                const endX = e.clientX - wrapperRect.left;
+                const endY = e.clientY - wrapperRect.top;
+                updatePreviewConnection(endX, endY);
+            }
+        }
+        
+        function handleMouseUp(e) {
+            if (isPanning) {
+                isPanning = false;
+                const canvasWrapper = document.querySelector('.canvas-wrapper');
+                canvasWrapper.classList.remove('panning');
+            } else if (isDragging && draggedBlock) {
+                const blockEl = document.querySelector(`[data-block-id="${draggedBlock.id}"]`);
+                if (blockEl) {
+                    blockEl.classList.remove('selected');
+                }
+                isDragging = false;
+                draggedBlock = null;
+            }
+        }
+        
+        // Handle canvas panning
+        function handleCanvasMouseDown(e) {
+            // Only start panning if clicking on canvas background (not on blocks, ports, or connections)
+            const target = e.target;
+            if (target.closest('.workflow-block') || 
+                target.closest('.port-tab') || 
+                target.closest('.connection-line') ||
+                target.closest('.connection-delete')) {
+                return;
+            }
+            
+            // Left-click (button 0) on empty canvas for panning
+            if (e.button === 0) {
+                e.preventDefault();
+                isPanning = true;
+                panStart.x = e.clientX;
+                panStart.y = e.clientY;
+                const canvasWrapper = document.querySelector('.canvas-wrapper');
+                canvasWrapper.classList.add('panning');
+            }
+        }
+        
+        // Update connections when block moves
+        function updateConnectionsForBlock(blockId, isDragging = false) {
+            connections.forEach((connection, connectionId) => {
+                if (connection.sourceBlockId === blockId || connection.targetBlockId === blockId) {
+                    const connectionEl = document.querySelector(`[data-connection-id="${connectionId}"]`);
+                    if (connectionEl) {
+                        HTMLConnectionRenderer.update(connection, connectionEl, isDragging);
+                    } else {
+                        const newEl = HTMLConnectionRenderer.render(connection);
+                        if (newEl) {
+                            // Insert connections at the beginning so blocks appear on top
+                            const firstBlock = canvasLayer.querySelector('.workflow-block');
+                            if (firstBlock) {
+                                canvasLayer.insertBefore(newEl, firstBlock);
+                            } else {
+                                canvasLayer.appendChild(newEl);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Handle port mouse down (start connection)
+        function handlePortMouseDown(e, blockId, portName, portType) {
+            e.stopPropagation();
+            
+            if (portType !== 'output') return;
+            
+            const block = blocks.get(blockId);
+            if (!block) return;
+            
+            const start = getPortPosition(block, portName, portType);
+            if (!start) return;
+            
+            isCreatingConnection = true;
+            connectionStart = {
+                blockId: blockId,
+                portName: portName,
+                portType: portType,
+                x: start.x,
+                y: start.y
+            };
+            
+            previewConnection = document.createElement('div');
+            previewConnection.className = 'html-connection';
+            previewConnection.style.pointerEvents = 'none';
+            previewConnection.style.opacity = '0.6';
+            // Insert preview at the beginning so blocks appear on top
+            const firstBlock = canvasLayer.querySelector('.workflow-block');
+            if (firstBlock) {
+                canvasLayer.insertBefore(previewConnection, firstBlock);
+            } else {
+                canvasLayer.appendChild(previewConnection);
+            }
+        }
+        
+        // Handle port mouse up (complete connection)
+        function handlePortMouseUp(e, blockId, portName, portType) {
+            e.stopPropagation();
+            
+            if (!isCreatingConnection || !connectionStart) return;
+            if (portType !== 'input') {
+                cancelConnection();
+                return;
+            }
+            
+            const sourceBlock = blocks.get(connectionStart.blockId);
+            const targetBlock = blocks.get(blockId);
+            
+            if (!sourceBlock || !targetBlock || sourceBlock.id === targetBlock.id) {
+                cancelConnection();
+                return;
+            }
+            
+            const targetPort = targetBlock.inputPorts?.find(p => p.name === portName);
+            if (!targetPort) {
+                cancelConnection();
+                return;
+            }
+            
+            connectionCounter++;
+            const connection = {
+                id: `connection-${connectionCounter}`,
+                sourceBlockId: sourceBlock.id,
+                targetBlockId: targetBlock.id,
+                sourcePortName: connectionStart.portName,
+                targetPortName: portName
+            };
+            
+            connections.set(connection.id, connection);
+            const connectionEl = HTMLConnectionRenderer.render(connection);
+            if (connectionEl) {
+                // Insert connections at the beginning so blocks appear on top
+                const firstBlock = canvasLayer.querySelector('.workflow-block');
+                if (firstBlock) {
+                    canvasLayer.insertBefore(connectionEl, firstBlock);
+                } else {
+                    canvasLayer.appendChild(connectionEl);
+                }
+            }
+            
+            cancelConnection();
+            updateInfo();
+        }
+        
+        function updatePreviewConnection(endX, endY) {
+            if (!previewConnection || !connectionStart) return;
+            
+            previewConnection.innerHTML = '';
+            const segments = connectionPathToHTMLSegments(
+                connectionStart.x, connectionStart.y,
+                endX, endY,
+                15
+            );
+            
+            segments.forEach(segment => {
+                const segmentEl = document.createElement('div');
+                segmentEl.className = 'connection-segment temp-segment';
+                segmentEl.style.cssText = `
+                    position: absolute;
+                    background-color: transparent;
+                    left: ${segment.x}px;
+                    top: ${segment.y}px;
+                    width: ${segment.width}px;
+                    height: 3px;
+                    transform-origin: 0 50%;
+                    transform: rotate(${segment.angle}deg);
+                    border-top: 3px dashed var(--accent-primary);
+                    border-radius: 0;
+                    transition: left 0.05s linear, top 0.05s linear, transform 0.05s linear, width 0.05s linear;
+                    opacity: 0.7;
+                `;
+                previewConnection.appendChild(segmentEl);
+            });
+        }
+        
+        function cancelConnection() {
+            isCreatingConnection = false;
+            connectionStart = null;
+            if (previewConnection) {
+                previewConnection.remove();
+                previewConnection = null;
+            }
+        }
+        
+        // Delete connection
+        function deleteConnection(connectionId) {
+            connections.delete(connectionId);
+            const connectionEl = document.querySelector(`[data-connection-id="${connectionId}"]`);
+            if (connectionEl) {
+                connectionEl.remove();
+            }
+            updateInfo();
+        }
+        
+        // Clear canvas
+        window.clearCanvas = function() {
+            blocks.clear();
+            connections.clear();
+            canvasLayer.innerHTML = ''; // Clear combined layer
+            blockCounter = 0;
+            connectionCounter = 0;
+            updateInfo();
+        };
+        
+        // Update info panel
+        function updateInfo() {
+            document.getElementById('block-count').textContent = blocks.size;
+            document.getElementById('connection-count').textContent = connections.size;
+        }
+        
+        // Add random block
+        window.addRandomBlock = function() {
+            blockCounter++;
+            const types = Object.values(BlockType);
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            const fields = [
+                { name: 'name', label: 'Name', type: 'text', placeholder: 'Enter name', value: '' },
+                { name: 'type', label: 'Type', type: 'select', options: ['Option 1', 'Option 2', 'Option 3'], value: 'Option 1' },
+                { name: 'status', label: 'Status', type: 'select', options: [
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                    { value: 'pending', label: 'Pending' }
+                ], value: 'active' }
+            ];
+            
+            const canvasWrapper = document.querySelector('.canvas-wrapper');
+            const wrapperRect = canvasWrapper.getBoundingClientRect();
+            const centerX = wrapperRect.width / 2;
+            const centerY = wrapperRect.height / 2;
+            
+            const fieldsHeight = fields.length * 35 + 10;
+            const maxInputPorts = 2;
+            const maxOutputPorts = 1;
+            const maxPorts = Math.max(maxInputPorts, maxOutputPorts);
+            const portsHeight = maxPorts > 0 ? (maxPorts - 1) * 30 + 20 : 0;
+            const portStartY = 50 + fieldsHeight;
+            const height = Math.max(150, portStartY + portsHeight);
+            
+            const block = {
+                id: `block-${blockCounter}`,
+                type: type,
+                name: `${type} Block ${blockCounter}`,
+                position: {
+                    x: centerX - 100 + (Math.random() * 200 - 100),
+                    y: centerY - 100 + (Math.random() * 200 - 100)
+                },
+                width: 200,
+                height: height,
+                selected: false,
+                inputPorts: [
+                    { name: 'input1', type: 'any' },
+                    { name: 'input2', type: 'any' }
+                ],
+                outputPorts: [
+                    { name: 'output1', type: 'any' }
+                ],
+                fields: fields,
+                fieldValues: {}
+            };
+            
+            blocks.set(block.id, block);
+            const blockElement = HTMLBlockRenderer.render(block);
+            // Attach drag handler to header (since block has pointer-events: none)
+            const header = blockElement.querySelector('.block-header');
+            if (header) {
+                header.addEventListener('mousedown', (e) => handleBlockMouseDown(e, block.id));
+            }
+            // Add block to canvas layer (after connections, so blocks appear on top)
+            canvasLayer.appendChild(blockElement);
+            
+            updateInfo();
+        };
+        
+        // Add random connection
+        window.addRandomConnection = function() {
+            if (blocks.size < 2) {
+                alert('Need at least 2 blocks to create a connection');
+                return;
+            }
+            
+            const blockArray = Array.from(blocks.values());
+            const sourceBlock = blockArray[Math.floor(Math.random() * blockArray.length)];
+            const targetBlock = blockArray[Math.floor(Math.random() * blockArray.length)];
+            
+            if (sourceBlock.id === targetBlock.id) return;
+            if (!sourceBlock.outputPorts || sourceBlock.outputPorts.length === 0) return;
+            if (!targetBlock.inputPorts || targetBlock.inputPorts.length === 0) return;
+            
+            connectionCounter++;
+            const connection = {
+                id: `connection-${connectionCounter}`,
+                sourceBlockId: sourceBlock.id,
+                targetBlockId: targetBlock.id,
+                sourcePortName: sourceBlock.outputPorts[0].name,
+                targetPortName: targetBlock.inputPorts[0].name
+            };
+            
+            connections.set(connection.id, connection);
+            const connectionElement = HTMLConnectionRenderer.render(connection);
+            if (connectionElement) {
+                // Insert connections at the beginning so blocks appear on top
+                const firstBlock = canvasLayer.querySelector('.workflow-block');
+                if (firstBlock) {
+                    canvasLayer.insertBefore(connectionElement, firstBlock);
+                } else {
+                    canvasLayer.appendChild(connectionElement);
+                }
+            }
+            
+            updateInfo();
+        };
+        
+        // Event listeners
+        const canvasWrapper = document.querySelector('.canvas-wrapper');
+        canvasWrapper.addEventListener('mousedown', handleCanvasMouseDown);
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        
+        // Prevent text selection while panning
+        canvasWrapper.addEventListener('selectstart', (e) => {
+            if (isPanning) {
+                e.preventDefault();
+            }
+        });
+        
+        // Add some initial blocks for demo
+        setTimeout(() => {
+            addRandomBlock();
+            addRandomBlock();
+            addRandomBlock();
+            setTimeout(() => {
+                addRandomConnection();
+                addRandomConnection();
+            }, 100);
+        }, 100);
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SiyeFlow SVG Canvas Debug</title>
+    <link rel="stylesheet" href="src/styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-base);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        .debug-header {
+            padding: 16px;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .debug-title {
+            color: var(--text-primary);
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .debug-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            background: var(--accent-primary);
+            color: var(--text-inverse);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: var(--accent-primary-light);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border-default);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--bg-overlay);
+        }
+        
+        .canvas-container {
+            width: 100vw;
+            height: calc(100vh - 60px);
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-base);
+        }
+        
+        #svg-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none !important; /* Prevent browser default pinch-to-zoom */
+            -ms-touch-action: none !important;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            cursor: grab;
+            /* Performance optimizations */
+            will-change: transform;
+            contain: layout style paint;
+        }
+        
+        #svg-canvas.panning {
+            cursor: grabbing;
+        }
+        
+        body {
+            touch-action: none;
+            -ms-touch-action: none;
+        }
+        
+        /* SVG element classes for better CSS styling */
+        .svg-block {
+            cursor: move;
+        }
+        
+        .svg-block-rect {
+            transition: stroke-width 0.15s ease, opacity 0.15s ease;
+        }
+        
+        .svg-block-header {
+            transition: fill 0.15s ease;
+        }
+        
+        .svg-block-title {
+            pointer-events: none;
+            user-select: none;
+        }
+        
+        .svg-port-circle {
+            transition: fill 0.2s ease, r 0.15s ease;
+        }
+        
+        .svg-port-circle:hover {
+            r: 8;
+        }
+        
+        .svg-port-label {
+            pointer-events: none;
+            user-select: none;
+        }
+        
+        .svg-connection-path {
+            transition: stroke-width 0.15s ease, opacity 0.15s ease;
+        }
+        
+        .svg-connection-path:hover {
+            stroke-width: 3;
+        }
+        
+        /* ForeignObject fallback styling */
+        .svg-field-input,
+        .svg-field-select {
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        
+        /* Accessibility improvements */
+        .svg-block[aria-selected="true"] .svg-block-rect {
+            stroke-width: 3;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            max-width: 250px;
+            z-index: 100;
+        }
+        
+        .info-item {
+            margin-bottom: 8px;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-right: 8px;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="debug-header">
+        <h1 class="debug-title">🔍 SVG Canvas Debug - Blocks & Connections</h1>
+        <div class="debug-controls">
+            <button class="btn" onclick="addRandomBlock()">Add Block</button>
+            <button class="btn" onclick="addRandomConnection()">Add Connection</button>
+            <button class="btn btn-secondary" onclick="clearCanvas()">Clear</button>
+        </div>
+    </div>
+    
+        <div class="canvas-container">
+        <svg id="svg-canvas" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                    <polygon points="0 0, 10 3, 0 6" fill="var(--accent-primary)" />
+                </marker>
+            </defs>
+            <g id="connections-layer"></g>
+            <g id="blocks-layer"></g>
+        </svg>
+        
+        <div class="info-panel">
+            <div class="info-item">
+                <span class="info-label">Blocks:</span>
+                <span id="block-count">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Connections:</span>
+                <span id="connection-count">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Zoom:</span>
+                <span id="zoom-level">100%</span>
+            </div>
+        </div>
+        
+    </div>
+    
+    <script type="module">
+        import { BlockType } from './src/models/workflow-models.ts';
+        import { connectionPathToSVG } from './src/utils/edge-algorithms/connection-path.ts';
+        
+        // Initialize theme
+        if (typeof document !== 'undefined') {
+            const theme = localStorage.getItem('siyeflow-theme') || 'light';
+            document.body.setAttribute('data-theme', theme);
+        }
+        
+        const svgCanvas = document.getElementById('svg-canvas');
+        const blocksLayer = document.getElementById('blocks-layer');
+        const connectionsLayer = document.getElementById('connections-layer');
+        
+        let blocks = new Map();
+        let connections = new Map();
+        let blockCounter = 0;
+        let connectionCounter = 0;
+        
+        // Performance optimizations
+        const blockCache = new Map(); // Cache block elements
+        const connectionCache = new Map(); // Cache connection elements
+        const eventListeners = new WeakMap(); // Track event listeners for cleanup
+        let renderScheduled = false;
+        let pendingUpdates = new Set();
+        const MAX_CACHE_SIZE = 500; // Limit cache size to prevent memory issues
+        
+        // Throttle function for performance
+        function throttle(func, limit) {
+            let inThrottle;
+            return function(...args) {
+                if (!inThrottle) {
+                    func.apply(this, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            };
+        }
+        
+        // Debounce function for performance
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+        
+        // Feature detection for ForeignObject compatibility
+        const supportsForeignObject = (() => {
+            try {
+                const testSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                const testFO = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+                testSVG.appendChild(testFO);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        })();
+        
+        // Element pool for reuse (memory optimization) - actually used now
+        const elementPool = {
+            rects: [],
+            circles: [],
+            texts: [],
+            paths: [],
+            maxSize: 100, // Limit pool size
+            getRect: () => {
+                const rect = elementPool.rects.pop();
+                if (rect) {
+                    // Clear all attributes
+                    while (rect.attributes.length > 0) {
+                        rect.removeAttribute(rect.attributes[0].name);
+                    }
+                    return rect;
+                }
+                return document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            },
+            getCircle: () => {
+                const circle = elementPool.circles.pop();
+                if (circle) {
+                    while (circle.attributes.length > 0) {
+                        circle.removeAttribute(circle.attributes[0].name);
+                    }
+                    return circle;
+                }
+                return document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            },
+            getText: () => {
+                const text = elementPool.texts.pop();
+                if (text) {
+                    text.textContent = '';
+                    while (text.attributes.length > 0) {
+                        text.removeAttribute(text.attributes[0].name);
+                    }
+                    return text;
+                }
+                return document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            },
+            getPath: () => {
+                const path = elementPool.paths.pop();
+                if (path) {
+                    while (path.attributes.length > 0) {
+                        path.removeAttribute(path.attributes[0].name);
+                    }
+                    return path;
+                }
+                return document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            },
+            release: (element) => {
+                if (!element) return;
+                // Remove all children
+                while (element.firstChild) {
+                    element.removeChild(element.firstChild);
+                }
+                // Remove all event listeners
+                const listeners = eventListeners.get(element);
+                if (listeners) {
+                    listeners.forEach(({ event, handler }) => {
+                        element.removeEventListener(event, handler);
+                    });
+                    eventListeners.delete(element);
+                }
+                // Return to pool if under limit
+                const tagName = element.tagName?.toLowerCase();
+                if (tagName === 'rect' && elementPool.rects.length < elementPool.maxSize) {
+                    elementPool.rects.push(element);
+                } else if (tagName === 'circle' && elementPool.circles.length < elementPool.maxSize) {
+                    elementPool.circles.push(element);
+                } else if (tagName === 'text' && elementPool.texts.length < elementPool.maxSize) {
+                    elementPool.texts.push(element);
+                } else if (tagName === 'path' && elementPool.paths.length < elementPool.maxSize) {
+                    elementPool.paths.push(element);
+                }
+            }
+        };
+        
+        // Helper to track event listeners for cleanup
+        function addEventListenerWithCleanup(element, event, handler) {
+            element.addEventListener(event, handler);
+            if (!eventListeners.has(element)) {
+                eventListeners.set(element, []);
+            }
+            eventListeners.get(element).push({ event, handler });
+        }
+        
+        // Batch render updates using requestAnimationFrame
+        function scheduleRender(blockId) {
+            pendingUpdates.add(blockId);
+            if (!renderScheduled) {
+                renderScheduled = true;
+                requestAnimationFrame(() => {
+                    renderScheduled = false;
+                    pendingUpdates.forEach(id => {
+                        const block = blocks.get(id);
+                        if (block) {
+                            updateBlockElement(block);
+                        }
+                    });
+                    pendingUpdates.clear();
+                });
+            }
+        }
+        
+        // Drag state
+        let isDragging = false;
+        let draggedBlock = null;
+        let dragOffset = { x: 0, y: 0 };
+        
+        // Connection creation state
+        let isCreatingConnection = false;
+        let connectionStart = null; // { blockId, portName, portType, x, y }
+        let previewConnectionPath = null;
+        
+        // Pan state
+        let isPanning = false;
+        let panStart = { x: 0, y: 0 };
+        
+        // Block colors
+        const blockColors = {
+            [BlockType.Start]: '#4CAF50',
+            [BlockType.End]: '#f44336',
+            [BlockType.HttpRequest]: '#2196F3',
+            [BlockType.Variable]: '#FF9800',
+            [BlockType.Condition]: '#9C27B0',
+            [BlockType.Delay]: '#00BCD4',
+            [BlockType.Log]: '#607D8B'
+        };
+        
+        // SVG Block Renderer with optimizations
+        class SVGBlockRenderer {
+            static render(block) {
+                // Check cache first
+                const cached = blockCache.get(block.id);
+                if (cached && cached.parentElement) {
+                    return cached;
+                }
+                
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('data-block-id', block.id);
+                g.setAttribute('class', 'svg-block');
+                g.setAttribute('role', 'button');
+                g.setAttribute('aria-label', `${block.name || block.type} block`);
+                g.setAttribute('aria-selected', block.selected ? 'true' : 'false');
+                g.setAttribute('tabindex', '0');
+                g.setAttribute('transform', `translate(${block.position.x}, ${block.position.y})`);
+                
+                // Block rectangle (reuse from pool)
+                const rect = elementPool.getRect();
+                rect.setAttribute('class', 'svg-block-rect');
+                rect.setAttribute('width', block.width);
+                rect.setAttribute('height', block.height);
+                rect.setAttribute('rx', '8');
+                rect.setAttribute('fill', blockColors[block.type] || '#666');
+                rect.setAttribute('stroke', '#fff');
+                rect.setAttribute('stroke-width', block.selected ? '3' : '2');
+                rect.setAttribute('opacity', '0.9');
+                g.appendChild(rect);
+                
+                // Block header
+                const headerRect = elementPool.getRect();
+                headerRect.setAttribute('class', 'svg-block-header');
+                headerRect.setAttribute('width', block.width);
+                headerRect.setAttribute('height', '40');
+                headerRect.setAttribute('rx', '8');
+                headerRect.setAttribute('fill', 'rgba(0, 0, 0, 0.2)');
+                g.appendChild(headerRect);
+                
+                // Block title
+                const title = elementPool.getText();
+                title.setAttribute('class', 'svg-block-title');
+                title.setAttribute('x', block.width / 2);
+                title.setAttribute('y', '25');
+                title.setAttribute('text-anchor', 'middle');
+                title.setAttribute('fill', '#fff');
+                title.setAttribute('font-size', '14');
+                title.setAttribute('font-weight', '600');
+                title.textContent = block.name || block.type;
+                g.appendChild(title);
+                
+                // Add form fields (text inputs and dropdowns)
+                if (block.fields && block.fields.length > 0) {
+                    block.fields.forEach((field, index) => {
+                        const fieldY = 50 + (index * 35);
+                        
+                        // Field label
+                        const label = elementPool.getText();
+                        label.setAttribute('x', '10');
+                        label.setAttribute('y', fieldY - 5);
+                        label.setAttribute('fill', '#fff');
+                        label.setAttribute('font-size', '11');
+                        label.setAttribute('opacity', '0.9');
+                        label.textContent = field.label || field.name;
+                        g.appendChild(label);
+                        
+                        // Create foreignObject for HTML input/select (with fallback)
+                        if (!supportsForeignObject) {
+                            // Fallback: Use SVG text input simulation
+                            const textInput = elementPool.getText();
+                            textInput.setAttribute('x', '10');
+                            textInput.setAttribute('y', fieldY + 15);
+                            textInput.setAttribute('fill', '#fff');
+                            textInput.setAttribute('font-size', '11');
+                            textInput.textContent = field.value || field.placeholder || '';
+                            textInput.setAttribute('opacity', field.value ? '1' : '0.5');
+                            g.appendChild(textInput);
+                        } else {
+                        
+                        const foreignObject = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+                        foreignObject.setAttribute('x', '10');
+                        foreignObject.setAttribute('y', fieldY);
+                        foreignObject.setAttribute('width', block.width - 20);
+                        foreignObject.setAttribute('height', '24');
+                        
+                        if (field.type === 'select' || field.type === 'dropdown') {
+                            // Dropdown select
+                            const select = document.createElement('select');
+                            select.className = 'svg-field-select';
+                            select.setAttribute('aria-label', field.label || field.name);
+                            select.style.cssText = `
+                                width: 100%;
+                                height: 24px;
+                                padding: 2px 6px;
+                                border: 1px solid rgba(255, 255, 255, 0.3);
+                                border-radius: 4px;
+                                background: rgba(255, 255, 255, 0.1);
+                                color: #fff;
+                                font-size: 11px;
+                                outline: none;
+                                cursor: pointer;
+                            `;
+                            select.addEventListener('mouseenter', () => {
+                                select.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                                select.style.background = 'rgba(255, 255, 255, 0.15)';
+                            });
+                            select.addEventListener('mouseleave', () => {
+                                select.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                                select.style.background = 'rgba(255, 255, 255, 0.1)';
+                            });
+                            select.setAttribute('data-field-name', field.name);
+                            select.setAttribute('data-block-id', block.id);
+                            
+                            // Add options
+                            const options = field.options || [];
+                            options.forEach(option => {
+                                const optionEl = document.createElement('option');
+                                optionEl.value = typeof option === 'string' ? option : option.value;
+                                optionEl.textContent = typeof option === 'string' ? option : option.label;
+                                optionEl.style.cssText = 'background: #1a1a1a; color: #fff;';
+                                if (field.value === optionEl.value) {
+                                    optionEl.selected = true;
+                                }
+                                select.appendChild(optionEl);
+                            });
+                            
+                            // Change handler
+                            const selectChangeHandler = (e) => {
+                                if (!block.fieldValues) block.fieldValues = {};
+                                block.fieldValues[field.name] = e.target.value;
+                                console.log(`Block ${block.id} - ${field.name}: ${e.target.value}`);
+                            };
+                            addEventListenerWithCleanup(select, 'change', selectChangeHandler);
+                            
+                            // Prevent dragging when interacting with select
+                            const selectStopPropagation = (e) => e.stopPropagation();
+                            addEventListenerWithCleanup(select, 'mousedown', selectStopPropagation);
+                            addEventListenerWithCleanup(select, 'mousemove', selectStopPropagation);
+                            
+                            foreignObject.appendChild(select);
+                        } else {
+                            // Text input
+                            const input = document.createElement('input');
+                            input.className = 'svg-field-input';
+                            input.type = field.type || 'text';
+                            input.placeholder = field.placeholder || '';
+                            input.value = field.value || '';
+                            input.setAttribute('aria-label', field.label || field.name);
+                            input.style.cssText = `
+                                width: 100%;
+                                height: 20px;
+                                padding: 2px 6px;
+                                border: 1px solid rgba(255, 255, 255, 0.3);
+                                border-radius: 4px;
+                                background: rgba(255, 255, 255, 0.1);
+                                color: #fff;
+                                font-size: 11px;
+                                outline: none;
+                                cursor: text;
+                            `;
+                            const inputFocusHandler = () => {
+                                input.style.borderColor = 'rgba(52, 152, 219, 0.8)';
+                                input.style.background = 'rgba(255, 255, 255, 0.15)';
+                            };
+                            const inputBlurHandler = () => {
+                                input.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                                input.style.background = 'rgba(255, 255, 255, 0.1)';
+                            };
+                            const inputMouseEnterHandler = () => {
+                                if (document.activeElement !== input) {
+                                    input.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                                    input.style.background = 'rgba(255, 255, 255, 0.12)';
+                                }
+                            };
+                            const inputMouseLeaveHandler = () => {
+                                if (document.activeElement !== input) {
+                                    input.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                                    input.style.background = 'rgba(255, 255, 255, 0.1)';
+                                }
+                            };
+                            const inputInputHandler = (e) => {
+                                if (!block.fieldValues) block.fieldValues = {};
+                                block.fieldValues[field.name] = e.target.value;
+                            };
+                            const inputBlurLogHandler = (e) => {
+                                console.log(`Block ${block.id} - ${field.name}: ${e.target.value}`);
+                            };
+                            const inputStopPropagation = (e) => e.stopPropagation();
+                            
+                            addEventListenerWithCleanup(input, 'focus', inputFocusHandler);
+                            addEventListenerWithCleanup(input, 'blur', inputBlurHandler);
+                            addEventListenerWithCleanup(input, 'mouseenter', inputMouseEnterHandler);
+                            addEventListenerWithCleanup(input, 'mouseleave', inputMouseLeaveHandler);
+                            addEventListenerWithCleanup(input, 'input', inputInputHandler);
+                            addEventListenerWithCleanup(input, 'blur', inputBlurLogHandler);
+                            addEventListenerWithCleanup(input, 'mousedown', inputStopPropagation);
+                            addEventListenerWithCleanup(input, 'mousemove', inputStopPropagation);
+                            
+                            input.setAttribute('data-field-name', field.name);
+                            input.setAttribute('data-block-id', block.id);
+                            
+                            // Placeholder styling
+                            input.style.setProperty('::placeholder', 'color: rgba(255, 255, 255, 0.5)');
+                            
+                            foreignObject.appendChild(input);
+                        }
+                        
+                        g.appendChild(foreignObject);
+                        }
+                    });
+                }
+                
+                // Calculate port start Y based on fields
+                const fieldsHeight = block.fields && block.fields.length > 0 ? block.fields.length * 35 + 10 : 0;
+                const portStartY = 50 + fieldsHeight;
+                
+                // Input ports
+                if (block.inputPorts) {
+                    block.inputPorts.forEach((port, index) => {
+                        const portY = portStartY + (index * 30);
+                        const portCircle = elementPool.getCircle();
+                        portCircle.setAttribute('class', 'svg-port-circle');
+                        portCircle.setAttribute('cx', '7'); // Center at 7 so left edge touches x=0 (radius 7)
+                        portCircle.setAttribute('cy', portY);
+                        portCircle.setAttribute('r', '7');
+                        portCircle.setAttribute('fill', '#3498db');
+                        portCircle.setAttribute('stroke', '#fff');
+                        portCircle.setAttribute('stroke-width', '2');
+                        portCircle.setAttribute('data-port-type', 'input');
+                        portCircle.setAttribute('data-port-name', port.name);
+                        portCircle.setAttribute('role', 'button');
+                        portCircle.setAttribute('aria-label', `Input port ${port.name}`);
+                        portCircle.setAttribute('tabindex', '0');
+                        // Use tracked event listener for cleanup
+                        const inputPortHandler = (e) => handlePortMouseUp(e, block.id, port.name, 'input');
+                        addEventListenerWithCleanup(portCircle, 'mouseup', inputPortHandler);
+                        // Keyboard support
+                        addEventListenerWithCleanup(portCircle, 'keydown', (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handlePortMouseUp(e, block.id, port.name, 'input');
+                            }
+                        });
+                        g.appendChild(portCircle);
+                        
+                        // Port label
+                        const portLabel = elementPool.getText();
+                        portLabel.setAttribute('class', 'svg-port-label');
+                        portLabel.setAttribute('x', '12');
+                        portLabel.setAttribute('y', portY + 4);
+                        portLabel.setAttribute('fill', '#fff');
+                        portLabel.setAttribute('font-size', '11');
+                        portLabel.textContent = port.name;
+                        g.appendChild(portLabel);
+                    });
+                }
+                
+                // Output ports
+                if (block.outputPorts) {
+                    block.outputPorts.forEach((port, index) => {
+                        const portY = portStartY + (index * 30);
+                        const portCircle = elementPool.getCircle();
+                        portCircle.setAttribute('class', 'svg-port-circle');
+                        portCircle.setAttribute('cx', block.width - 7); // Center at width-7 so right edge touches x=width (radius 7)
+                        portCircle.setAttribute('cy', portY);
+                        portCircle.setAttribute('r', '7');
+                        portCircle.setAttribute('fill', '#3498db');
+                        portCircle.setAttribute('stroke', '#fff');
+                        portCircle.setAttribute('stroke-width', '2');
+                        portCircle.setAttribute('data-port-type', 'output');
+                        portCircle.setAttribute('data-port-name', port.name);
+                        portCircle.setAttribute('role', 'button');
+                        portCircle.setAttribute('aria-label', `Output port ${port.name}`);
+                        portCircle.setAttribute('tabindex', '0');
+                        const outputPortHandler = (e) => handlePortMouseDown(e, block.id, port.name, 'output');
+                        addEventListenerWithCleanup(portCircle, 'mousedown', outputPortHandler);
+                        // Keyboard support
+                        addEventListenerWithCleanup(portCircle, 'keydown', (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handlePortMouseDown(e, block.id, port.name, 'output');
+                            }
+                        });
+                        g.appendChild(portCircle);
+                        
+                        // Port label
+                        const portLabel = elementPool.getText();
+                        portLabel.setAttribute('class', 'svg-port-label');
+                        portLabel.setAttribute('x', block.width - 12);
+                        portLabel.setAttribute('y', portY + 4);
+                        portLabel.setAttribute('text-anchor', 'end');
+                        portLabel.setAttribute('fill', '#fff');
+                        portLabel.setAttribute('font-size', '11');
+                        portLabel.textContent = port.name;
+                        g.appendChild(portLabel);
+                    });
+                }
+                
+                // Cache the element
+                blockCache.set(block.id, g);
+                return g;
+            }
+            
+            // Update existing block element (performance optimization)
+            static update(block, element) {
+                if (!element) return;
+                
+                try {
+                    // Update transform (use CSS transform if possible for better performance)
+                    // For SVG, we still need transform attribute, but optimize the string
+                    const transformStr = `translate(${block.position.x},${block.position.y})`;
+                    if (element.getAttribute('transform') !== transformStr) {
+                        element.setAttribute('transform', transformStr);
+                    }
+                    element.setAttribute('aria-selected', block.selected ? 'true' : 'false');
+                    
+                    // Update rect
+                    const rect = element.querySelector('.svg-block-rect');
+                    if (rect) {
+                        const newStrokeWidth = block.selected ? '3' : '2';
+                        if (rect.getAttribute('stroke-width') !== newStrokeWidth) {
+                            rect.setAttribute('stroke-width', newStrokeWidth);
+                        }
+                    }
+                    
+                    // Update title if changed
+                    const title = element.querySelector('.svg-block-title');
+                    if (title && title.textContent !== (block.name || block.type)) {
+                        title.textContent = block.name || block.type;
+                    }
+                } catch (error) {
+                    console.error(`Error updating block ${block.id}:`, error);
+                }
+            }
+        }
+        
+        // Helper to update block element efficiently
+        function updateBlockElement(block) {
+            const element = blockCache.get(block.id);
+            if (element) {
+                SVGBlockRenderer.update(block, element);
+            }
+        }
+        
+        // SVG Connection Renderer with optimizations
+        class SVGConnectionRenderer {
+            static render(connection) {
+                try {
+                    // Check cache first
+                    const cached = connectionCache.get(connection.id);
+                    if (cached && cached.parentElement) {
+                        return cached;
+                    }
+                    
+                    // Limit cache size
+                    if (connectionCache.size >= MAX_CACHE_SIZE) {
+                        const firstKey = connectionCache.keys().next().value;
+                        const oldElement = connectionCache.get(firstKey);
+                        if (oldElement) {
+                            const children = Array.from(oldElement.children);
+                            children.forEach(child => elementPool.release(child));
+                            const listeners = eventListeners.get(oldElement);
+                            if (listeners) {
+                                listeners.forEach(({ event, handler }) => {
+                                    oldElement.removeEventListener(event, handler);
+                                });
+                                eventListeners.delete(oldElement);
+                            }
+                            if (oldElement.parentElement) {
+                                oldElement.remove();
+                            }
+                            connectionCache.delete(firstKey);
+                        }
+                    }
+                    
+                    const sourceBlock = blocks.get(connection.sourceBlockId);
+                    const targetBlock = blocks.get(connection.targetBlockId);
+                    
+                    if (!sourceBlock || !targetBlock) {
+                        console.warn(`Connection ${connection.id} references missing blocks`);
+                        return null;
+                    }
+                
+                // Get port positions
+                const sourcePort = sourceBlock.outputPorts?.find(p => p.name === connection.sourcePortName);
+                const targetPort = targetBlock.inputPorts?.find(p => p.name === connection.targetPortName);
+                
+                if (!sourcePort || !targetPort) return null;
+                
+                const sourcePortIndex = sourceBlock.outputPorts.indexOf(sourcePort);
+                const targetPortIndex = targetBlock.inputPorts.indexOf(targetPort);
+                
+                // Calculate port positions accounting for fields
+                const sourceFieldsHeight = sourceBlock.fields && sourceBlock.fields.length > 0 ? sourceBlock.fields.length * 35 + 10 : 0;
+                const targetFieldsHeight = targetBlock.fields && targetBlock.fields.length > 0 ? targetBlock.fields.length * 35 + 10 : 0;
+                const sourcePortStartY = 50 + sourceFieldsHeight;
+                const targetPortStartY = 50 + targetFieldsHeight;
+                
+                // Port centers: input at x+7, output at x+width-7 (radius 7, edge touches border)
+                const startX = sourceBlock.position.x + sourceBlock.width - 7; // Output port center
+                const startY = sourceBlock.position.y + sourcePortStartY + (sourcePortIndex * 30);
+                const endX = targetBlock.position.x + 7; // Input port center
+                const endY = targetBlock.position.y + targetPortStartY + (targetPortIndex * 30);
+                
+                // Create path using connection path algorithm
+                const path = connectionPathToSVG(startX, startY, endX, endY);
+                
+                // Calculate actual midpoint along the curved path
+                function getPathMidpoint(pathString) {
+                    // Parse the path to get control points
+                    const outputStraight = 60;
+                    const inputStraight = 60;
+                    const outEndX = startX + outputStraight;
+                    const outEndY = startY;
+                    const inStartX = endX - inputStraight;
+                    const inStartY = endY;
+                    const horizontalGap = inStartX - outEndX;
+                    const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
+                    const cp1x = outEndX + curveDistance;
+                    const cp1y = outEndY;
+                    const cp2x = inStartX - curveDistance;
+                    const cp2y = inStartY;
+                    
+                    // Calculate midpoint at t=0.5 using cubic bezier formula
+                    const t = 0.5;
+                    const midX = Math.pow(1 - t, 3) * outEndX + 
+                                3 * Math.pow(1 - t, 2) * t * cp1x +
+                                3 * (1 - t) * Math.pow(t, 2) * cp2x +
+                                Math.pow(t, 3) * inStartX;
+                    const midY = Math.pow(1 - t, 3) * outEndY +
+                                3 * Math.pow(1 - t, 2) * t * cp1y +
+                                3 * (1 - t) * Math.pow(t, 2) * cp2y +
+                                Math.pow(t, 3) * inStartY;
+                    
+                    return { x: midX, y: midY };
+                }
+                
+                const midpoint = getPathMidpoint(path);
+                
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('data-connection-id', connection.id);
+                g.setAttribute('role', 'group');
+                g.setAttribute('aria-label', `Connection from ${sourceBlock.name} to ${targetBlock.name}`);
+                
+                // Connection path - make it thicker for easier clicking (invisible but interactive)
+                const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathElement.setAttribute('d', path);
+                pathElement.setAttribute('fill', 'none');
+                pathElement.setAttribute('stroke', '#3498db');
+                pathElement.setAttribute('stroke-width', '12'); // Thicker for easier clicking
+                pathElement.setAttribute('stroke-opacity', '0');
+                pathElement.setAttribute('fill-opacity', '0');
+                pathElement.setAttribute('pointer-events', 'stroke'); // Allow stroke to receive events
+                pathElement.setAttribute('style', 'cursor: pointer;');
+                pathElement.setAttribute('data-connection-path', connection.id);
+                g.appendChild(pathElement);
+                
+                // Visible connection path (reuse from pool) - visual only
+                const visiblePath = elementPool.getPath();
+                visiblePath.setAttribute('class', 'svg-connection-path');
+                visiblePath.setAttribute('d', path);
+                visiblePath.setAttribute('fill', 'none');
+                visiblePath.setAttribute('stroke', '#3498db');
+                visiblePath.setAttribute('stroke-width', '3');
+                visiblePath.setAttribute('marker-end', 'url(#arrowhead)');
+                visiblePath.setAttribute('opacity', '0.8');
+                visiblePath.setAttribute('pointer-events', 'none'); // No interaction, visual only
+                visiblePath.setAttribute('aria-hidden', 'true');
+                g.appendChild(visiblePath);
+                
+                // Delete button at actual midpoint of the curved path
+                const midX = midpoint.x;
+                const midY = midpoint.y;
+                
+                const deleteButton = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                deleteButton.setAttribute('cx', midX);
+                deleteButton.setAttribute('cy', midY);
+                deleteButton.setAttribute('r', '12');
+                deleteButton.setAttribute('fill', '#e74c3c');
+                deleteButton.setAttribute('stroke', '#fff');
+                deleteButton.setAttribute('stroke-width', '2');
+                deleteButton.setAttribute('opacity', '0');
+                deleteButton.setAttribute('pointer-events', 'none');
+                deleteButton.setAttribute('data-connection-delete', connection.id);
+                deleteButton.setAttribute('style', 'cursor: pointer;');
+                
+                // Delete icon (X)
+                const deleteText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                deleteText.setAttribute('x', midX);
+                deleteText.setAttribute('y', midY + 4);
+                deleteText.setAttribute('text-anchor', 'middle');
+                deleteText.setAttribute('fill', '#fff');
+                deleteText.setAttribute('font-size', '14');
+                deleteText.setAttribute('font-weight', 'bold');
+                deleteText.setAttribute('pointer-events', 'none');
+                deleteText.setAttribute('opacity', '0');
+                deleteText.textContent = '×';
+                
+                g.appendChild(deleteButton);
+                g.appendChild(deleteText);
+                
+                // Hover state management to prevent flickering
+                let hoverTimeout = null;
+                
+                function showDeleteButton() {
+                    if (hoverTimeout) {
+                        clearTimeout(hoverTimeout);
+                        hoverTimeout = null;
+                    }
+                    // Update visible path highlight
+                    visiblePath.setAttribute('stroke', '#5dade2');
+                    visiblePath.setAttribute('stroke-width', '4');
+                    // Show delete button
+                    deleteButton.setAttribute('opacity', '1');
+                    deleteText.setAttribute('opacity', '1');
+                    deleteButton.setAttribute('pointer-events', 'all');
+                    deleteText.setAttribute('pointer-events', 'none'); // Text is not interactive
+                }
+                
+                function hideDeleteButton() {
+                    if (hoverTimeout) {
+                        clearTimeout(hoverTimeout);
+                    }
+                    // Small delay to prevent flickering when moving between path and button
+                    hoverTimeout = setTimeout(() => {
+                        visiblePath.setAttribute('stroke', '#3498db');
+                        visiblePath.setAttribute('stroke-width', '3');
+                        deleteButton.setAttribute('opacity', '0');
+                        deleteText.setAttribute('opacity', '0');
+                        deleteButton.setAttribute('pointer-events', 'none');
+                        hoverTimeout = null;
+                    }, 100);
+                }
+                
+                // Hover handlers on path
+                const pathMouseEnterHandler = () => showDeleteButton();
+                const pathMouseLeaveHandler = () => hideDeleteButton();
+                const pathClickHandler = (e) => {
+                    e.stopPropagation();
+                    deleteConnection(connection.id);
+                };
+                
+                addEventListenerWithCleanup(pathElement, 'mouseenter', pathMouseEnterHandler);
+                addEventListenerWithCleanup(pathElement, 'mouseleave', pathMouseLeaveHandler);
+                addEventListenerWithCleanup(pathElement, 'click', pathClickHandler);
+                
+                // Hover handlers on delete button to keep it visible
+                const deleteMouseEnterHandler = () => showDeleteButton();
+                const deleteMouseLeaveHandler = () => hideDeleteButton();
+                const deleteClickHandler = (e) => {
+                    e.stopPropagation();
+                    deleteConnection(connection.id);
+                };
+                
+                addEventListenerWithCleanup(deleteButton, 'mouseenter', deleteMouseEnterHandler);
+                addEventListenerWithCleanup(deleteButton, 'mouseleave', deleteMouseLeaveHandler);
+                addEventListenerWithCleanup(deleteButton, 'click', deleteClickHandler);
+                
+                // Keyboard support for delete button
+                deleteButton.setAttribute('role', 'button');
+                deleteButton.setAttribute('tabindex', '0');
+                deleteButton.setAttribute('aria-label', `Delete connection from ${sourceBlock.name} to ${targetBlock.name}`);
+                addEventListenerWithCleanup(deleteButton, 'keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        deleteConnection(connection.id);
+                    }
+                });
+                
+                    // Cache the element
+                    connectionCache.set(connection.id, g);
+                    return g;
+                } catch (error) {
+                    console.error(`Error rendering connection ${connection.id}:`, error);
+                    return null;
+                }
+            }
+            
+            // Update existing connection (performance optimization)
+            static update(connection, element) {
+                if (!element) return;
+                
+                try {
+                    const sourceBlock = blocks.get(connection.sourceBlockId);
+                    const targetBlock = blocks.get(connection.targetBlockId);
+                    if (!sourceBlock || !targetBlock) {
+                        console.warn(`Connection ${connection.id} references missing blocks`);
+                        return;
+                    }
+                
+                // Recalculate path
+                const sourcePort = sourceBlock.outputPorts?.find(p => p.name === connection.sourcePortName);
+                const targetPort = targetBlock.inputPorts?.find(p => p.name === connection.targetPortName);
+                if (!sourcePort || !targetPort) return;
+                
+                const sourcePortIndex = sourceBlock.outputPorts.indexOf(sourcePort);
+                const targetPortIndex = targetBlock.inputPorts.indexOf(targetPort);
+                const sourceFieldsHeight = sourceBlock.fields && sourceBlock.fields.length > 0 ? sourceBlock.fields.length * 35 + 10 : 0;
+                const targetFieldsHeight = targetBlock.fields && targetBlock.fields.length > 0 ? targetBlock.fields.length * 35 + 10 : 0;
+                const sourcePortStartY = 50 + sourceFieldsHeight;
+                const targetPortStartY = 50 + targetFieldsHeight;
+                
+                const startX = sourceBlock.position.x + sourceBlock.width - 7;
+                const startY = sourceBlock.position.y + sourcePortStartY + (sourcePortIndex * 30);
+                const endX = targetBlock.position.x + 7;
+                const endY = targetBlock.position.y + targetPortStartY + (targetPortIndex * 30);
+                
+                const pathString = connectionPathToSVG(startX, startY, endX, endY);
+                
+                    // Update paths
+                    const paths = element.querySelectorAll('path');
+                    paths.forEach(p => {
+                        if (p.getAttribute('d') !== pathString) {
+                            p.setAttribute('d', pathString);
+                        }
+                    });
+                    
+                    // Recalculate midpoint and update delete button position
+                    function getPathMidpoint() {
+                        const outputStraight = 60;
+                        const inputStraight = 60;
+                        const outEndX = startX + outputStraight;
+                        const outEndY = startY;
+                        const inStartX = endX - inputStraight;
+                        const inStartY = endY;
+                        const horizontalGap = inStartX - outEndX;
+                        const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
+                        const cp1x = outEndX + curveDistance;
+                        const cp1y = outEndY;
+                        const cp2x = inStartX - curveDistance;
+                        const cp2y = inStartY;
+                        
+                        const t = 0.5;
+                        const midX = Math.pow(1 - t, 3) * outEndX + 
+                                    3 * Math.pow(1 - t, 2) * t * cp1x +
+                                    3 * (1 - t) * Math.pow(t, 2) * cp2x +
+                                    Math.pow(t, 3) * inStartX;
+                        const midY = Math.pow(1 - t, 3) * outEndY +
+                                    3 * Math.pow(1 - t, 2) * t * cp1y +
+                                    3 * (1 - t) * Math.pow(t, 2) * cp2y +
+                                    Math.pow(t, 3) * inStartY;
+                        
+                        return { x: midX, y: midY };
+                    }
+                    
+                    const midpoint = getPathMidpoint();
+                    
+                    // Update delete button position (circle element)
+                    const deleteButton = element.querySelector('circle[data-connection-delete]');
+                    if (deleteButton) {
+                        deleteButton.setAttribute('cx', midpoint.x.toString());
+                        deleteButton.setAttribute('cy', midpoint.y.toString());
+                    }
+                    
+                    // Update delete text position (X icon)
+                    // Find text element that is a sibling of deleteButton and contains '×'
+                    const allTexts = element.querySelectorAll('text');
+                    allTexts.forEach(text => {
+                        if (text.textContent === '×') {
+                            text.setAttribute('x', midpoint.x.toString());
+                            text.setAttribute('y', (midpoint.y + 4).toString());
+                        }
+                    });
+                } catch (error) {
+                    console.error(`Error updating connection ${connection.id}:`, error);
+                }
+            }
+        }
+        
+        // Helper function to get port position
+        function getPortPosition(block, portName, portType) {
+            const ports = portType === 'input' ? block.inputPorts : block.outputPorts;
+            const portIndex = ports?.findIndex(p => p.name === portName) ?? -1;
+            if (portIndex === -1) return null;
+            
+            // Account for fields height
+            const fieldsHeight = block.fields && block.fields.length > 0 ? block.fields.length * 35 + 10 : 0;
+            const portStartY = 50 + fieldsHeight;
+            const portY = portStartY + (portIndex * 30);
+            
+            // Port centers: input at x+7, output at x+width-7 (radius 7, edge touches border)
+            const portX = portType === 'input' 
+                ? block.position.x + 7  // Input port center (left edge touches left border)
+                : block.position.x + block.width - 7; // Output port center (right edge touches right border)
+            
+            return { x: portX, y: block.position.y + portY };
+        }
+        
+        // Add random block
+        window.addRandomBlock = function() {
+            blockCounter++;
+            const types = Object.values(BlockType);
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            const fields = [
+                { name: 'name', label: 'Name', type: 'text', placeholder: 'Enter name', value: '' },
+                { name: 'type', label: 'Type', type: 'select', options: ['Option 1', 'Option 2', 'Option 3'], value: 'Option 1' },
+                { name: 'status', label: 'Status', type: 'select', options: [
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                    { value: 'pending', label: 'Pending' }
+                ], value: 'active' }
+            ];
+            
+            // Position blocks within the initial viewBox area (centered around canvas center)
+            const canvasCenterX = canvasSize / 2;
+            const canvasCenterY = canvasSize / 2;
+            const block = {
+                id: `block-${blockCounter}`,
+                type: type,
+                name: `${type} Block ${blockCounter}`,
+                position: {
+                    x: canvasCenterX - 100 + (Math.random() * 200 - 100), // Center around canvas center
+                    y: canvasCenterY - 100 + (Math.random() * 200 - 100)
+                },
+                width: 200,
+                selected: false,
+                inputPorts: [
+                    { name: 'input1', type: 'any' },
+                    { name: 'input2', type: 'any' }
+                ],
+                outputPorts: [
+                    { name: 'output1', type: 'any' }
+                ],
+                fields: fields,
+                fieldValues: {}
+            };
+            
+            // Calculate height based on fields and ports
+            const fieldsHeight = fields.length > 0 ? fields.length * 35 + 10 : 0;
+            const portStartY = 50 + fieldsHeight;
+            const maxInputPorts = block.inputPorts ? block.inputPorts.length : 0;
+            const maxOutputPorts = block.outputPorts ? block.outputPorts.length : 0;
+            const maxPorts = Math.max(maxInputPorts, maxOutputPorts);
+            const portsHeight = maxPorts > 0 ? (maxPorts - 1) * 30 + 20 : 0; // Last port + padding
+            block.height = Math.max(150, portStartY + portsHeight);
+            
+            blocks.set(block.id, block);
+            
+            // Limit cache size
+            if (blockCache.size >= MAX_CACHE_SIZE) {
+                // Remove oldest entry (simple FIFO)
+                const firstKey = blockCache.keys().next().value;
+                const oldElement = blockCache.get(firstKey);
+                if (oldElement) {
+                    // Clean up old element
+                    const listeners = eventListeners.get(oldElement);
+                    if (listeners) {
+                        listeners.forEach(({ event, handler }) => {
+                            oldElement.removeEventListener(event, handler);
+                        });
+                        eventListeners.delete(oldElement);
+                    }
+                    if (oldElement.parentElement) {
+                        oldElement.remove();
+                    }
+                    blockCache.delete(firstKey);
+                }
+            }
+            
+            const blockElement = SVGBlockRenderer.render(block);
+            
+            // Add mouse event listeners for dragging with cleanup tracking
+            const blockMouseDownHandler = (e) => handleBlockMouseDown(e, block.id);
+            addEventListenerWithCleanup(blockElement, 'mousedown', blockMouseDownHandler);
+            
+            // Keyboard navigation for blocks
+            addEventListenerWithCleanup(blockElement, 'keydown', (e) => {
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    // Could add block deletion here
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    // Could add keyboard movement here
+                }
+            });
+            
+            blocksLayer.appendChild(blockElement);
+            
+            updateInfo();
+        };
+        
+        // Add random connection
+        window.addRandomConnection = function() {
+            if (blocks.size < 2) {
+                alert('Need at least 2 blocks to create a connection');
+                return;
+            }
+            
+            const blockArray = Array.from(blocks.values());
+            const sourceBlock = blockArray[Math.floor(Math.random() * blockArray.length)];
+            const targetBlock = blockArray[Math.floor(Math.random() * blockArray.length)];
+            
+            if (sourceBlock.id === targetBlock.id) return;
+            if (!sourceBlock.outputPorts || sourceBlock.outputPorts.length === 0) return;
+            if (!targetBlock.inputPorts || targetBlock.inputPorts.length === 0) return;
+            
+            connectionCounter++;
+            const connection = {
+                id: `connection-${connectionCounter}`,
+                sourceBlockId: sourceBlock.id,
+                targetBlockId: targetBlock.id,
+                sourcePortName: sourceBlock.outputPorts[0].name,
+                targetPortName: targetBlock.inputPorts[0].name
+            };
+            
+            connections.set(connection.id, connection);
+            const connectionElement = SVGConnectionRenderer.render(connection);
+            if (connectionElement) {
+                connectionsLayer.appendChild(connectionElement);
+            }
+            
+            updateInfo();
+        };
+        
+        // Delete connection with proper cleanup
+        function deleteConnection(connectionId) {
+            try {
+                connections.delete(connectionId);
+                
+                // Get cached element
+                const connectionElement = connectionCache.get(connectionId);
+                if (connectionElement) {
+                    // Clean up all child elements
+                    const children = Array.from(connectionElement.children);
+                    children.forEach(child => {
+                        elementPool.release(child);
+                    });
+                    
+                    // Remove event listeners
+                    const listeners = eventListeners.get(connectionElement);
+                    if (listeners) {
+                        listeners.forEach(({ event, handler }) => {
+                            connectionElement.removeEventListener(event, handler);
+                        });
+                        eventListeners.delete(connectionElement);
+                    }
+                    
+                    // Remove from DOM
+                    if (connectionElement.parentElement) {
+                        connectionElement.remove();
+                    }
+                    
+                    // Remove from cache
+                    connectionCache.delete(connectionId);
+                } else {
+                    // Fallback: find in DOM
+                    const element = document.querySelector(`[data-connection-id="${connectionId}"]`);
+                    if (element) {
+                        const children = Array.from(element.children);
+                        children.forEach(child => elementPool.release(child));
+                        element.remove();
+                    }
+                }
+                
+                updateInfo();
+            } catch (error) {
+                console.error('Error deleting connection:', error);
+            }
+        }
+        
+        // Clear canvas with proper cleanup
+        window.clearCanvas = function() {
+            try {
+                // Clean up all blocks
+                blocks.forEach((block, blockId) => {
+                    const blockElement = blockCache.get(blockId);
+                    if (blockElement) {
+                        // Clean up all child elements (including foreignObject inputs)
+                        const children = Array.from(blockElement.querySelectorAll('*'));
+                        children.forEach(child => {
+                            // Special handling for foreignObject children
+                            if (child.tagName === 'INPUT' || child.tagName === 'SELECT') {
+                                // Remove event listeners from HTML elements
+                                const listeners = eventListeners.get(child);
+                                if (listeners) {
+                                    listeners.forEach(({ event, handler }) => {
+                                        child.removeEventListener(event, handler);
+                                    });
+                                    eventListeners.delete(child);
+                                }
+                            } else {
+                                elementPool.release(child);
+                            }
+                        });
+                        
+                        // Remove block event listeners
+                        const listeners = eventListeners.get(blockElement);
+                        if (listeners) {
+                            listeners.forEach(({ event, handler }) => {
+                                blockElement.removeEventListener(event, handler);
+                            });
+                            eventListeners.delete(blockElement);
+                        }
+                        
+                        if (blockElement.parentElement) {
+                            blockElement.remove();
+                        }
+                    }
+                });
+                
+                // Clean up all connections
+                connections.forEach((connection, connectionId) => {
+                    deleteConnection(connectionId);
+                });
+                
+                // Clear all caches
+                blocks.clear();
+                connections.clear();
+                blockCache.clear();
+                connectionCache.clear();
+                // Note: WeakMap clears automatically when elements are garbage collected
+                
+                // Clear layers
+                blocksLayer.innerHTML = '';
+                connectionsLayer.innerHTML = '';
+                
+                // Reset counters
+                blockCounter = 0;
+                connectionCounter = 0;
+                
+                updateInfo();
+            } catch (error) {
+                console.error('Error clearing canvas:', error);
+            }
+        };
+        
+        // Update info panel
+        function updateInfo() {
+            document.getElementById('block-count').textContent = blocks.size;
+            document.getElementById('connection-count').textContent = connections.size;
+        }
+        
+        // Canvas size matches real app: 8000x8000
+        // Initial viewBox shows a reasonable portion (like 2000x1500) so blocks aren't tiny
+        const canvasSize = 8000;
+        const initialViewWidth = 2000; // Show 2000px width initially
+        const initialViewHeight = 1500; // Show 1500px height initially
+        // ViewBox - can be panned
+        const viewBox = { 
+            x: (canvasSize - initialViewWidth) / 2, // Center the view
+            y: (canvasSize - initialViewHeight) / 2, 
+            width: initialViewWidth, 
+            height: initialViewHeight 
+        };
+        
+        // Update viewBox on SVG
+        function updateViewBox() {
+            svgCanvas.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+        }
+        
+        // Helper to convert screen coordinates to SVG coordinates
+        function screenToSVG(screenX, screenY) {
+            const rect = svgCanvas.getBoundingClientRect();
+            const scaleX = viewBox.width / rect.width;
+            const scaleY = viewBox.height / rect.height;
+            return {
+                x: (screenX - rect.left) * scaleX + viewBox.x,
+                y: (screenY - rect.top) * scaleY + viewBox.y
+            };
+        }
+        
+        // Block dragging handlers
+        function handleBlockMouseDown(e, blockId) {
+            e.stopPropagation();
+            const block = blocks.get(blockId);
+            if (!block) return;
+            
+            const svgPoint = screenToSVG(e.clientX, e.clientY);
+            isDragging = true;
+            draggedBlock = block;
+            dragOffset = {
+                x: svgPoint.x - block.position.x,
+                y: svgPoint.y - block.position.y
+            };
+            
+            // Highlight block
+            const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
+            if (blockElement) {
+                const rect = blockElement.querySelector('rect');
+                if (rect) {
+                    rect.setAttribute('stroke-width', '3');
+                    rect.setAttribute('opacity', '0.95');
+                }
+            }
+            
+            svgCanvas.style.cursor = 'grabbing';
+        }
+        
+        // Throttled mouse move handler (60fps = ~16ms)
+        const handleMouseMoveThrottled = throttle(function(e) {
+            if (isPanning) {
+                const rect = svgCanvas.getBoundingClientRect();
+                const scaleX = viewBox.width / rect.width;
+                const scaleY = viewBox.height / rect.height;
+                const deltaX = (e.clientX - panStart.x) * scaleX;
+                const deltaY = (e.clientY - panStart.y) * scaleY;
+                
+                viewBox.x -= deltaX;
+                viewBox.y -= deltaY;
+                
+                // Clamp viewBox to canvas bounds
+                viewBox.x = Math.max(0, Math.min(canvasSize - viewBox.width, viewBox.x));
+                viewBox.y = Math.max(0, Math.min(canvasSize - viewBox.height, viewBox.y));
+                
+                updateViewBox();
+                
+                panStart.x = e.clientX;
+                panStart.y = e.clientY;
+            } else if (isCreatingConnection) {
+                // Update preview connection line
+                updatePreviewConnection(e.clientX, e.clientY);
+            } else if (isDragging && draggedBlock) {
+                const svgPoint = screenToSVG(e.clientX, e.clientY);
+                draggedBlock.position.x = svgPoint.x - dragOffset.x;
+                draggedBlock.position.y = svgPoint.y - dragOffset.y;
+                
+                // Update block position (use optimized update method)
+                updateBlockElement(draggedBlock);
+                
+                // Update all connections for this block
+                updateConnectionsForBlock(draggedBlock.id);
+            }
+        }, 16); // ~60fps
+        
+        function handleMouseMove(e) {
+            handleMouseMoveThrottled(e);
+        }
+        
+        function handleMouseUp(e) {
+            if (isPanning) {
+                isPanning = false;
+                svgCanvas.classList.remove('panning');
+            } else {
+                // Check if releasing on a port (handled by handlePortMouseUp)
+                const target = e.target.closest('[data-port-type]');
+                if (!target && isCreatingConnection) {
+                    // Cancel connection if not released on a port
+                    cancelConnection();
+                }
+                
+                if (isDragging && draggedBlock) {
+                    // Remove highlight
+                    const blockElement = document.querySelector(`[data-block-id="${draggedBlock.id}"]`);
+                    if (blockElement) {
+                        const rect = blockElement.querySelector('rect');
+                        if (rect) {
+                            rect.setAttribute('stroke-width', '2');
+                            rect.setAttribute('opacity', '0.9');
+                        }
+                    }
+                    
+                    isDragging = false;
+                    draggedBlock = null;
+                    svgCanvas.style.cursor = 'default';
+                }
+            }
+        }
+        
+        // Handle canvas panning
+        function handleCanvasMouseDown(e) {
+            // Only start panning if clicking on canvas background (not on blocks, ports, or connections)
+            const target = e.target;
+            
+            // Check if clicking on interactive elements (SVG supports closest)
+            if (target.closest && (
+                target.closest('[data-block-id]') || 
+                target.closest('[data-port-type]') || 
+                target.closest('[data-connection-id]') ||
+                target.closest('[data-connection-delete]')
+            )) {
+                return;
+            }
+            
+            // Also check direct attributes and parent
+            if (target.getAttribute('data-block-id') ||
+                target.getAttribute('data-port-type') ||
+                target.getAttribute('data-connection-id') ||
+                target.getAttribute('data-connection-delete')) {
+                return;
+            }
+            
+            // Check parent element
+            let parent = target.parentElement;
+            if (parent && (
+                parent.getAttribute('data-block-id') ||
+                parent.getAttribute('data-connection-id')
+            )) {
+                return;
+            }
+            
+            // Left-click (button 0) on empty canvas for panning
+            if (e.button === 0) {
+                e.preventDefault();
+                isPanning = true;
+                panStart.x = e.clientX;
+                panStart.y = e.clientY;
+                svgCanvas.classList.add('panning');
+            }
+        }
+        
+        // Update connections when a block moves (optimized)
+        function updateConnectionsForBlock(blockId) {
+            connections.forEach((connection, connectionId) => {
+                if (connection.sourceBlockId === blockId || connection.targetBlockId === blockId) {
+                    const connectionElement = connectionCache.get(connectionId);
+                    if (connectionElement && connectionElement.parentElement) {
+                        // Update in place instead of recreating
+                        SVGConnectionRenderer.update(connection, connectionElement);
+                    } else {
+                        // Create new if doesn't exist
+                        const existingInDOM = document.querySelector(`[data-connection-id="${connectionId}"]`);
+                        if (existingInDOM) existingInDOM.remove();
+                        const newElement = SVGConnectionRenderer.render(connection);
+                        if (newElement) {
+                            connectionsLayer.appendChild(newElement);
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Handle port mouse down (start connection)
+        function handlePortMouseDown(e, blockId, portName, portType) {
+            e.stopPropagation();
+            
+            if (portType !== 'output') return;
+            
+            const block = blocks.get(blockId);
+            if (!block) return;
+            
+            const port = block.outputPorts?.find(p => p.name === portName);
+            if (!port) return;
+            
+            const portIndex = block.outputPorts.indexOf(port);
+            const fieldsHeight = block.fields && block.fields.length > 0 ? block.fields.length * 35 + 10 : 0;
+            const portStartY = 50 + fieldsHeight;
+            const portY = portStartY + (portIndex * 30);
+            
+            // Output port center: width - 7 (radius 7, edge touches right border)
+            const startX = block.position.x + block.width - 7;
+            const startY = block.position.y + portY;
+            
+            isCreatingConnection = true;
+            connectionStart = {
+                blockId: blockId,
+                portName: portName,
+                portType: portType,
+                x: startX,
+                y: startY
+            };
+            
+            // Create preview connection path
+            previewConnectionPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            previewConnectionPath.setAttribute('id', 'preview-connection');
+            previewConnectionPath.setAttribute('fill', 'none');
+            previewConnectionPath.setAttribute('stroke', '#3498db');
+            previewConnectionPath.setAttribute('stroke-width', '3');
+            previewConnectionPath.setAttribute('stroke-dasharray', '5,5');
+            previewConnectionPath.setAttribute('opacity', '0.6');
+            previewConnectionPath.setAttribute('marker-end', 'url(#arrowhead)');
+            connectionsLayer.appendChild(previewConnectionPath);
+            
+            svgCanvas.style.cursor = 'crosshair';
+        }
+        
+        // Handle port mouse up (complete connection)
+        function handlePortMouseUp(e, blockId, portName, portType) {
+            e.stopPropagation();
+            
+            if (!isCreatingConnection || !connectionStart) return;
+            if (portType !== 'input') {
+                // Cancel connection if not on input port
+                cancelConnection();
+                return;
+            }
+            
+            const sourceBlock = blocks.get(connectionStart.blockId);
+            const targetBlock = blocks.get(blockId);
+            
+            if (!sourceBlock || !targetBlock) {
+                cancelConnection();
+                return;
+            }
+            
+            // Can't connect to same block
+            if (sourceBlock.id === targetBlock.id) {
+                cancelConnection();
+                return;
+            }
+            
+            // Check if port exists
+            const targetPort = targetBlock.inputPorts?.find(p => p.name === portName);
+            if (!targetPort) {
+                cancelConnection();
+                return;
+            }
+            
+            // Create connection
+            connectionCounter++;
+            const connection = {
+                id: `connection-${connectionCounter}`,
+                sourceBlockId: connectionStart.blockId,
+                targetBlockId: blockId,
+                sourcePortName: connectionStart.portName,
+                targetPortName: portName
+            };
+            
+            connections.set(connection.id, connection);
+            const connectionElement = SVGConnectionRenderer.render(connection);
+            if (connectionElement) {
+                connectionsLayer.appendChild(connectionElement);
+            }
+            
+            // Clean up preview
+            cancelConnection();
+            updateInfo();
+        }
+        
+        // Cancel connection creation
+        function cancelConnection() {
+            isCreatingConnection = false;
+            connectionStart = null;
+            
+            if (previewConnectionPath) {
+                previewConnectionPath.remove();
+                previewConnectionPath = null;
+            }
+            
+            svgCanvas.style.cursor = 'default';
+        }
+        
+        // Update preview connection
+        function updatePreviewConnection(mouseX, mouseY) {
+            if (!isCreatingConnection || !connectionStart || !previewConnectionPath) return;
+            
+            const svgPoint = screenToSVG(mouseX, mouseY);
+            const path = connectionPathToSVG(connectionStart.x, connectionStart.y, svgPoint.x, svgPoint.y);
+            previewConnectionPath.setAttribute('d', path);
+        }
+        
+        svgCanvas.addEventListener('mousedown', handleCanvasMouseDown);
+        svgCanvas.addEventListener('mousemove', handleMouseMove);
+        svgCanvas.addEventListener('mouseup', handleMouseUp);
+        svgCanvas.addEventListener('mouseleave', handleMouseUp);
+        
+        // Prevent text selection while panning
+        svgCanvas.addEventListener('selectstart', (e) => {
+            if (isPanning) {
+                e.preventDefault();
+            }
+        });
+        
+        // Prevent all zoom and pan interactions
+        svgCanvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, { passive: false });
+        
+        svgCanvas.addEventListener('touchstart', (e) => {
+            // Don't interfere with block dragging or connection creation
+            const target = e.target.closest('[data-block-id]');
+            const portTarget = e.target.closest('[data-port-type]');
+            if (target || portTarget) return;
+            
+            // Prevent all touch gestures (pan/zoom)
+            e.preventDefault();
+            e.stopPropagation();
+        }, { passive: false });
+        
+        svgCanvas.addEventListener('touchmove', (e) => {
+            // Don't interfere with block dragging or connection creation
+            const target = e.target.closest('[data-block-id]');
+            const portTarget = e.target.closest('[data-port-type]');
+            if (target || portTarget) return;
+            
+            // Prevent all touch gestures (pan/zoom)
+            e.preventDefault();
+            e.stopPropagation();
+        }, { passive: false });
+        
+        svgCanvas.addEventListener('touchend', (e) => {
+            // Don't interfere with block dragging or connection creation
+            const target = e.target.closest('[data-block-id]');
+            const portTarget = e.target.closest('[data-port-type]');
+            if (target || portTarget) return;
+            
+            // Prevent all touch gestures (pan/zoom)
+            e.preventDefault();
+            e.stopPropagation();
+        }, { passive: false });
+        
+        // Prevent gesture events (Safari/WebKit)
+        svgCanvas.addEventListener('gesturestart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, { passive: false });
+        
+        svgCanvas.addEventListener('gesturechange', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, { passive: false });
+        
+        svgCanvas.addEventListener('gestureend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, { passive: false });
+        
+        // Monitor and restore viewBox width/height if browser tries to zoom (but allow panning)
+        const viewBoxObserver = new MutationObserver((mutations) => {
+            const actualViewBox = svgCanvas.getAttribute('viewBox');
+            if (actualViewBox) {
+                const parts = actualViewBox.split(/\s+/);
+                if (parts.length === 4) {
+                    const actualX = parseFloat(parts[0]);
+                    const actualY = parseFloat(parts[1]);
+                    const actualWidth = parseFloat(parts[2]);
+                    const actualHeight = parseFloat(parts[3]);
+                    // Only restore width/height if changed (allow x/y to change for panning)
+                    if (Math.abs(actualWidth - viewBox.width) > 0.1 || 
+                        Math.abs(actualHeight - viewBox.height) > 0.1) {
+                        svgCanvas.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+                    } else {
+                        // Update our viewBox x/y from actual (in case it was changed externally)
+                        viewBox.x = actualX;
+                        viewBox.y = actualY;
+                    }
+                }
+            }
+        });
+        viewBoxObserver.observe(svgCanvas, { 
+            attributes: true, 
+            attributeFilter: ['viewBox'] 
+        });
+        
+        // Initialize viewBox
+        updateViewBox();
+        
+        // Display canvas size in info panel
+        const infoPanel = document.querySelector('.info-panel');
+        if (infoPanel) {
+            const canvasSizeItem = document.createElement('div');
+            canvasSizeItem.className = 'info-item';
+            canvasSizeItem.innerHTML = `
+                <span class="info-label">Canvas:</span>
+                <span id="canvas-size">${canvasSize} × ${canvasSize}</span>
+            `;
+            infoPanel.appendChild(canvasSizeItem);
+        }
+        
+        
+        // Add some initial blocks for demo
+        setTimeout(() => {
+            addRandomBlock();
+            addRandomBlock();
+            addRandomBlock();
+            setTimeout(() => {
+                addRandomConnection();
+                addRandomConnection();
+            }, 100);
+        }, 100);
+    </script>
+</body>
+</html>
+

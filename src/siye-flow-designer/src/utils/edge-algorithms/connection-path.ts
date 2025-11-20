@@ -112,3 +112,38 @@ export function connectionPathToHTMLSegments(
   return result;
 }
 
+/**
+ * Convert connection path to SVG path string
+ * Uses straight segments (60px from output, 60px to input) with a curve in between
+ */
+export function connectionPathToSVG(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+): string {
+  // Fixed constant straight lengths
+  const outputStraight = 60; // Always 60px straight from output port
+  const inputStraight = 60;  // Always 60px straight to input port
+  
+  // Calculate straight segment endpoints
+  const outEndX = startX + outputStraight;
+  const outEndY = startY;
+  
+  const inStartX = endX - inputStraight;
+  const inStartY = endY;
+  
+  // Calculate curve between the two straight segments
+  const horizontalGap = inStartX - outEndX;
+  const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
+  
+  const cp1x = outEndX + curveDistance;
+  const cp1y = outEndY;
+  
+  const cp2x = inStartX - curveDistance;
+  const cp2y = inStartY;
+  
+  // Build SVG path: M (move to start), L (line to), C (cubic bezier curve), L (line to end)
+  return `M ${startX} ${startY} L ${outEndX} ${outEndY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${inStartX} ${inStartY} L ${endX} ${endY}`;
+}
+

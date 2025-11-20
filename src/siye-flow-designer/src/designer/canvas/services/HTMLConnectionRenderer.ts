@@ -2,13 +2,15 @@ import { VisualBlock, VisualConnection, VisualPort, Position } from '../../Visua
 import { connectionPathToHTMLSegments } from '../../../utils/edge-algorithms';
 
 /**
- * HTML-based connection renderer that solves the z-index/layering issue
- * Connections are rendered as HTML elements behind blocks
+ * HTML-based connection renderer with seamless animations and accurate port connections
+ * Connections are cached and smoothly updated instead of being recreated
  */
 export class HTMLConnectionRenderer {
     private container: HTMLElement;
     private connectionsContainer: HTMLElement;
     private onDeleteConnection: (connectionId: string) => void;
+    private connectionCache: Map<string, HTMLElement> = new Map();
+    private tempConnectionEl: HTMLElement | null = null;
     
     constructor(container: HTMLElement, onDeleteConnection: (connectionId: string) => void) {
         this.container = container;
@@ -54,7 +56,7 @@ export class HTMLConnectionRenderer {
     }
     
     /**
-     * Render all connections
+     * Render all connections with smooth updates
      */
     public renderConnections(
         connections: Map<string, VisualConnection>,
@@ -62,35 +64,166 @@ export class HTMLConnectionRenderer {
         isConnecting: boolean = false,
         connectionStart?: { blockId: string, portName: string, position: Position } | null,
         mousePosition?: Position,
-        getPortTabPosition?: (block: VisualBlock, port: VisualPort) => Position
+        getPortTabPosition?: (block: VisualBlock, port: VisualPort) => Position,
+        isDragging: boolean = false
     ): void {
-        // Clear only non-temp connections
-        const tempConnection = this.connectionsContainer.querySelector('.temp-connection');
+        if (!getPortTabPosition) return;
         
-        // Clear existing connections but preserve temp
-        Array.from(this.connectionsContainer.children).forEach(child => {
-            if (!child.classList.contains('temp-connection')) {
-                child.remove();
+        // Track which connections still exist
+        const activeConnectionIds = new Set<string>();
+        
+        // Update or create connections
+        connections.forEach((connection, connectionId) => {
+            activeConnectionIds.add(connectionId);
+            
+            const existingEl = this.connectionCache.get(connectionId);
+            
+            // Check if element exists and is in DOM
+            if (existingEl && existingEl.parentElement === this.connectionsContainer) {
+                // Update existing connection smoothly
+                this.updateConnection(existingEl, connection, blocks, getPortTabPosition, isDragging);
+            } else {
+                // Remove stale cache entry if element doesn't exist in DOM
+                if (existingEl) {
+                    this.connectionCache.delete(connectionId);
+                    // Also remove from DOM if it exists elsewhere
+                    if (existingEl.parentElement) {
+                        existingEl.remove();
+                    }
+                }
+                
+                // Check if connection already exists in DOM (prevent duplicates)
+                const existingInDOM = this.connectionsContainer.querySelector(`[data-connection-id="${connectionId}"]`);
+                if (existingInDOM) {
+                    existingInDOM.remove();
+                }
+                
+                // Create new connection
+                const element = this.createConnection(connection, blocks, getPortTabPosition);
+                if (element) {
+                    this.connectionCache.set(connectionId, element);
+                    this.connectionsContainer.appendChild(element);
+                }
             }
         });
         
-        // Render each connection
-        connections.forEach(connection => {
-            const element = this.createConnection(connection, blocks, getPortTabPosition!);
-            if (element) {
-                this.connectionsContainer.appendChild(element);
+        // Remove connections that no longer exist
+        this.connectionCache.forEach((element, connectionId) => {
+            if (!activeConnectionIds.has(connectionId)) {
+                if (element.parentElement) {
+                    element.remove();
+                }
+                this.connectionCache.delete(connectionId);
             }
         });
         
         // Handle temporary connection being drawn
         if (isConnecting && connectionStart && mousePosition) {
-            // Always render temp connection when connecting
             this.renderTempConnection(connectionStart.position, mousePosition);
         } else {
-            // Remove temp connection if not connecting
-            if (tempConnection) {
-                tempConnection.remove();
-            }
+            this.clearTempConnection();
+        }
+    }
+    
+    /**
+     * Update existing connection smoothly using CSS transitions
+     */
+    private updateConnection(
+        connectionEl: HTMLElement,
+        connection: VisualConnection,
+        blocks: Map<string, VisualBlock>,
+        getPortTabPosition: (block: VisualBlock, port: VisualPort) => Position,
+        isDragging: boolean = false
+    ): void {
+        const sourceBlock = blocks.get(connection.sourceBlockId);
+        const targetBlock = blocks.get(connection.targetBlockId);
+        
+        if (!sourceBlock || !targetBlock) return;
+        
+        const sourcePort = sourceBlock.outputPorts?.find(p => p.name === connection.sourcePortName);
+        const targetPort = targetBlock.inputPorts?.find(p => p.name === connection.targetPortName);
+        
+        if (!sourcePort || !targetPort) return;
+        
+        // Get fresh port positions
+        const start = getPortTabPosition(sourceBlock, sourcePort);
+        const end = getPortTabPosition(targetBlock, targetPort);
+        
+        // Validate positions are valid numbers
+        if (isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) {
+            return;
+        }
+        
+        // Calculate new segments - line connects directly to existing port tabs on blocks
+        const segments = connectionPathToHTMLSegments(start.x, start.y, end.x, end.y, 20);
+        const existingSegments = Array.from(connectionEl.querySelectorAll('.connection-segment:not(.connection-delete)')) as HTMLElement[];
+        
+        // During drag, update existing segments in place (no transitions) for instant feedback
+        // When not dragging, recreate segments for smooth transitions
+        if (isDragging && existingSegments.length === segments.length) {
+            // Update existing segments instantly without transitions
+            segments.forEach((segment, index) => {
+                const segmentEl = existingSegments[index];
+                if (segmentEl) {
+                    // Disable transitions during drag for instant updates
+                    segmentEl.style.transition = 'none';
+                    segmentEl.style.left = `${segment.x}px`;
+                    segmentEl.style.top = `${segment.y}px`;
+                    segmentEl.style.width = `${segment.width}px`;
+                    segmentEl.style.transform = `rotate(${segment.angle}deg)`;
+                }
+            });
+        } else {
+            // Remove all existing segments and recreate
+            existingSegments.forEach(seg => seg.remove());
+            
+            // Create all segments fresh with correct positions
+            // The line connects directly to the existing port tabs on the blocks
+            segments.forEach((segment) => {
+                const segmentEl = document.createElement('div');
+                segmentEl.className = 'connection-segment';
+                // Disable transitions during drag, enable them when not dragging
+                const transition = isDragging 
+                    ? 'background-color 0.2s' 
+                    : 'background-color 0.2s, left 0.15s ease-out, top 0.15s ease-out, transform 0.15s ease-out, width 0.15s ease-out';
+                
+                segmentEl.style.cssText = `
+                    position: absolute;
+                    background-color: var(--accent-primary);
+                    pointer-events: all;
+                    cursor: pointer;
+                    left: ${segment.x}px;
+                    top: ${segment.y}px;
+                    width: ${segment.width}px;
+                    height: 3px;
+                    transform-origin: 0 50%;
+                    transform: rotate(${segment.angle}deg);
+                    border-radius: 1.5px;
+                    transition: ${transition};
+                `;
+                
+                // Add hover effect
+                segmentEl.addEventListener('mouseenter', () => {
+                    segmentEl.style.backgroundColor = 'var(--accent-primary-light)';
+                    this.showDeleteButton(connectionEl, start, end);
+                });
+                
+                segmentEl.addEventListener('mouseleave', () => {
+                    segmentEl.style.backgroundColor = 'var(--accent-primary)';
+                });
+                
+                // Append segment to connection
+                connectionEl.appendChild(segmentEl);
+            });
+        }
+        
+        // Update delete button position
+        const deleteBtn = connectionEl.querySelector('.connection-delete') as HTMLElement;
+        if (deleteBtn) {
+            const midX = (start.x + end.x) / 2;
+            const midY = (start.y + end.y) / 2;
+            deleteBtn.style.left = `${midX - 12}px`;
+            deleteBtn.style.top = `${midY - 12}px`;
         }
     }
     
@@ -112,23 +245,32 @@ export class HTMLConnectionRenderer {
         
         if (!sourcePort || !targetPort) return null;
         
+        // Get port positions - ensure they're valid
         const start = getPortTabPosition(sourceBlock, sourcePort);
         const end = getPortTabPosition(targetBlock, targetPort);
+        
+        // Validate positions are valid numbers
+        if (isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) {
+            console.warn(`Invalid port positions for connection ${connection.id}`, { start, end });
+            return null;
+        }
         
         // Create connection container
         const connectionEl = document.createElement('div');
         connectionEl.className = 'html-connection';
         connectionEl.dataset.connectionId = connection.id;
+        connectionEl.setAttribute('data-connection-id', connection.id);
         connectionEl.style.cssText = `
             position: absolute;
             pointer-events: none;
         `;
         
         // Use connection path with straight segments and curve
+        // The line connects directly to the existing port tabs (blue dots) on the blocks
         const segments = connectionPathToHTMLSegments(
             start.x, start.y,
             end.x, end.y,
-            15 // number of segments for smooth curve
+            20 // More segments for smoother curve
         );
         
         segments.forEach((segment) => {
@@ -136,35 +278,31 @@ export class HTMLConnectionRenderer {
             segmentEl.className = 'connection-segment';
             segmentEl.style.cssText = `
                 position: absolute;
-                background-color: #58a6ff;
+                background-color: var(--accent-primary);
                 pointer-events: all;
                 cursor: pointer;
                 left: ${segment.x}px;
                 top: ${segment.y}px;
                 width: ${segment.width}px;
-                height: ${segment.height}px;
+                height: 3px;
                 transform-origin: 0 50%;
                 transform: rotate(${segment.angle}deg);
-                border-radius: 2px;
-                transition: background-color 0.2s;
+                border-radius: 1.5px;
+                transition: background-color 0.2s, left 0.15s ease-out, top 0.15s ease-out, transform 0.15s ease-out, width 0.15s ease-out;
             `;
             
             // Add hover effect
             segmentEl.addEventListener('mouseenter', () => {
-                segmentEl.style.backgroundColor = '#79c0ff';
+                segmentEl.style.backgroundColor = 'var(--accent-primary-light)';
                 this.showDeleteButton(connectionEl, start, end);
             });
             
             segmentEl.addEventListener('mouseleave', () => {
-                segmentEl.style.backgroundColor = '#58a6ff';
+                segmentEl.style.backgroundColor = 'var(--accent-primary)';
             });
             
             connectionEl.appendChild(segmentEl);
         });
-        
-        // Add arrow at the end
-        const arrow = this.createArrow(end);
-        connectionEl.appendChild(arrow);
         
         // Create delete button (hidden by default)
         const deleteBtn = this.createDeleteButton(connection.id, start, end);
@@ -176,26 +314,6 @@ export class HTMLConnectionRenderer {
         });
         
         return connectionEl;
-    }
-    
-    /**
-     * Create arrow element
-     */
-    private createArrow(position: Position): HTMLElement {
-        const arrow = document.createElement('div');
-        arrow.className = 'connection-arrow';
-        arrow.style.cssText = `
-            position: absolute;
-            width: 0;
-            height: 0;
-            border-left: 8px solid #58a6ff;
-            border-top: 5px solid transparent;
-            border-bottom: 5px solid transparent;
-            left: ${position.x - 8}px;
-            top: ${position.y - 5}px;
-            pointer-events: none;
-        `;
-        return arrow;
     }
     
     /**
@@ -213,9 +331,9 @@ export class HTMLConnectionRenderer {
             width: 24px;
             height: 24px;
             border-radius: 50%;
-            background: #da3633;
-            border: 2px solid #f85149;
-            color: white;
+            background: var(--error-base);
+            border: 2px solid var(--error-hover);
+            color: var(--text-inverse);
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
@@ -226,11 +344,20 @@ export class HTMLConnectionRenderer {
             top: ${midY - 12}px;
             padding: 0;
             line-height: 1;
+            transition: left 0.15s ease-out, top 0.15s ease-out, background 0.2s;
         `;
         
         deleteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.onDeleteConnection(connectionId);
+        });
+        
+        deleteBtn.addEventListener('mouseenter', () => {
+            deleteBtn.style.background = 'var(--error-hover)';
+        });
+        
+        deleteBtn.addEventListener('mouseleave', () => {
+            deleteBtn.style.background = 'var(--error-base)';
         });
         
         return deleteBtn;
@@ -249,29 +376,37 @@ export class HTMLConnectionRenderer {
     }
     
     /**
-     * Render temporary connection while dragging
+     * Render temporary connection while dragging - updates smoothly
      */
     public renderTempConnection(start: Position, end: Position): void {
-        // Remove existing temp connection
-        const existing = this.connectionsContainer.querySelector('.temp-connection');
-        if (existing) {
-            existing.remove();
+        if (this.tempConnectionEl) {
+            // Update existing temp connection smoothly
+            this.updateTempConnection(start, end);
+        } else {
+            // Create new temp connection
+            this.tempConnectionEl = document.createElement('div');
+            this.tempConnectionEl.className = 'html-connection temp-connection';
+            this.tempConnectionEl.style.cssText = `
+                position: absolute;
+                pointer-events: none;
+                z-index: 10;
+            `;
+            this.connectionsContainer.appendChild(this.tempConnectionEl);
         }
         
-        // Create temp connection
-        const tempEl = document.createElement('div');
-        tempEl.className = 'html-connection temp-connection';
-        tempEl.style.cssText = `
-            position: absolute;
-            pointer-events: none;
-            z-index: 10;
-        `;
+        this.updateTempConnection(start, end);
+    }
+    
+    /**
+     * Update temporary connection smoothly
+     */
+    private updateTempConnection(start: Position, end: Position): void {
+        if (!this.tempConnectionEl) return;
         
-        const segments = connectionPathToHTMLSegments(
-            start.x, start.y,
-            end.x, end.y,
-            10 // fewer segments for performance
-        );
+        // Clear existing segments
+        this.tempConnectionEl.innerHTML = '';
+        
+        const segments = connectionPathToHTMLSegments(start.x, start.y, end.x, end.y, 15);
         
         segments.forEach(segment => {
             const segmentEl = document.createElement('div');
@@ -282,25 +417,25 @@ export class HTMLConnectionRenderer {
                 left: ${segment.x}px;
                 top: ${segment.y}px;
                 width: ${segment.width}px;
-                height: ${segment.height}px;
+                height: 3px;
                 transform-origin: 0 50%;
                 transform: rotate(${segment.angle}deg);
-                border-top: 3px dashed #ff9800;
+                border-top: 3px dashed var(--accent-primary);
                 border-radius: 0;
+                transition: left 0.05s linear, top 0.05s linear, transform 0.05s linear, width 0.05s linear;
+                opacity: 0.7;
             `;
-            tempEl.appendChild(segmentEl);
+            this.tempConnectionEl!.appendChild(segmentEl);
         });
-        
-        this.connectionsContainer.appendChild(tempEl);
     }
     
     /**
      * Clear temporary connection
      */
     public clearTempConnection(): void {
-        const temp = this.connectionsContainer.querySelector('.temp-connection');
-        if (temp) {
-            temp.remove();
+        if (this.tempConnectionEl) {
+            this.tempConnectionEl.remove();
+            this.tempConnectionEl = null;
         }
     }
     
@@ -308,9 +443,10 @@ export class HTMLConnectionRenderer {
      * Clean up
      */
     public destroy(): void {
+        this.connectionCache.clear();
+        this.clearTempConnection();
         if (this.connectionsContainer && this.connectionsContainer.parentElement) {
             this.connectionsContainer.parentElement.removeChild(this.connectionsContainer);
         }
     }
 }
-
