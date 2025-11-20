@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "debug": "vite --config vite.config.ts debug-ui/index.html",
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",

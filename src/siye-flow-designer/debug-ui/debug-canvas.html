@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SiyeFlow SVG Canvas Debug</title>
-    <link rel="stylesheet" href="src/styles.css">
+    <link rel="stylesheet" href="../src/styles.css">
     <style>
         body {
             margin: 0;
@@ -96,10 +96,20 @@
         /* SVG element classes for better CSS styling */
         .svg-block {
             cursor: move;
+            transition: transform 0.2s ease;
+        }
+        
+        .svg-block:hover {
+            transform: translateY(-2px);
         }
         
         .svg-block-rect {
-            transition: stroke-width 0.15s ease, opacity 0.15s ease;
+            transition: stroke-width 0.15s ease, opacity 0.15s ease, filter 0.2s ease;
+            filter: url(#blockShadow);
+        }
+        
+        .svg-block:hover .svg-block-rect {
+            filter: url(#blockShadowHover);
         }
         
         .svg-block-header {
@@ -109,19 +119,24 @@
         .svg-block-title {
             pointer-events: none;
             user-select: none;
+            filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
         }
         
         .svg-port-circle {
-            transition: fill 0.2s ease, r 0.15s ease;
+            transition: fill 0.2s ease, r 0.15s ease, stroke-width 0.15s ease;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
         }
         
         .svg-port-circle:hover {
             r: 8;
+            stroke-width: 2.5;
+            filter: drop-shadow(0 2px 4px rgba(52, 152, 219, 0.4));
         }
         
         .svg-port-label {
             pointer-events: none;
             user-select: none;
+            filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
         }
         
         .svg-connection-path {
@@ -186,6 +201,53 @@
                 <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
                     <polygon points="0 0, 10 3, 0 6" fill="var(--accent-primary)" />
                 </marker>
+                
+                <!-- Gradient definitions for blocks -->
+                <linearGradient id="blockGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:rgba(255,255,255,0.15);stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:rgba(0,0,0,0.1);stop-opacity:1" />
+                </linearGradient>
+                
+                <linearGradient id="headerGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:rgba(255,255,255,0.25);stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:rgba(0,0,0,0.15);stop-opacity:1" />
+                </linearGradient>
+                
+                <!-- Port gradients -->
+                <radialGradient id="portGradient" cx="50%" cy="50%">
+                    <stop offset="0%" style="stop-color:#5dade2;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#3498db;stop-opacity:1" />
+                </radialGradient>
+                
+                <radialGradient id="portHoverGradient" cx="50%" cy="50%">
+                    <stop offset="0%" style="stop-color:#7fb3d3;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#5dade2;stop-opacity:1" />
+                </radialGradient>
+                
+                <!-- Shadow filter for blocks -->
+                <filter id="blockShadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+                    <feOffset dx="0" dy="2" result="offsetblur"/>
+                    <feComponentTransfer>
+                        <feFuncA type="linear" slope="0.3"/>
+                    </feComponentTransfer>
+                    <feMerge>
+                        <feMergeNode/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+                
+                <filter id="blockShadowHover" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+                    <feOffset dx="0" dy="4" result="offsetblur"/>
+                    <feComponentTransfer>
+                        <feFuncA type="linear" slope="0.4"/>
+                    </feComponentTransfer>
+                    <feMerge>
+                        <feMergeNode/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
             </defs>
             <g id="connections-layer"></g>
             <g id="blocks-layer"></g>
@@ -209,8 +271,8 @@
     </div>
     
     <script type="module">
-        import { BlockType } from './src/models/workflow-models.ts';
-        import { connectionPathToSVG } from './src/utils/edge-algorithms/connection-path.ts';
+        import { BlockType } from '../src/models/workflow-models.ts';
+        import { connectionPathToSVG } from '../src/utils/edge-algorithms/connection-path.ts';
         
         // Initialize theme
         if (typeof document !== 'undefined') {
@@ -415,36 +477,56 @@
                 g.setAttribute('tabindex', '0');
                 g.setAttribute('transform', `translate(${block.position.x}, ${block.position.y})`);
                 
-                // Block rectangle (reuse from pool)
+                // Block rectangle with gradient overlay (reuse from pool)
                 const rect = elementPool.getRect();
                 rect.setAttribute('class', 'svg-block-rect');
                 rect.setAttribute('width', block.width);
                 rect.setAttribute('height', block.height);
-                rect.setAttribute('rx', '8');
+                rect.setAttribute('rx', '10');
                 rect.setAttribute('fill', blockColors[block.type] || '#666');
                 rect.setAttribute('stroke', '#fff');
                 rect.setAttribute('stroke-width', block.selected ? '3' : '2');
-                rect.setAttribute('opacity', '0.9');
+                rect.setAttribute('opacity', '0.95');
                 g.appendChild(rect);
                 
-                // Block header
+                // Gradient overlay for depth
+                const gradientOverlay = elementPool.getRect();
+                gradientOverlay.setAttribute('width', block.width);
+                gradientOverlay.setAttribute('height', block.height);
+                gradientOverlay.setAttribute('rx', '10');
+                gradientOverlay.setAttribute('fill', 'url(#blockGradient)');
+                gradientOverlay.setAttribute('pointer-events', 'none');
+                g.appendChild(gradientOverlay);
+                
+                // Block header with gradient
                 const headerRect = elementPool.getRect();
                 headerRect.setAttribute('class', 'svg-block-header');
                 headerRect.setAttribute('width', block.width);
-                headerRect.setAttribute('height', '40');
-                headerRect.setAttribute('rx', '8');
-                headerRect.setAttribute('fill', 'rgba(0, 0, 0, 0.2)');
+                headerRect.setAttribute('height', '42');
+                headerRect.setAttribute('rx', '10');
+                headerRect.setAttribute('y', '0');
+                headerRect.setAttribute('fill', 'url(#headerGradient)');
                 g.appendChild(headerRect);
                 
-                // Block title
+                // Header bottom border for separation
+                const headerBorder = elementPool.getRect();
+                headerBorder.setAttribute('width', block.width);
+                headerBorder.setAttribute('height', '1');
+                headerBorder.setAttribute('y', '42');
+                headerBorder.setAttribute('fill', 'rgba(255, 255, 255, 0.2)');
+                headerBorder.setAttribute('pointer-events', 'none');
+                g.appendChild(headerBorder);
+                
+                // Block title with better styling
                 const title = elementPool.getText();
                 title.setAttribute('class', 'svg-block-title');
                 title.setAttribute('x', block.width / 2);
-                title.setAttribute('y', '25');
+                title.setAttribute('y', '26');
                 title.setAttribute('text-anchor', 'middle');
-                title.setAttribute('fill', '#fff');
-                title.setAttribute('font-size', '14');
+                title.setAttribute('fill', '#ffffff');
+                title.setAttribute('font-size', '15');
                 title.setAttribute('font-weight', '600');
+                title.setAttribute('letter-spacing', '0.3px');
                 title.textContent = block.name || block.type;
                 g.appendChild(title);
                 
@@ -453,14 +535,16 @@
                     block.fields.forEach((field, index) => {
                         const fieldY = 50 + (index * 35);
                         
-                        // Field label
+                        // Field label with better styling
                         const label = elementPool.getText();
-                        label.setAttribute('x', '10');
-                        label.setAttribute('y', fieldY - 5);
-                        label.setAttribute('fill', '#fff');
+                        label.setAttribute('x', '12');
+                        label.setAttribute('y', fieldY - 6);
+                        label.setAttribute('fill', '#e8e8e8');
                         label.setAttribute('font-size', '11');
-                        label.setAttribute('opacity', '0.9');
-                        label.textContent = field.label || field.name;
+                        label.setAttribute('font-weight', '500');
+                        label.setAttribute('opacity', '0.95');
+                        label.textContent = (field.label || field.name).toUpperCase();
+                        label.setAttribute('letter-spacing', '0.5px');
                         g.appendChild(label);
                         
                         // Create foreignObject for HTML input/select (with fallback)
@@ -489,23 +573,28 @@
                             select.setAttribute('aria-label', field.label || field.name);
                             select.style.cssText = `
                                 width: 100%;
-                                height: 24px;
-                                padding: 2px 6px;
-                                border: 1px solid rgba(255, 255, 255, 0.3);
-                                border-radius: 4px;
-                                background: rgba(255, 255, 255, 0.1);
-                                color: #fff;
-                                font-size: 11px;
+                                height: 26px;
+                                padding: 4px 8px;
+                                border: 1.5px solid rgba(255, 255, 255, 0.25);
+                                border-radius: 6px;
+                                background: rgba(255, 255, 255, 0.12);
+                                color: #ffffff;
+                                font-size: 12px;
+                                font-weight: 500;
                                 outline: none;
                                 cursor: pointer;
+                                transition: all 0.2s ease;
+                                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
                             `;
                             select.addEventListener('mouseenter', () => {
-                                select.style.borderColor = 'rgba(255, 255, 255, 0.5)';
-                                select.style.background = 'rgba(255, 255, 255, 0.15)';
+                                select.style.borderColor = 'rgba(52, 152, 219, 0.6)';
+                                select.style.background = 'rgba(255, 255, 255, 0.18)';
+                                select.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.15)';
                             });
                             select.addEventListener('mouseleave', () => {
-                                select.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                                select.style.background = 'rgba(255, 255, 255, 0.1)';
+                                select.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                                select.style.background = 'rgba(255, 255, 255, 0.12)';
+                                select.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
                             });
                             select.setAttribute('data-field-name', field.name);
                             select.setAttribute('data-block-id', block.id);
@@ -547,34 +636,41 @@
                             input.setAttribute('aria-label', field.label || field.name);
                             input.style.cssText = `
                                 width: 100%;
-                                height: 20px;
-                                padding: 2px 6px;
-                                border: 1px solid rgba(255, 255, 255, 0.3);
-                                border-radius: 4px;
-                                background: rgba(255, 255, 255, 0.1);
-                                color: #fff;
-                                font-size: 11px;
+                                height: 24px;
+                                padding: 4px 8px;
+                                border: 1.5px solid rgba(255, 255, 255, 0.25);
+                                border-radius: 6px;
+                                background: rgba(255, 255, 255, 0.12);
+                                color: #ffffff;
+                                font-size: 12px;
+                                font-weight: 500;
                                 outline: none;
                                 cursor: text;
+                                transition: all 0.2s ease;
+                                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
                             `;
                             const inputFocusHandler = () => {
                                 input.style.borderColor = 'rgba(52, 152, 219, 0.8)';
-                                input.style.background = 'rgba(255, 255, 255, 0.15)';
+                                input.style.background = 'rgba(255, 255, 255, 0.18)';
+                                input.style.boxShadow = '0 2px 6px rgba(52, 152, 219, 0.3)';
                             };
                             const inputBlurHandler = () => {
-                                input.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                                input.style.background = 'rgba(255, 255, 255, 0.1)';
+                                input.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                                input.style.background = 'rgba(255, 255, 255, 0.12)';
+                                input.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
                             };
                             const inputMouseEnterHandler = () => {
                                 if (document.activeElement !== input) {
-                                    input.style.borderColor = 'rgba(255, 255, 255, 0.5)';
-                                    input.style.background = 'rgba(255, 255, 255, 0.12)';
+                                    input.style.borderColor = 'rgba(52, 152, 219, 0.6)';
+                                    input.style.background = 'rgba(255, 255, 255, 0.15)';
+                                    input.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.15)';
                                 }
                             };
                             const inputMouseLeaveHandler = () => {
                                 if (document.activeElement !== input) {
-                                    input.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                                    input.style.background = 'rgba(255, 255, 255, 0.1)';
+                                    input.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                                    input.style.background = 'rgba(255, 255, 255, 0.12)';
+                                    input.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
                                 }
                             };
                             const inputInputHandler = (e) => {
@@ -622,14 +718,21 @@
                         portCircle.setAttribute('cx', '7'); // Center at 7 so left edge touches x=0 (radius 7)
                         portCircle.setAttribute('cy', portY);
                         portCircle.setAttribute('r', '7');
-                        portCircle.setAttribute('fill', '#3498db');
-                        portCircle.setAttribute('stroke', '#fff');
-                        portCircle.setAttribute('stroke-width', '2');
+                        portCircle.setAttribute('fill', 'url(#portGradient)');
+                        portCircle.setAttribute('stroke', '#ffffff');
+                        portCircle.setAttribute('stroke-width', '2.5');
                         portCircle.setAttribute('data-port-type', 'input');
                         portCircle.setAttribute('data-port-name', port.name);
                         portCircle.setAttribute('role', 'button');
                         portCircle.setAttribute('aria-label', `Input port ${port.name}`);
                         portCircle.setAttribute('tabindex', '0');
+                        // Add hover effect
+                        portCircle.addEventListener('mouseenter', () => {
+                            portCircle.setAttribute('fill', 'url(#portHoverGradient)');
+                        });
+                        portCircle.addEventListener('mouseleave', () => {
+                            portCircle.setAttribute('fill', 'url(#portGradient)');
+                        });
                         // Use tracked event listener for cleanup
                         const inputPortHandler = (e) => handlePortMouseUp(e, block.id, port.name, 'input');
                         addEventListenerWithCleanup(portCircle, 'mouseup', inputPortHandler);
@@ -642,13 +745,14 @@
                         });
                         g.appendChild(portCircle);
                         
-                        // Port label
+                        // Port label with better styling
                         const portLabel = elementPool.getText();
                         portLabel.setAttribute('class', 'svg-port-label');
-                        portLabel.setAttribute('x', '12');
-                        portLabel.setAttribute('y', portY + 4);
-                        portLabel.setAttribute('fill', '#fff');
+                        portLabel.setAttribute('x', '18');
+                        portLabel.setAttribute('y', portY + 5);
+                        portLabel.setAttribute('fill', '#e8e8e8');
                         portLabel.setAttribute('font-size', '11');
+                        portLabel.setAttribute('font-weight', '500');
                         portLabel.textContent = port.name;
                         g.appendChild(portLabel);
                     });
@@ -663,14 +767,21 @@
                         portCircle.setAttribute('cx', block.width - 7); // Center at width-7 so right edge touches x=width (radius 7)
                         portCircle.setAttribute('cy', portY);
                         portCircle.setAttribute('r', '7');
-                        portCircle.setAttribute('fill', '#3498db');
-                        portCircle.setAttribute('stroke', '#fff');
-                        portCircle.setAttribute('stroke-width', '2');
+                        portCircle.setAttribute('fill', 'url(#portGradient)');
+                        portCircle.setAttribute('stroke', '#ffffff');
+                        portCircle.setAttribute('stroke-width', '2.5');
                         portCircle.setAttribute('data-port-type', 'output');
                         portCircle.setAttribute('data-port-name', port.name);
                         portCircle.setAttribute('role', 'button');
                         portCircle.setAttribute('aria-label', `Output port ${port.name}`);
                         portCircle.setAttribute('tabindex', '0');
+                        // Add hover effect
+                        portCircle.addEventListener('mouseenter', () => {
+                            portCircle.setAttribute('fill', 'url(#portHoverGradient)');
+                        });
+                        portCircle.addEventListener('mouseleave', () => {
+                            portCircle.setAttribute('fill', 'url(#portGradient)');
+                        });
                         const outputPortHandler = (e) => handlePortMouseDown(e, block.id, port.name, 'output');
                         addEventListenerWithCleanup(portCircle, 'mousedown', outputPortHandler);
                         // Keyboard support
@@ -682,14 +793,15 @@
                         });
                         g.appendChild(portCircle);
                         
-                        // Port label
+                        // Port label with better styling
                         const portLabel = elementPool.getText();
                         portLabel.setAttribute('class', 'svg-port-label');
-                        portLabel.setAttribute('x', block.width - 12);
-                        portLabel.setAttribute('y', portY + 4);
+                        portLabel.setAttribute('x', block.width - 18);
+                        portLabel.setAttribute('y', portY + 5);
                         portLabel.setAttribute('text-anchor', 'end');
-                        portLabel.setAttribute('fill', '#fff');
+                        portLabel.setAttribute('fill', '#e8e8e8');
                         portLabel.setAttribute('font-size', '11');
+                        portLabel.setAttribute('font-weight', '500');
                         portLabel.textContent = port.name;
                         g.appendChild(portLabel);
                     });

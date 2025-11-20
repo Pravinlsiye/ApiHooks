@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SiyeFlow Debug Pages</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 40px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 40px;
+        }
+        .debug-list {
+            display: grid;
+            gap: 20px;
+        }
+        .debug-card {
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            padding: 24px;
+            transition: all 0.2s;
+        }
+        .debug-card:hover {
+            border-color: #4a9eff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 158, 255, 0.2);
+        }
+        .debug-card h2 {
+            margin: 0 0 8px 0;
+            color: #fff;
+            font-size: 20px;
+        }
+        .debug-card p {
+            margin: 0 0 16px 0;
+            color: #aaa;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .debug-card a {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4a9eff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .debug-card a:hover {
+            background: #5dade2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 SiyeFlow Debug Pages</h1>
+        <p class="subtitle">Debug and test pages for SiyeFlow Designer</p>
+        
+        <div class="debug-list">
+            <div class="debug-card">
+                <h2>SVG Canvas Debug</h2>
+                <p>Test the SVG-based canvas implementation with optimized rendering, gradients, and smooth animations. Best for performance with 100+ blocks.</p>
+                <a href="./debug-canvas.html">Open SVG Canvas</a>
+            </div>
+            
+            <div class="debug-card">
+                <h2>HTML Canvas Debug</h2>
+                <p>Test the HTML-based canvas implementation with native form elements. Easier to work with but better for smaller workflows.</p>
+                <a href="./debug-canvas-html.html">Open HTML Canvas</a>
+            </div>
+            
+            <div class="debug-card">
+                <h2>Block Renderer Debug</h2>
+                <p>Test individual block rendering and styling. Useful for debugging block appearance and interactions.</p>
+                <a href="./debug.html">Open Block Renderer</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
