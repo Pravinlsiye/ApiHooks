@@ -139,6 +139,16 @@
             overflow: visible;
         }
         
+        /* Preview connection styling */
+        .connection-line.preview-connection {
+            pointer-events: none !important;
+            z-index: 1;
+        }
+        
+        .connection-line.preview-connection path {
+            pointer-events: none;
+        }
+        
         /* Make SVG path receive events */
         .connection-line path {
             pointer-events: all;
@@ -207,7 +217,6 @@
             background: var(--bg-elevated);
             pointer-events: none; /* Block body doesn't capture events - allows connections behind to receive events */
             z-index: 10; /* Blocks appear above connections */
-            min-width: 200px;
             transition: box-shadow 0.2s, border-color 0.2s;
         }
         
@@ -224,6 +233,18 @@
         
         .workflow-block .port-tab {
             pointer-events: all;
+        }
+        
+        /* Ensure port tabs in Start/End blocks are clickable */
+        .workflow-block .port-input-tab,
+        .workflow-block .port-input-tab .port-tab {
+            pointer-events: all;
+            cursor: crosshair;
+        }
+        
+        .workflow-block .port-row .port-tab {
+            pointer-events: all;
+            cursor: crosshair;
         }
         
         .workflow-block:hover {
@@ -273,45 +294,154 @@
         .block-ports {
             display: flex;
             justify-content: space-between;
-            padding: 8px 12px;
+            align-items: flex-start;
+            padding: 12px 16px;
             border-top: 1px solid var(--border-default);
+            background: rgba(0, 0, 0, 0.05);
+            min-height: 60px;
+            gap: 16px;
+            position: relative;
+        }
+        
+        /* Ensure ports align properly when counts differ */
+        .port-group:first-child {
+            justify-content: flex-start;
+        }
+        
+        .port-group:last-child {
+            justify-content: flex-start;
         }
         
         .port-group {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+            max-width: 50%;
+        }
+        
+        .port-group:first-child {
+            align-items: flex-start;
+            text-align: left;
+        }
+        
+        .port-group:last-child {
+            align-items: flex-end;
+            text-align: right;
         }
         
         .port {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             font-size: 11px;
             color: var(--text-secondary);
+            position: relative;
+            white-space: nowrap;
+            min-height: 24px;
+        }
+        
+        .port.input-port {
+            justify-content: flex-start;
+            flex-direction: row;
+        }
+        
+        .port.output-port {
+            justify-content: flex-end;
+            flex-direction: row-reverse;
+        }
+        
+        .port-label {
+            flex-shrink: 0;
+            user-select: none;
         }
         
         .port-tab {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            border: 2px solid var(--bg-elevated);
+            width: 16px;
+            height: 24px;
+            min-width: 16px;
+            min-height: 24px;
             cursor: crosshair;
-            transition: transform 0.2s, background 0.2s;
+            transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 20;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            border: none;
         }
         
-        .port-tab:hover {
-            transform: scale(1.2);
-            background: var(--accent-primary-light);
-        }
-        
+        /* Input port - flat edge on left (border), curved edge extends right (inside block) */
         .port-tab.input {
-            margin-left: -7px;
+            margin-left: -2px; /* Extend slightly to align flat edge with border */
+            background: #4CAF50;
+            border-radius: 0 12px 12px 0;
+            border-left: 2px solid var(--bg-elevated);
         }
         
+        .port-tab.input:hover {
+            background: #66BB6A;
+            transform: scale(1.15);
+            box-shadow: 0 3px 8px rgba(76, 175, 80, 0.4);
+        }
+        
+        /* Output port - flat edge on right (border), curved edge extends left (inside block) */
         .port-tab.output {
-            margin-right: -7px;
+            margin-right: -2px; /* Extend slightly to align flat edge with border */
+            background: var(--accent-primary);
+            border-radius: 12px 0 0 12px;
+            border-right: 2px solid var(--bg-elevated);
+        }
+        
+        .port-tab.output:hover {
+            background: var(--accent-primary-light);
+            transform: scale(1.15);
+            box-shadow: 0 3px 8px rgba(74, 144, 226, 0.4);
+        }
+        
+        /* Ensure port tabs extend outside block boundaries */
+        .workflow-block {
+            overflow: visible;
+        }
+        
+        /* Ensure proper alignment and spacing for semi-circular ports */
+        .port-group:first-child {
+            padding-right: 0;
+        }
+        
+        .port-group:last-child {
+            padding-left: 0;
+        }
+        
+        /* Ensure ports align vertically with labels */
+        .port {
+            align-items: center;
+        }
+        
+        /* Visual indicator for semi-circular ports - centered on flat edge */
+        .port-tab::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        
+        .port-tab.input::before {
+            left: 1px; /* Center on flat edge (left border side) */
+        }
+        
+        .port-tab.output::before {
+            right: 1px; /* Center on flat edge (right border side) */
+        }
+        
+        .port-tab:hover::before {
+            opacity: 1;
         }
         
         .info-panel {
@@ -369,6 +499,7 @@
     <script type="module">
         import { BlockType } from '../src/models/workflow-models.ts';
         import { connectionPathToHTMLSegments } from '../src/utils/edge-algorithms/index.ts';
+        import { BlockRendererFactory } from '../src/designer/renderers/BlockRendererFactory.ts';
         
         // Initialize theme
         if (typeof document !== 'undefined') {
@@ -383,8 +514,6 @@
         
         let blocks = new Map();
         let connections = new Map();
-        let blockCounter = 0;
-        let connectionCounter = 0;
         
         // Block colors
         const blockColors = {
@@ -396,6 +525,476 @@
             [BlockType.Delay]: '#00BCD4',
             [BlockType.Log]: '#607D8B'
         };
+        
+        // Block schemas from debug.html
+        const blockSchemas = [
+            {
+                type: BlockType.Start,
+                name: 'Start',
+                schema: {
+                    id: 'start1',
+                    type: BlockType.Start,
+                    name: 'API Configuration',
+                    description: 'Start block with profiles',
+                    config: {
+                        profiles: [
+                            {
+                                name: 'Development',
+                                description: 'Dev environment',
+                                default: true,
+                                inputs: {
+                                    apiUrl: { type: 'string', value: 'http://localhost:5216' },
+                                    userId: { type: 'string', value: 'dev-user' },
+                                    timeout: { type: 'number', value: 5000 }
+                                }
+                            },
+                            {
+                                name: 'Production',
+                                description: 'Prod environment',
+                                inputs: {
+                                    apiUrl: { type: 'string', value: 'https://api.prod.com' },
+                                    userId: { type: 'string', value: 'prod-user' },
+                                    timeout: { type: 'number', value: 30000 }
+                                }
+                            }
+                        ],
+                        selectedProfile: 'Development'
+                    }
+                }
+            },
+            {
+                type: BlockType.HttpRequest,
+                name: 'HTTP Request',
+                schema: {
+                    id: 'http1',
+                    type: BlockType.HttpRequest,
+                    name: 'Get User Data',
+                    description: 'Fetch user information',
+                    config: {
+                        method: 'GET',
+                        url: '{{apiUrl}}/api/users/{{userId}}'
+                    },
+                    inputPorts: [
+                        { name: 'apiUrl', type: 'string', required: true },
+                        { name: 'userId', type: 'string', required: true }
+                    ],
+                    outputPorts: [
+                        { name: 'response', type: 'object' }
+                    ]
+                }
+            },
+            {
+                type: BlockType.Variable,
+                name: 'Variable',
+                schema: {
+                    id: 'var1',
+                    type: BlockType.Variable,
+                    name: 'Process Data',
+                    description: 'Set variables',
+                    config: {
+                        operation: 'set',
+                        variables: {
+                            userName: '{{response.name}}',
+                            userEmail: '{{response.email}}'
+                        }
+                    },
+                    inputPorts: [
+                        { name: 'response', type: 'object' }
+                    ],
+                    outputPorts: [
+                        { name: 'userName', type: 'string' },
+                        { name: 'userEmail', type: 'string' }
+                    ]
+                }
+            },
+            {
+                type: BlockType.Condition,
+                name: 'Condition',
+                schema: {
+                    id: 'cond1',
+                    type: BlockType.Condition,
+                    name: 'Check Value',
+                    description: 'Evaluate condition',
+                    config: {
+                        expression: '{{value}} > 10'
+                    },
+                    inputPorts: [
+                        { name: 'value', type: 'number' }
+                    ],
+                    outputPorts: [
+                        { name: 'true', type: 'boolean' },
+                        { name: 'false', type: 'boolean' }
+                    ]
+                }
+            },
+            {
+                type: BlockType.Log,
+                name: 'Log',
+                schema: {
+                    id: 'log1',
+                    type: BlockType.Log,
+                    name: 'Log Message',
+                    description: 'Display log message',
+                    config: {
+                        message: 'User data: {{userData}}',
+                        level: 'info'
+                    },
+                    inputPorts: [
+                        { name: 'userData', type: 'object' }
+                    ]
+                }
+            },
+            {
+                type: BlockType.Delay,
+                name: 'Delay',
+                schema: {
+                    id: 'delay1',
+                    type: BlockType.Delay,
+                    name: 'Wait',
+                    description: 'Delay execution',
+                    config: {
+                        milliseconds: 1000
+                    },
+                    inputPorts: [
+                        { name: 'trigger', type: 'any' }
+                    ],
+                    outputPorts: [
+                        { name: 'continue', type: 'any' }
+                    ]
+                }
+            },
+            {
+                type: BlockType.End,
+                name: 'End',
+                schema: {
+                    id: 'end1',
+                    type: BlockType.End,
+                    name: 'Complete',
+                    description: 'Workflow completion',
+                    config: {
+                        outputs: {
+                            result: { type: 'object', value: '{{userData}}' }
+                        }
+                    },
+                    inputPorts: [
+                        { name: 'in', type: 'any', multiple: true }
+                    ]
+                }
+            }
+        ];
+        
+        // Block Factory - Handles block creation
+        class BlockFactory {
+            constructor(blocksMap, blockColors) {
+                this.blocks = blocksMap;
+                this.blockColors = blockColors;
+                this.counter = 0;
+            }
+            
+            /**
+             * Creates a random block using schemas from debug.html
+             * @returns {Object} The created block object
+             */
+            createRandomBlock() {
+                this.counter++;
+                
+                // Pick a random schema
+                const schemaTemplate = blockSchemas[Math.floor(Math.random() * blockSchemas.length)];
+                const schema = JSON.parse(JSON.stringify(schemaTemplate.schema)); // Deep clone
+                
+                const canvasWrapper = document.querySelector('.canvas-wrapper');
+                const wrapperRect = canvasWrapper.getBoundingClientRect();
+                const centerX = wrapperRect.width / 2;
+                const centerY = wrapperRect.height / 2;
+                
+                const inputPorts = schema.inputPorts || [];
+                const outputPorts = schema.outputPorts || [];
+                
+                const block = {
+                    id: `${schema.type.toLowerCase()}-${this.counter}`,
+                    type: schema.type,
+                    name: schema.name || `${schema.type} Block ${this.counter}`,
+                    description: schema.description,
+                    position: {
+                        x: centerX - 100 + (Math.random() * 200 - 100),
+                        y: centerY - 100 + (Math.random() * 200 - 100)
+                    },
+                    selected: false,
+                    inputPorts: inputPorts.map(p => ({ name: p.name, type: p.type || 'any' })),
+                    outputPorts: outputPorts.map(p => ({ name: p.name, type: p.type || 'any' })),
+                    schema: schema // Store the full schema for rendering
+                };
+                
+                this.blocks.set(block.id, block);
+                return block;
+            }
+            
+            /**
+             * Creates a block from a specific schema type
+             * @param {string} blockType - The BlockType to create
+             * @returns {Object} The created block object
+             */
+            createBlockFromSchema(blockType) {
+                const schemaTemplate = blockSchemas.find(bs => bs.type === blockType);
+                if (!schemaTemplate) {
+                    console.warn(`Schema not found for block type: ${blockType}`);
+                    return this.createRandomBlock();
+                }
+                
+                this.counter++;
+                const schema = JSON.parse(JSON.stringify(schemaTemplate.schema)); // Deep clone
+                
+                const canvasWrapper = document.querySelector('.canvas-wrapper');
+                const wrapperRect = canvasWrapper.getBoundingClientRect();
+                const centerX = wrapperRect.width / 2;
+                const centerY = wrapperRect.height / 2;
+                
+                const inputPorts = schema.inputPorts || [];
+                const outputPorts = schema.outputPorts || [];
+                
+                const block = {
+                    id: `${schema.type.toLowerCase()}-${this.counter}`,
+                    type: schema.type,
+                    name: schema.name || `${schema.type} Block ${this.counter}`,
+                    description: schema.description,
+                    position: {
+                        x: centerX - 100 + (Math.random() * 200 - 100),
+                        y: centerY - 100 + (Math.random() * 200 - 100)
+                    },
+                    selected: false,
+                    inputPorts: inputPorts.map(p => ({ name: p.name, type: p.type || 'any' })),
+                    outputPorts: outputPorts.map(p => ({ name: p.name, type: p.type || 'any' })),
+                    schema: schema // Store the full schema for rendering
+                };
+                
+                this.blocks.set(block.id, block);
+                return block;
+            }
+            
+            /**
+             * Creates a custom block with specified configuration
+             * @param {Object} config - Block configuration
+             * @returns {Object} The created block object
+             */
+            createBlock(config) {
+                this.counter++;
+                const block = {
+                    id: config.id || `block-${this.counter}`,
+                    type: config.type || BlockType.Log,
+                    name: config.name || `${config.type || BlockType.Log} Block ${this.counter}`,
+                    position: config.position || { x: 0, y: 0 },
+                    selected: config.selected || false,
+                    inputPorts: config.inputPorts || [],
+                    outputPorts: config.outputPorts || [],
+                    fields: config.fields || [],
+                    fieldValues: config.fieldValues || {}
+                };
+                
+                // Only set width/height if explicitly provided
+                if (config.width !== undefined) block.width = config.width;
+                if (config.height !== undefined) block.height = config.height;
+                
+                this.blocks.set(block.id, block);
+                return block;
+            }
+            
+            /**
+             * Deletes a block by ID
+             * @param {string} blockId - The ID of the block to delete
+             * @returns {boolean} True if block was deleted, false otherwise
+             */
+            deleteBlock(blockId) {
+                return this.blocks.delete(blockId);
+            }
+            
+            /**
+             * Gets a block by ID
+             * @param {string} blockId - The ID of the block
+             * @returns {Object|null} The block object or null if not found
+             */
+            getBlock(blockId) {
+                return this.blocks.get(blockId) || null;
+            }
+            
+            /**
+             * Gets all blocks
+             * @returns {Map} Map of all blocks
+             */
+            getAllBlocks() {
+                return this.blocks;
+            }
+            
+            /**
+             * Clears all blocks
+             */
+            clearAll() {
+                this.blocks.clear();
+                this.counter = 0;
+            }
+            
+            /**
+             * Resets the counter
+             */
+            resetCounter() {
+                this.counter = 0;
+            }
+        }
+        
+        // Connection Factory - Handles connection creation
+        class ConnectionFactory {
+            constructor(connectionsMap, blocksMap) {
+                this.connections = connectionsMap;
+                this.blocks = blocksMap;
+                this.counter = 0;
+            }
+            
+            /**
+             * Creates a random connection between two random blocks
+             * @returns {Object|null} The created connection object or null if creation failed
+             */
+            createRandomConnection() {
+                if (this.blocks.size < 2) {
+                    return null;
+                }
+                
+                const blockArray = Array.from(this.blocks.values());
+                const sourceBlock = blockArray[Math.floor(Math.random() * blockArray.length)];
+                const targetBlock = blockArray[Math.floor(Math.random() * blockArray.length)];
+                
+                if (sourceBlock.id === targetBlock.id) return null;
+                if (!sourceBlock.outputPorts || sourceBlock.outputPorts.length === 0) return null;
+                if (!targetBlock.inputPorts || targetBlock.inputPorts.length === 0) return null;
+                
+                return this.createConnection({
+                    sourceBlockId: sourceBlock.id,
+                    targetBlockId: targetBlock.id,
+                    sourcePortName: sourceBlock.outputPorts[0].name,
+                    targetPortName: targetBlock.inputPorts[0].name
+                });
+            }
+            
+            /**
+             * Creates a connection with specified configuration
+             * @param {Object} config - Connection configuration
+             * @returns {Object|null} The created connection object or null if creation failed
+             */
+            createConnection(config) {
+                // Validate source block
+                const sourceBlock = this.blocks.get(config.sourceBlockId);
+                if (!sourceBlock) {
+                    console.error(`Source block ${config.sourceBlockId} not found`);
+                    return null;
+                }
+                
+                // Validate target block
+                const targetBlock = this.blocks.get(config.targetBlockId);
+                if (!targetBlock) {
+                    console.error(`Target block ${config.targetBlockId} not found`);
+                    return null;
+                }
+                
+                // Prevent self-connection
+                if (sourceBlock.id === targetBlock.id) {
+                    console.error('Cannot create connection from block to itself');
+                    return null;
+                }
+                
+                // Validate source port
+                const sourcePort = sourceBlock.outputPorts?.find(p => p.name === config.sourcePortName);
+                if (!sourcePort) {
+                    console.error(`Source port ${config.sourcePortName} not found on block ${config.sourceBlockId}`);
+                    return null;
+                }
+                
+                // Validate target port
+                const targetPort = targetBlock.inputPorts?.find(p => p.name === config.targetPortName);
+                if (!targetPort) {
+                    console.error(`Target port ${config.targetPortName} not found on block ${config.targetBlockId}`);
+                    return null;
+                }
+                
+                // Check for duplicate connection
+                const existingConnection = Array.from(this.connections.values()).find(
+                    conn => conn.sourceBlockId === config.sourceBlockId &&
+                           conn.targetBlockId === config.targetBlockId &&
+                           conn.sourcePortName === config.sourcePortName &&
+                           conn.targetPortName === config.targetPortName
+                );
+                
+                if (existingConnection) {
+                    console.warn('Connection already exists');
+                    return existingConnection;
+                }
+                
+                this.counter++;
+                const connection = {
+                    id: config.id || `connection-${this.counter}`,
+                    sourceBlockId: config.sourceBlockId,
+                    targetBlockId: config.targetBlockId,
+                    sourcePortName: config.sourcePortName,
+                    targetPortName: config.targetPortName
+                };
+                
+                this.connections.set(connection.id, connection);
+                return connection;
+            }
+            
+            /**
+             * Deletes a connection by ID
+             * @param {string} connectionId - The ID of the connection to delete
+             * @returns {boolean} True if connection was deleted, false otherwise
+             */
+            deleteConnection(connectionId) {
+                return this.connections.delete(connectionId);
+            }
+            
+            /**
+             * Gets a connection by ID
+             * @param {string} connectionId - The ID of the connection
+             * @returns {Object|null} The connection object or null if not found
+             */
+            getConnection(connectionId) {
+                return this.connections.get(connectionId) || null;
+            }
+            
+            /**
+             * Gets all connections
+             * @returns {Map} Map of all connections
+             */
+            getAllConnections() {
+                return this.connections;
+            }
+            
+            /**
+             * Gets connections for a specific block
+             * @param {string} blockId - The ID of the block
+             * @returns {Array} Array of connection objects
+             */
+            getConnectionsForBlock(blockId) {
+                return Array.from(this.connections.values()).filter(
+                    conn => conn.sourceBlockId === blockId || conn.targetBlockId === blockId
+                );
+            }
+            
+            /**
+             * Clears all connections
+             */
+            clearAll() {
+                this.connections.clear();
+                this.counter = 0;
+            }
+            
+            /**
+             * Resets the counter
+             */
+            resetCounter() {
+                this.counter = 0;
+            }
+        }
+        
+        // Initialize factories
+        const blockFactory = new BlockFactory(blocks, blockColors);
+        const connectionFactory = new ConnectionFactory(connections, blocks);
         
         // Drag state
         let isDragging = false;
@@ -412,128 +1011,111 @@
         let panStart = { x: 0, y: 0 };
         let panOffset = { x: 0, y: 0 };
         
-        // HTML Block Renderer
+        // HTML Block Renderer - Uses BlockRendererFactory from debug.html
         class HTMLBlockRenderer {
             static render(block) {
                 const blockEl = document.createElement('div');
                 blockEl.className = `workflow-block block-type-${block.type}`;
-                blockEl.dataset.blockId = block.id;
+                blockEl.id = `block-${block.id}`; // BlockRendererFactory expects id="block-{id}"
+                blockEl.dataset.blockId = block.id; // Also keep for our selectors
                 blockEl.style.left = `${block.position.x}px`;
                 blockEl.style.top = `${block.position.y}px`;
-                blockEl.style.width = `${block.width}px`;
-                blockEl.style.minHeight = `${block.height}px`;
+                // Only set width/height if explicitly provided - let blocks size naturally otherwise
+                if (block.width !== undefined) {
+                    blockEl.style.width = `${block.width}px`;
+                }
+                if (block.height !== undefined) {
+                    blockEl.style.height = `${block.height}px`;
+                }
                 blockEl.style.borderColor = blockColors[block.type] || '#666';
                 
-                // Header
-                const header = document.createElement('div');
-                header.className = 'block-header';
-                header.textContent = block.name || block.type;
-                blockEl.appendChild(header);
+                // Use BlockRendererFactory to render the block (same as debug.html)
+                const visualBlock = {
+                    id: block.id,
+                    type: block.type,
+                    position: block.position,
+                    width: block.width,
+                    height: block.height,
+                    selected: block.selected,
+                    inputPorts: block.inputPorts || [],
+                    outputPorts: block.outputPorts || []
+                };
                 
-                // Content
-                const content = document.createElement('div');
-                content.className = 'block-content';
+                const blockSchema = block.schema || {
+                    id: block.id,
+                    type: block.type,
+                    name: block.name,
+                    description: block.description,
+                    config: block.config,
+                    inputPorts: block.inputPorts,
+                    outputPorts: block.outputPorts
+                };
                 
-                // Fields
-                if (block.fields && block.fields.length > 0) {
-                    block.fields.forEach(field => {
-                        const fieldDiv = document.createElement('div');
-                        fieldDiv.className = 'block-field';
+                try {
+                    const renderer = BlockRendererFactory.createRenderer(visualBlock, blockSchema);
+                    renderer.updatePorts();
+                    
+                    // Sync ports back to block object after updatePorts() (important for End blocks)
+                    // This updates the block object which is stored in the Map (by reference)
+                    block.inputPorts = visualBlock.inputPorts || [];
+                    block.outputPorts = visualBlock.outputPorts || [];
+                    
+                    const html = renderer.render();
+                    blockEl.innerHTML = html;
+                    
+                    // Attach port event handlers to the rendered ports (BlockRendererFactory structure)
+                    // Handle both standard port-row and special port-input-tab (used by Start/End blocks)
+                    const inputPortRows = blockEl.querySelectorAll('.port-row.port-input, .port-input-tab, [data-port-type="input"]');
+                    inputPortRows.forEach(portRow => {
+                        const portName = portRow.dataset.port;
+                        if (!portName) return;
                         
-                        const label = document.createElement('label');
-                        label.textContent = field.label || field.name;
-                        fieldDiv.appendChild(label);
-                        
-                        if (field.type === 'select' || field.type === 'dropdown') {
-                            const select = document.createElement('select');
-                            const options = field.options || [];
-                            options.forEach(option => {
-                                const optionEl = document.createElement('option');
-                                optionEl.value = typeof option === 'string' ? option : option.value;
-                                optionEl.textContent = typeof option === 'string' ? option : option.label;
-                                if (field.value === optionEl.value) {
-                                    optionEl.selected = true;
-                                }
-                                select.appendChild(optionEl);
+                        const portTab = portRow.querySelector('.port-tab');
+                        if (portTab) {
+                            // Remove any existing handlers
+                            const newPortTab = portTab.cloneNode(true);
+                            portTab.parentNode.replaceChild(newPortTab, portTab);
+                            
+                            newPortTab.addEventListener('mouseup', (e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handlePortMouseUp(e, block.id, portName, 'input');
                             });
-                            select.addEventListener('change', (e) => {
-                                if (!block.fieldValues) block.fieldValues = {};
-                                block.fieldValues[field.name] = e.target.value;
-                            });
-                            fieldDiv.appendChild(select);
-                        } else {
-                            const input = document.createElement('input');
-                            input.type = field.type || 'text';
-                            input.placeholder = field.placeholder || '';
-                            input.value = field.value || '';
-                            input.addEventListener('input', (e) => {
-                                if (!block.fieldValues) block.fieldValues = {};
-                                block.fieldValues[field.name] = e.target.value;
-                            });
-                            fieldDiv.appendChild(input);
                         }
-                        
-                        content.appendChild(fieldDiv);
                     });
-                }
-                
-                blockEl.appendChild(content);
-                
-                // Ports
-                const portsDiv = document.createElement('div');
-                portsDiv.className = 'block-ports';
-                
-                // Input ports
-                const inputPortsDiv = document.createElement('div');
-                inputPortsDiv.className = 'port-group';
-                if (block.inputPorts) {
-                    block.inputPorts.forEach(port => {
-                        const portDiv = document.createElement('div');
-                        portDiv.className = 'port';
+                    
+                    const outputPortRows = blockEl.querySelectorAll('.port-row.port-output, [data-port-type="output"]');
+                    outputPortRows.forEach(portRow => {
+                        const portName = portRow.dataset.port;
+                        if (!portName) return;
                         
-                        const portTab = document.createElement('div');
-                        portTab.className = 'port-tab input';
-                        portTab.dataset.portType = 'input';
-                        portTab.dataset.portName = port.name;
-                        portTab.dataset.blockId = block.id;
-                        portTab.addEventListener('mouseup', (e) => handlePortMouseUp(e, block.id, port.name, 'input'));
-                        
-                        const portLabel = document.createElement('span');
-                        portLabel.textContent = port.name;
-                        
-                        portDiv.appendChild(portTab);
-                        portDiv.appendChild(portLabel);
-                        inputPortsDiv.appendChild(portDiv);
+                        const portTab = portRow.querySelector('.port-tab');
+                        if (portTab) {
+                            // Remove any existing handlers
+                            const newPortTab = portTab.cloneNode(true);
+                            portTab.parentNode.replaceChild(newPortTab, portTab);
+                            
+                            newPortTab.addEventListener('mousedown', (e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handlePortMouseDown(e, block.id, portName, 'output');
+                            });
+                        }
                     });
+                    
+                    // Attach drag handler to header
+                    const header = blockEl.querySelector('.block-header');
+                    if (header) {
+                        header.addEventListener('mousedown', (e) => handleBlockMouseDown(e, block.id));
+                    }
+                } catch (error) {
+                    console.error('Error rendering block:', error);
+                    // Fallback to simple rendering
+                    blockEl.innerHTML = `
+                        <div class="block-header">${block.name || block.type}</div>
+                        <div class="block-content"></div>
+                    `;
                 }
-                
-                // Output ports
-                const outputPortsDiv = document.createElement('div');
-                outputPortsDiv.className = 'port-group';
-                if (block.outputPorts) {
-                    block.outputPorts.forEach(port => {
-                        const portDiv = document.createElement('div');
-                        portDiv.className = 'port';
-                        
-                        const portLabel = document.createElement('span');
-                        portLabel.textContent = port.name;
-                        
-                        const portTab = document.createElement('div');
-                        portTab.className = 'port-tab output';
-                        portTab.dataset.portType = 'output';
-                        portTab.dataset.portName = port.name;
-                        portTab.dataset.blockId = block.id;
-                        portTab.addEventListener('mousedown', (e) => handlePortMouseDown(e, block.id, port.name, 'output'));
-                        
-                        portDiv.appendChild(portLabel);
-                        portDiv.appendChild(portTab);
-                        outputPortsDiv.appendChild(portDiv);
-                    });
-                }
-                
-                portsDiv.appendChild(inputPortsDiv);
-                portsDiv.appendChild(outputPortsDiv);
-                blockEl.appendChild(portsDiv);
                 
                 return blockEl;
             }
@@ -548,8 +1130,8 @@
         // Simple Connection Renderer - Fresh Start
         class HTMLConnectionRenderer {
             static render(connection) {
-                const sourceBlock = blocks.get(connection.sourceBlockId);
-                const targetBlock = blocks.get(connection.targetBlockId);
+                const sourceBlock = blockFactory.getBlock(connection.sourceBlockId);
+                const targetBlock = blockFactory.getBlock(connection.targetBlockId);
                 
                 if (!sourceBlock || !targetBlock) return null;
                 
@@ -730,8 +1312,8 @@
             static update(connection, element, isDragging = false) {
                 if (!element) return;
                 
-                const sourceBlock = blocks.get(connection.sourceBlockId);
-                const targetBlock = blocks.get(connection.targetBlockId);
+                const sourceBlock = blockFactory.getBlock(connection.sourceBlockId);
+                const targetBlock = blockFactory.getBlock(connection.targetBlockId);
                 
                 if (!sourceBlock || !targetBlock) return;
                 
@@ -816,31 +1398,76 @@
             }
         }
         
-        // Helper to get port position
+        // Helper to get block element (works with both id and data-block-id)
+        function getBlockElement(blockId) {
+            return document.getElementById(`block-${blockId}`) || 
+                   document.querySelector(`[data-block-id="${blockId}"]`);
+        }
+        
+        // Helper to get port position - calculates from flat edge (where it touches border)
+        // Works with BlockRendererFactory port structure
         function getPortPosition(block, portName, portType) {
-            const blockEl = document.querySelector(`[data-block-id="${block.id}"]`);
-            if (!blockEl) return null;
+            const blockEl = getBlockElement(block.id);
+            if (!blockEl) {
+                console.warn(`Block element not found for block ${block.id}`);
+                return null;
+            }
             
-            const portTab = blockEl.querySelector(`[data-port-type="${portType}"][data-port-name="${portName}"]`);
-            if (!portTab) return null;
+            // BlockRendererFactory uses data-port and data-port-type on port-row or port-input-tab
+            // Try multiple selectors to find the port
+            let portRow = blockEl.querySelector(`[data-port="${portName}"][data-port-type="${portType}"]`);
             
-            const rect = portTab.getBoundingClientRect();
+            // Fallback: try finding by port name only (for End blocks)
+            if (!portRow) {
+                portRow = blockEl.querySelector(`[data-port="${portName}"]`);
+            }
+            
+            if (!portRow) {
+                console.warn(`Port row not found for port ${portName} (${portType}) on block ${block.id}`);
+                return null;
+            }
+            
+            // Find the actual port-tab element inside the port row
+            const portTab = portRow.querySelector('.port-tab');
+            if (!portTab) {
+                console.warn(`Port tab not found for port ${portName} (${portType}) on block ${block.id}`);
+                return null;
+            }
+            
+            const portRect = portTab.getBoundingClientRect();
+            const blockRect = blockEl.getBoundingClientRect();
             const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
             
-            return {
-                x: rect.left - wrapperRect.left + rect.width / 2,
-                y: rect.top - wrapperRect.top + rect.height / 2
-            };
+            // Get the border width (2px)
+            const borderWidth = 2;
+            
+            // Calculate position on the flat edge (border line)
+            let x, y;
+            
+            if (portType === 'input') {
+                // Input port: flat edge is on the left border
+                // Position is at the left edge of the port tab (which aligns with block border)
+                x = portRect.left - wrapperRect.left;
+            } else {
+                // Output port: flat edge is on the right border
+                // Position is at the right edge of the port tab (which aligns with block border)
+                x = portRect.right - wrapperRect.left;
+            }
+            
+            // Y position is the center of the port tab (vertical center of flat edge)
+            y = portRect.top - wrapperRect.top + portRect.height / 2;
+            
+            return { x, y };
         }
         
         
         // Block dragging handlers
         function handleBlockMouseDown(e, blockId) {
             e.stopPropagation();
-            const block = blocks.get(blockId);
+            const block = blockFactory.getBlock(blockId);
             if (!block) return;
             
-            const blockEl = document.querySelector(`[data-block-id="${blockId}"]`);
+            const blockEl = getBlockElement(blockId);
             if (!blockEl) return;
             
             const rect = blockEl.getBoundingClientRect();
@@ -872,7 +1499,7 @@
                 draggedBlock.position.x = e.clientX - wrapperRect.left - dragOffset.x;
                 draggedBlock.position.y = e.clientY - wrapperRect.top - dragOffset.y;
                 
-                const blockEl = document.querySelector(`[data-block-id="${draggedBlock.id}"]`);
+                const blockEl = getBlockElement(draggedBlock.id);
                 if (blockEl) {
                     HTMLBlockRenderer.update(draggedBlock, blockEl);
                 }
@@ -892,12 +1519,18 @@
                 const canvasWrapper = document.querySelector('.canvas-wrapper');
                 canvasWrapper.classList.remove('panning');
             } else if (isDragging && draggedBlock) {
-                const blockEl = document.querySelector(`[data-block-id="${draggedBlock.id}"]`);
+                const blockEl = getBlockElement(draggedBlock.id);
                 if (blockEl) {
                     blockEl.classList.remove('selected');
                 }
                 isDragging = false;
                 draggedBlock = null;
+            } else if (isCreatingConnection && connectionStart) {
+                // Cancel connection if mouse up outside of a port
+                const target = e.target;
+                if (!target.closest('.port-tab')) {
+                    cancelConnection();
+                }
             }
         }
         
@@ -925,21 +1558,20 @@
         
         // Update connections when block moves
         function updateConnectionsForBlock(blockId, isDragging = false) {
-            connections.forEach((connection, connectionId) => {
-                if (connection.sourceBlockId === blockId || connection.targetBlockId === blockId) {
-                    const connectionEl = document.querySelector(`[data-connection-id="${connectionId}"]`);
-                    if (connectionEl) {
-                        HTMLConnectionRenderer.update(connection, connectionEl, isDragging);
-                    } else {
-                        const newEl = HTMLConnectionRenderer.render(connection);
-                        if (newEl) {
-                            // Insert connections at the beginning so blocks appear on top
-                            const firstBlock = canvasLayer.querySelector('.workflow-block');
-                            if (firstBlock) {
-                                canvasLayer.insertBefore(newEl, firstBlock);
-                            } else {
-                                canvasLayer.appendChild(newEl);
-                            }
+            const relatedConnections = connectionFactory.getConnectionsForBlock(blockId);
+            relatedConnections.forEach(connection => {
+                const connectionEl = document.querySelector(`[data-connection-id="${connection.id}"]`);
+                if (connectionEl) {
+                    HTMLConnectionRenderer.update(connection, connectionEl, isDragging);
+                } else {
+                    const newEl = HTMLConnectionRenderer.render(connection);
+                    if (newEl) {
+                        // Insert connections at the beginning so blocks appear on top
+                        const firstBlock = canvasLayer.querySelector('.workflow-block');
+                        if (firstBlock) {
+                            canvasLayer.insertBefore(newEl, firstBlock);
+                        } else {
+                            canvasLayer.appendChild(newEl);
                         }
                     }
                 }
@@ -952,7 +1584,7 @@
             
             if (portType !== 'output') return;
             
-            const block = blocks.get(blockId);
+            const block = blockFactory.getBlock(blockId);
             if (!block) return;
             
             const start = getPortPosition(block, portName, portType);
@@ -990,38 +1622,23 @@
                 return;
             }
             
-            const sourceBlock = blocks.get(connectionStart.blockId);
-            const targetBlock = blocks.get(blockId);
-            
-            if (!sourceBlock || !targetBlock || sourceBlock.id === targetBlock.id) {
-                cancelConnection();
-                return;
-            }
-            
-            const targetPort = targetBlock.inputPorts?.find(p => p.name === portName);
-            if (!targetPort) {
-                cancelConnection();
-                return;
-            }
-            
-            connectionCounter++;
-            const connection = {
-                id: `connection-${connectionCounter}`,
-                sourceBlockId: sourceBlock.id,
-                targetBlockId: targetBlock.id,
+            const connection = connectionFactory.createConnection({
+                sourceBlockId: connectionStart.blockId,
+                targetBlockId: blockId,
                 sourcePortName: connectionStart.portName,
                 targetPortName: portName
-            };
+            });
             
-            connections.set(connection.id, connection);
-            const connectionEl = HTMLConnectionRenderer.render(connection);
-            if (connectionEl) {
-                // Insert connections at the beginning so blocks appear on top
-                const firstBlock = canvasLayer.querySelector('.workflow-block');
-                if (firstBlock) {
-                    canvasLayer.insertBefore(connectionEl, firstBlock);
-                } else {
-                    canvasLayer.appendChild(connectionEl);
+            if (connection) {
+                const connectionEl = HTMLConnectionRenderer.render(connection);
+                if (connectionEl) {
+                    // Insert connections at the beginning so blocks appear on top
+                    const firstBlock = canvasLayer.querySelector('.workflow-block');
+                    if (firstBlock) {
+                        canvasLayer.insertBefore(connectionEl, firstBlock);
+                    } else {
+                        canvasLayer.appendChild(connectionEl);
+                    }
                 }
             }
             
@@ -1032,32 +1649,68 @@
         function updatePreviewConnection(endX, endY) {
             if (!previewConnection || !connectionStart) return;
             
-            previewConnection.innerHTML = '';
-            const segments = connectionPathToHTMLSegments(
-                connectionStart.x, connectionStart.y,
-                endX, endY,
-                15
-            );
+            const start = {
+                x: connectionStart.x,
+                y: connectionStart.y
+            };
+            const end = {
+                x: endX,
+                y: endY
+            };
             
-            segments.forEach(segment => {
-                const segmentEl = document.createElement('div');
-                segmentEl.className = 'connection-segment temp-segment';
-                segmentEl.style.cssText = `
-                    position: absolute;
-                    background-color: transparent;
-                    left: ${segment.x}px;
-                    top: ${segment.y}px;
-                    width: ${segment.width}px;
-                    height: 3px;
-                    transform-origin: 0 50%;
-                    transform: rotate(${segment.angle}deg);
-                    border-top: 3px dashed var(--accent-primary);
-                    border-radius: 0;
-                    transition: left 0.05s linear, top 0.05s linear, transform 0.05s linear, width 0.05s linear;
-                    opacity: 0.7;
-                `;
-                previewConnection.appendChild(segmentEl);
-            });
+            // Create smooth bezier curve path (same logic as actual connections)
+            const outputStraight = 60;
+            const inputStraight = 60;
+            const outEndX = start.x + outputStraight;
+            const outEndY = start.y;
+            const inStartX = end.x - inputStraight;
+            const inStartY = end.y;
+            const horizontalGap = inStartX - outEndX;
+            const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
+            
+            const cp1x = outEndX + curveDistance;
+            const cp1y = outEndY;
+            const cp2x = inStartX - curveDistance;
+            const cp2y = inStartY;
+            
+            // Calculate bounding box for SVG
+            const minX = Math.min(start.x, outEndX, inStartX, end.x) - 10;
+            const maxX = Math.max(start.x, outEndX, inStartX, end.x) + 10;
+            const minY = Math.min(start.y, outEndY, inStartY, end.y) - 10;
+            const maxY = Math.max(start.y, outEndY, inStartY, end.y) + 10;
+            const svgWidth = maxX - minX;
+            const svgHeight = maxY - minY;
+            
+            // Clear previous content
+            previewConnection.innerHTML = '';
+            
+            // Create SVG element for smooth preview line
+            const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svgEl.setAttribute('class', 'connection-line preview-connection');
+            svgEl.style.cssText = `
+                position: absolute;
+                left: ${minX}px;
+                top: ${minY}px;
+                width: ${svgWidth}px;
+                height: ${svgHeight}px;
+                pointer-events: none;
+                overflow: visible;
+            `;
+            
+            // Create dashed preview path
+            const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = `M ${start.x - minX} ${start.y - minY} L ${outEndX - minX} ${outEndY - minY} C ${cp1x - minX} ${cp1y - minY}, ${cp2x - minX} ${cp2y - minY}, ${inStartX - minX} ${inStartY - minY} L ${end.x - minX} ${end.y - minY}`;
+            pathEl.setAttribute('d', pathData);
+            pathEl.setAttribute('stroke', 'var(--accent-primary)');
+            pathEl.setAttribute('stroke-width', '3');
+            pathEl.setAttribute('fill', 'none');
+            pathEl.setAttribute('stroke-linecap', 'round');
+            pathEl.setAttribute('stroke-dasharray', '8, 4');
+            pathEl.style.opacity = '0.7';
+            pathEl.style.pointerEvents = 'none';
+            
+            svgEl.appendChild(pathEl);
+            previewConnection.appendChild(svgEl);
         }
         
         function cancelConnection() {
@@ -1071,82 +1724,34 @@
         
         // Delete connection
         function deleteConnection(connectionId) {
-            connections.delete(connectionId);
-            const connectionEl = document.querySelector(`[data-connection-id="${connectionId}"]`);
-            if (connectionEl) {
-                connectionEl.remove();
+            if (connectionFactory.deleteConnection(connectionId)) {
+                const connectionEl = document.querySelector(`[data-connection-id="${connectionId}"]`);
+                if (connectionEl) {
+                    connectionEl.remove();
+                }
+                updateInfo();
             }
-            updateInfo();
         }
         
         // Clear canvas
         window.clearCanvas = function() {
-            blocks.clear();
-            connections.clear();
+            blockFactory.clearAll();
+            connectionFactory.clearAll();
             canvasLayer.innerHTML = ''; // Clear combined layer
-            blockCounter = 0;
-            connectionCounter = 0;
             updateInfo();
         };
         
         // Update info panel
         function updateInfo() {
-            document.getElementById('block-count').textContent = blocks.size;
-            document.getElementById('connection-count').textContent = connections.size;
+            document.getElementById('block-count').textContent = blockFactory.getAllBlocks().size;
+            document.getElementById('connection-count').textContent = connectionFactory.getAllConnections().size;
         }
         
         // Add random block
         window.addRandomBlock = function() {
-            blockCounter++;
-            const types = Object.values(BlockType);
-            const type = types[Math.floor(Math.random() * types.length)];
+            const block = blockFactory.createRandomBlock();
+            if (!block) return;
             
-            const fields = [
-                { name: 'name', label: 'Name', type: 'text', placeholder: 'Enter name', value: '' },
-                { name: 'type', label: 'Type', type: 'select', options: ['Option 1', 'Option 2', 'Option 3'], value: 'Option 1' },
-                { name: 'status', label: 'Status', type: 'select', options: [
-                    { value: 'active', label: 'Active' },
-                    { value: 'inactive', label: 'Inactive' },
-                    { value: 'pending', label: 'Pending' }
-                ], value: 'active' }
-            ];
-            
-            const canvasWrapper = document.querySelector('.canvas-wrapper');
-            const wrapperRect = canvasWrapper.getBoundingClientRect();
-            const centerX = wrapperRect.width / 2;
-            const centerY = wrapperRect.height / 2;
-            
-            const fieldsHeight = fields.length * 35 + 10;
-            const maxInputPorts = 2;
-            const maxOutputPorts = 1;
-            const maxPorts = Math.max(maxInputPorts, maxOutputPorts);
-            const portsHeight = maxPorts > 0 ? (maxPorts - 1) * 30 + 20 : 0;
-            const portStartY = 50 + fieldsHeight;
-            const height = Math.max(150, portStartY + portsHeight);
-            
-            const block = {
-                id: `block-${blockCounter}`,
-                type: type,
-                name: `${type} Block ${blockCounter}`,
-                position: {
-                    x: centerX - 100 + (Math.random() * 200 - 100),
-                    y: centerY - 100 + (Math.random() * 200 - 100)
-                },
-                width: 200,
-                height: height,
-                selected: false,
-                inputPorts: [
-                    { name: 'input1', type: 'any' },
-                    { name: 'input2', type: 'any' }
-                ],
-                outputPorts: [
-                    { name: 'output1', type: 'any' }
-                ],
-                fields: fields,
-                fieldValues: {}
-            };
-            
-            blocks.set(block.id, block);
             const blockElement = HTMLBlockRenderer.render(block);
             // Attach drag handler to header (since block has pointer-events: none)
             const header = blockElement.querySelector('.block-header');
@@ -1161,29 +1766,12 @@
         
         // Add random connection
         window.addRandomConnection = function() {
-            if (blocks.size < 2) {
-                alert('Need at least 2 blocks to create a connection');
+            const connection = connectionFactory.createRandomConnection();
+            if (!connection) {
+                alert('Need at least 2 blocks with compatible ports to create a connection');
                 return;
             }
             
-            const blockArray = Array.from(blocks.values());
-            const sourceBlock = blockArray[Math.floor(Math.random() * blockArray.length)];
-            const targetBlock = blockArray[Math.floor(Math.random() * blockArray.length)];
-            
-            if (sourceBlock.id === targetBlock.id) return;
-            if (!sourceBlock.outputPorts || sourceBlock.outputPorts.length === 0) return;
-            if (!targetBlock.inputPorts || targetBlock.inputPorts.length === 0) return;
-            
-            connectionCounter++;
-            const connection = {
-                id: `connection-${connectionCounter}`,
-                sourceBlockId: sourceBlock.id,
-                targetBlockId: targetBlock.id,
-                sourcePortName: sourceBlock.outputPorts[0].name,
-                targetPortName: targetBlock.inputPorts[0].name
-            };
-            
-            connections.set(connection.id, connection);
             const connectionElement = HTMLConnectionRenderer.render(connection);
             if (connectionElement) {
                 // Insert connections at the beginning so blocks appear on top
@@ -1198,11 +1786,20 @@
             updateInfo();
         };
         
+        // Handle keyboard events
+        function handleKeyDown(e) {
+            // Cancel connection creation on Escape key
+            if (e.key === 'Escape' && isCreatingConnection) {
+                cancelConnection();
+            }
+        }
+        
         // Event listeners
         const canvasWrapper = document.querySelector('.canvas-wrapper');
         canvasWrapper.addEventListener('mousedown', handleCanvasMouseDown);
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('keydown', handleKeyDown);
         
         // Prevent text selection while panning
         canvasWrapper.addEventListener('selectstart', (e) => {
