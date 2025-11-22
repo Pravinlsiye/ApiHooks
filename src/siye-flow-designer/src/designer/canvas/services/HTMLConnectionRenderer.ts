@@ -6,6 +6,13 @@ import { connectionPathToHTMLSegments } from '../../../utils/edge-algorithms';
  * Connections are cached and smoothly updated instead of being recreated
  */
 export class HTMLConnectionRenderer {
+    // Constants
+    private static readonly DEFAULT_CANVAS_SIZE = 8000;
+    private static readonly SEGMENT_COUNT = 20;
+    private static readonly TEMP_SEGMENT_COUNT = 15;
+    private static readonly DELETE_BUTTON_SIZE = 24;
+    private static readonly DELETE_BUTTON_OFFSET = 12;
+    
     private container: HTMLElement;
     private connectionsContainer: HTMLElement;
     private onDeleteConnection: (connectionId: string) => void;
@@ -18,8 +25,8 @@ export class HTMLConnectionRenderer {
         
         // Get canvas wrapper size to match connections container
         const wrapperStyle = window.getComputedStyle(container);
-        const width = wrapperStyle.width ? parseInt(wrapperStyle.width) : 8000;
-        const height = wrapperStyle.height ? parseInt(wrapperStyle.height) : 8000;
+        const width = wrapperStyle.width ? parseInt(wrapperStyle.width, 10) : HTMLConnectionRenderer.DEFAULT_CANVAS_SIZE;
+        const height = wrapperStyle.height ? parseInt(wrapperStyle.height, 10) : HTMLConnectionRenderer.DEFAULT_CANVAS_SIZE;
         
         // Create connections container (behind blocks)
         this.connectionsContainer = document.createElement('div');
@@ -40,8 +47,13 @@ export class HTMLConnectionRenderer {
         if (blocksLayer) {
             this.container.insertBefore(this.connectionsContainer, blocksLayer);
         } else {
-            // Fallback: insert at beginning
-            this.container.insertBefore(this.connectionsContainer, this.container.firstChild);
+            // Fallback: insert at beginning or append if no children
+            const firstChild = this.container.firstChild;
+            if (firstChild) {
+                this.container.insertBefore(this.connectionsContainer, firstChild);
+            } else {
+                this.container.appendChild(this.connectionsContainer);
+            }
         }
     }
     
@@ -67,7 +79,8 @@ export class HTMLConnectionRenderer {
         getPortTabPosition?: (block: VisualBlock, port: VisualPort) => Position,
         isDragging: boolean = false
     ): void {
-        if (!getPortTabPosition) return;
+        // Validate required parameters
+        if (!getPortTabPosition || !connections || !blocks) return;
         
         // Track which connections still exist
         const activeConnectionIds = new Set<string>();
@@ -155,8 +168,10 @@ export class HTMLConnectionRenderer {
         }
         
         // Calculate new segments - line connects directly to existing port tabs on blocks
-        const segments = connectionPathToHTMLSegments(start.x, start.y, end.x, end.y, 20);
-        const existingSegments = Array.from(connectionEl.querySelectorAll('.connection-segment:not(.connection-delete)')) as HTMLElement[];
+        const segments = connectionPathToHTMLSegments(start.x, start.y, end.x, end.y, HTMLConnectionRenderer.SEGMENT_COUNT);
+        const existingSegments = Array.from(connectionEl.querySelectorAll('.connection-segment:not(.connection-delete)')).filter(
+            (el): el is HTMLElement => el instanceof HTMLElement
+        );
         
         // During drag, update existing segments in place (no transitions) for instant feedback
         // When not dragging, recreate segments for smooth transitions
@@ -202,19 +217,30 @@ export class HTMLConnectionRenderer {
                     transition: ${transition};
                 `;
                 
-                // Add hover effect
-                segmentEl.addEventListener('mouseenter', () => {
-                    segmentEl.style.backgroundColor = 'var(--accent-primary-light)';
-                    this.showDeleteButton(connectionEl, start, end);
-                });
-                
-                segmentEl.addEventListener('mouseleave', () => {
-                    segmentEl.style.backgroundColor = 'var(--accent-primary)';
-                });
-                
                 // Append segment to connection
                 connectionEl.appendChild(segmentEl);
             });
+            
+            // Event delegation is already set up on connectionEl in createConnection
+            // If this is an update, ensure event listeners are attached
+            if (!connectionEl.dataset.hasListeners) {
+                connectionEl.addEventListener('mouseenter', (e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.classList.contains('connection-segment')) {
+                        target.style.backgroundColor = 'var(--accent-primary-light)';
+                        this.showDeleteButton(connectionEl, start, end);
+                    }
+                }, true);
+                
+                connectionEl.addEventListener('mouseleave', (e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.classList.contains('connection-segment')) {
+                        target.style.backgroundColor = 'var(--accent-primary)';
+                    }
+                }, true);
+                
+                connectionEl.dataset.hasListeners = 'true';
+            }
         }
         
         // Update delete button position
@@ -222,8 +248,8 @@ export class HTMLConnectionRenderer {
         if (deleteBtn) {
             const midX = (start.x + end.x) / 2;
             const midY = (start.y + end.y) / 2;
-            deleteBtn.style.left = `${midX - 12}px`;
-            deleteBtn.style.top = `${midY - 12}px`;
+            deleteBtn.style.left = `${midX - HTMLConnectionRenderer.DELETE_BUTTON_OFFSET}px`;
+            deleteBtn.style.top = `${midY - HTMLConnectionRenderer.DELETE_BUTTON_OFFSET}px`;
         }
     }
     
@@ -259,7 +285,6 @@ export class HTMLConnectionRenderer {
         const connectionEl = document.createElement('div');
         connectionEl.className = 'html-connection';
         connectionEl.dataset.connectionId = connection.id;
-        connectionEl.setAttribute('data-connection-id', connection.id);
         connectionEl.style.cssText = `
             position: absolute;
             pointer-events: none;
@@ -270,7 +295,7 @@ export class HTMLConnectionRenderer {
         const segments = connectionPathToHTMLSegments(
             start.x, start.y,
             end.x, end.y,
-            20 // More segments for smoother curve
+            HTMLConnectionRenderer.SEGMENT_COUNT
         );
         
         segments.forEach((segment) => {
@@ -291,18 +316,27 @@ export class HTMLConnectionRenderer {
                 transition: background-color 0.2s, left 0.15s ease-out, top 0.15s ease-out, transform 0.15s ease-out, width 0.15s ease-out;
             `;
             
-            // Add hover effect
-            segmentEl.addEventListener('mouseenter', () => {
-                segmentEl.style.backgroundColor = 'var(--accent-primary-light)';
-                this.showDeleteButton(connectionEl, start, end);
-            });
-            
-            segmentEl.addEventListener('mouseleave', () => {
-                segmentEl.style.backgroundColor = 'var(--accent-primary)';
-            });
-            
             connectionEl.appendChild(segmentEl);
         });
+        
+        // Use event delegation on connectionEl to handle hover effects (prevents memory leaks)
+        connectionEl.addEventListener('mouseenter', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('connection-segment')) {
+                target.style.backgroundColor = 'var(--accent-primary-light)';
+                this.showDeleteButton(connectionEl, start, end);
+            }
+        }, true);
+        
+        connectionEl.addEventListener('mouseleave', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('connection-segment')) {
+                target.style.backgroundColor = 'var(--accent-primary)';
+            }
+        }, true);
+        
+        // Mark that event listeners have been attached to prevent duplicates in updateConnection()
+        connectionEl.dataset.hasListeners = 'true';
         
         // Create delete button (hidden by default)
         const deleteBtn = this.createDeleteButton(connection.id, start, end);
@@ -322,14 +356,16 @@ export class HTMLConnectionRenderer {
     private createDeleteButton(connectionId: string, start: Position, end: Position): HTMLElement {
         const midX = (start.x + end.x) / 2;
         const midY = (start.y + end.y) / 2;
+        const size = HTMLConnectionRenderer.DELETE_BUTTON_SIZE;
+        const offset = HTMLConnectionRenderer.DELETE_BUTTON_OFFSET;
         
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'connection-delete';
         deleteBtn.innerHTML = '×';
         deleteBtn.style.cssText = `
             position: absolute;
-            width: 24px;
-            height: 24px;
+            width: ${size}px;
+            height: ${size}px;
             border-radius: 50%;
             background: var(--error-base);
             border: 2px solid var(--error-hover);
@@ -340,8 +376,8 @@ export class HTMLConnectionRenderer {
             display: none;
             z-index: 20;
             pointer-events: all;
-            left: ${midX - 12}px;
-            top: ${midY - 12}px;
+            left: ${midX - offset}px;
+            top: ${midY - offset}px;
             padding: 0;
             line-height: 1;
             transition: left 0.15s ease-out, top 0.15s ease-out, background 0.2s;
@@ -382,7 +418,7 @@ export class HTMLConnectionRenderer {
         if (this.tempConnectionEl) {
             // Update existing temp connection smoothly
             this.updateTempConnection(start, end);
-        } else {
+            } else {
             // Create new temp connection
             this.tempConnectionEl = document.createElement('div');
             this.tempConnectionEl.className = 'html-connection temp-connection';
@@ -406,13 +442,17 @@ export class HTMLConnectionRenderer {
         // Clear existing segments
         this.tempConnectionEl.innerHTML = '';
         
-        const segments = connectionPathToHTMLSegments(start.x, start.y, end.x, end.y, 15);
+        const segments = connectionPathToHTMLSegments(
+            start.x, start.y, 
+            end.x, end.y, 
+            HTMLConnectionRenderer.TEMP_SEGMENT_COUNT
+        );
         
         segments.forEach(segment => {
             const segmentEl = document.createElement('div');
             segmentEl.className = 'connection-segment temp-segment';
             segmentEl.style.cssText = `
-                position: absolute;
+            position: absolute;
                 background-color: transparent;
                 left: ${segment.x}px;
                 top: ${segment.y}px;

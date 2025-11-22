@@ -992,44 +992,113 @@
             }
         }
         
-        // Initialize factories
-        const blockFactory = new BlockFactory(blocks, blockColors);
-        const connectionFactory = new ConnectionFactory(connections, blocks);
+        // ============================================================================
+        // PORT POSITION CALCULATOR - Utility class for calculating port positions
+        // ============================================================================
+        class PortPositionCalculator {
+            /**
+             * Gets the DOM element for a block
+             * @param {string} blockId - The block ID
+             * @returns {HTMLElement|null} The block element or null
+             */
+            static getBlockElement(blockId) {
+                return document.getElementById(`block-${blockId}`) || 
+                       document.querySelector(`[data-block-id="${blockId}"]`);
+            }
+            
+            /**
+             * Calculates the position of a port on a block
+             * @param {Object} block - The block object
+             * @param {string} portName - The port name
+             * @param {string} portType - 'input' or 'output'
+             * @param {HTMLElement} canvasWrapper - The canvas wrapper element
+             * @returns {{x: number, y: number}|null} The port position or null
+             */
+            static getPortPosition(block, portName, portType, canvasWrapper) {
+                const blockEl = this.getBlockElement(block.id);
+                if (!blockEl) {
+                    console.warn(`Block element not found for block ${block.id}`);
+                    return null;
+                }
+                
+                // BlockRendererFactory uses data-port and data-port-type on port-row or port-input-tab
+                let portRow = blockEl.querySelector(`[data-port="${portName}"][data-port-type="${portType}"]`);
+                
+                // Fallback: try finding by port name only (for End blocks)
+                if (!portRow) {
+                    portRow = blockEl.querySelector(`[data-port="${portName}"]`);
+                }
+                
+                if (!portRow) {
+                    console.warn(`Port row not found for port ${portName} (${portType}) on block ${block.id}`);
+                    return null;
+                }
+                
+                const portTab = portRow.querySelector('.port-tab');
+                if (!portTab) {
+                    console.warn(`Port tab not found for port ${portName} (${portType}) on block ${block.id}`);
+                    return null;
+                }
+                
+                const portRect = portTab.getBoundingClientRect();
+                const wrapperRect = canvasWrapper.getBoundingClientRect();
+                
+                let x, y;
+                
+                if (portType === 'input') {
+                    // Input port: flat edge is on the left border
+                    x = portRect.left - wrapperRect.left;
+                } else {
+                    // Output port: flat edge is on the right border
+                    x = portRect.right - wrapperRect.left;
+                }
+                
+                // Y position is the center of the port tab
+                y = portRect.top - wrapperRect.top + portRect.height / 2;
+                
+                return { x, y };
+            }
+        }
         
-        // Drag state
-        let isDragging = false;
-        let draggedBlock = null;
-        let dragOffset = { x: 0, y: 0 };
-        
-        // Connection creation state
-        let isCreatingConnection = false;
-        let connectionStart = null;
-        let previewConnection = null;
-        
-        // Pan state
-        let isPanning = false;
-        let panStart = { x: 0, y: 0 };
-        let panOffset = { x: 0, y: 0 };
-        
-        // HTML Block Renderer - Uses BlockRendererFactory from debug.html
+        // ============================================================================
+        // HTML BLOCK RENDERER - Renders blocks using BlockRendererFactory
+        // ============================================================================
         class HTMLBlockRenderer {
-            static render(block) {
+            /**
+             * Creates a block renderer instance
+             * @param {Object} blockColors - Map of block types to colors
+             * @param {Function} onPortMouseDown - Callback for port mouse down events
+             * @param {Function} onPortMouseUp - Callback for port mouse up events
+             * @param {Function} onBlockMouseDown - Callback for block mouse down events
+             */
+            constructor(blockColors, onPortMouseDown, onPortMouseUp, onBlockMouseDown) {
+                this.blockColors = blockColors;
+                this.onPortMouseDown = onPortMouseDown;
+                this.onPortMouseUp = onPortMouseUp;
+                this.onBlockMouseDown = onBlockMouseDown;
+            }
+            
+            /**
+             * Renders a block element
+             * @param {Object} block - The block object to render
+             * @returns {HTMLElement} The rendered block element
+             */
+            render(block) {
                 const blockEl = document.createElement('div');
                 blockEl.className = `workflow-block block-type-${block.type}`;
-                blockEl.id = `block-${block.id}`; // BlockRendererFactory expects id="block-{id}"
-                blockEl.dataset.blockId = block.id; // Also keep for our selectors
+                blockEl.id = `block-${block.id}`;
+                blockEl.dataset.blockId = block.id;
                 blockEl.style.left = `${block.position.x}px`;
                 blockEl.style.top = `${block.position.y}px`;
-                // Only set width/height if explicitly provided - let blocks size naturally otherwise
+                
                 if (block.width !== undefined) {
                     blockEl.style.width = `${block.width}px`;
                 }
                 if (block.height !== undefined) {
                     blockEl.style.height = `${block.height}px`;
                 }
-                blockEl.style.borderColor = blockColors[block.type] || '#666';
+                blockEl.style.borderColor = this.blockColors[block.type] || '#666';
                 
-                // Use BlockRendererFactory to render the block (same as debug.html)
                 const visualBlock = {
                     id: block.id,
                     type: block.type,
@@ -1055,62 +1124,24 @@
                     const renderer = BlockRendererFactory.createRenderer(visualBlock, blockSchema);
                     renderer.updatePorts();
                     
-                    // Sync ports back to block object after updatePorts() (important for End blocks)
-                    // This updates the block object which is stored in the Map (by reference)
                     block.inputPorts = visualBlock.inputPorts || [];
                     block.outputPorts = visualBlock.outputPorts || [];
                     
                     const html = renderer.render();
                     blockEl.innerHTML = html;
                     
-                    // Attach port event handlers to the rendered ports (BlockRendererFactory structure)
-                    // Handle both standard port-row and special port-input-tab (used by Start/End blocks)
-                    const inputPortRows = blockEl.querySelectorAll('.port-row.port-input, .port-input-tab, [data-port-type="input"]');
-                    inputPortRows.forEach(portRow => {
-                        const portName = portRow.dataset.port;
-                        if (!portName) return;
-                        
-                        const portTab = portRow.querySelector('.port-tab');
-                        if (portTab) {
-                            // Remove any existing handlers
-                            const newPortTab = portTab.cloneNode(true);
-                            portTab.parentNode.replaceChild(newPortTab, portTab);
-                            
-                            newPortTab.addEventListener('mouseup', (e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                handlePortMouseUp(e, block.id, portName, 'input');
+                    this.attachPortHandlers(blockEl, block.id);
+                    
+                    if (this.onBlockMouseDown) {
+                        const header = blockEl.querySelector('.block-header');
+                        if (header) {
+                            header.addEventListener('mousedown', (e) => {
+                                this.onBlockMouseDown(e, block.id);
                             });
                         }
-                    });
-                    
-                    const outputPortRows = blockEl.querySelectorAll('.port-row.port-output, [data-port-type="output"]');
-                    outputPortRows.forEach(portRow => {
-                        const portName = portRow.dataset.port;
-                        if (!portName) return;
-                        
-                        const portTab = portRow.querySelector('.port-tab');
-                        if (portTab) {
-                            // Remove any existing handlers
-                            const newPortTab = portTab.cloneNode(true);
-                            portTab.parentNode.replaceChild(newPortTab, portTab);
-                            
-                            newPortTab.addEventListener('mousedown', (e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                handlePortMouseDown(e, block.id, portName, 'output');
-                            });
-                        }
-                    });
-                    
-                    // Attach drag handler to header
-                    const header = blockEl.querySelector('.block-header');
-                    if (header) {
-                        header.addEventListener('mousedown', (e) => handleBlockMouseDown(e, block.id));
                     }
                 } catch (error) {
                     console.error('Error rendering block:', error);
-                    // Fallback to simple rendering
                     blockEl.innerHTML = `
                         <div class="block-header">${block.name || block.type}</div>
                         <div class="block-content"></div>
@@ -1120,18 +1151,85 @@
                 return blockEl;
             }
             
-            static update(block, element) {
+            /**
+             * Attaches event handlers to port elements
+             * @param {HTMLElement} blockEl - The block element
+             * @param {string} blockId - The block ID
+             */
+            attachPortHandlers(blockEl, blockId) {
+                const inputPortRows = blockEl.querySelectorAll('.port-row.port-input, .port-input-tab, [data-port-type="input"]');
+                inputPortRows.forEach(portRow => {
+                    const portName = portRow.dataset.port;
+                    if (!portName || !this.onPortMouseUp) return;
+                    
+                    const portTab = portRow.querySelector('.port-tab');
+                    if (portTab) {
+                        const newPortTab = portTab.cloneNode(true);
+                        portTab.parentNode.replaceChild(newPortTab, portTab);
+                        
+                        newPortTab.addEventListener('mouseup', (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            this.onPortMouseUp(e, blockId, portName, 'input');
+                        });
+                    }
+                });
+                
+                const outputPortRows = blockEl.querySelectorAll('.port-row.port-output, [data-port-type="output"]');
+                outputPortRows.forEach(portRow => {
+                    const portName = portRow.dataset.port;
+                    if (!portName || !this.onPortMouseDown) return;
+                    
+                    const portTab = portRow.querySelector('.port-tab');
+                    if (portTab) {
+                        const newPortTab = portTab.cloneNode(true);
+                        portTab.parentNode.replaceChild(newPortTab, portTab);
+                        
+                        newPortTab.addEventListener('mousedown', (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            this.onPortMouseDown(e, blockId, portName, 'output');
+                        });
+                    }
+                });
+            }
+            
+            /**
+             * Updates block position
+             * @param {Object} block - The block object
+             * @param {HTMLElement} element - The block element
+             */
+            update(block, element) {
                 if (!element) return;
                 element.style.left = `${block.position.x}px`;
                 element.style.top = `${block.position.y}px`;
             }
         }
         
-        // Simple Connection Renderer - Fresh Start
+        // ============================================================================
+        // HTML CONNECTION RENDERER - Renders connections between blocks
+        // ============================================================================
         class HTMLConnectionRenderer {
-            static render(connection) {
-                const sourceBlock = blockFactory.getBlock(connection.sourceBlockId);
-                const targetBlock = blockFactory.getBlock(connection.targetBlockId);
+            /**
+             * Creates a connection renderer instance
+             * @param {Function} getBlock - Function to get block by ID
+             * @param {Function} getPortPosition - Function to get port position
+             * @param {Function} onDelete - Callback for connection deletion
+             */
+            constructor(getBlock, getPortPosition, onDelete) {
+                this.getBlock = getBlock;
+                this.getPortPosition = getPortPosition;
+                this.onDelete = onDelete;
+            }
+            
+            /**
+             * Renders a connection element
+             * @param {Object} connection - The connection object
+             * @returns {HTMLElement|null} The rendered connection element or null
+             */
+            render(connection) {
+                const sourceBlock = this.getBlock(connection.sourceBlockId);
+                const targetBlock = this.getBlock(connection.targetBlockId);
                 
                 if (!sourceBlock || !targetBlock) return null;
                 
@@ -1140,8 +1238,8 @@
                 
                 if (!sourcePort || !targetPort) return null;
                 
-                const start = getPortPosition(sourceBlock, sourcePort.name, 'output');
-                const end = getPortPosition(targetBlock, targetPort.name, 'input');
+                const start = this.getPortPosition(sourceBlock, sourcePort.name, 'output');
+                const end = this.getPortPosition(targetBlock, targetPort.name, 'input');
                 
                 if (!start || !end) return null;
                 
@@ -1259,11 +1357,13 @@
                 deleteBtn.setAttribute('data-connection-id', connection.id);
                 
                 // Delete button click handler
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    deleteConnection(connection.id);
-                });
+                if (this.onDelete) {
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        this.onDelete(connection.id);
+                    });
+                }
                 
                 // Show/hide delete button on line hover
                 let hideTimeout = null;
@@ -1309,11 +1409,17 @@
                 return connectionEl;
             }
             
-            static update(connection, element, isDragging = false) {
+            /**
+             * Updates connection position
+             * @param {Object} connection - The connection object
+             * @param {HTMLElement} element - The connection element
+             * @param {boolean} isDragging - Whether a block is being dragged
+             */
+            update(connection, element, isDragging = false) {
                 if (!element) return;
                 
-                const sourceBlock = blockFactory.getBlock(connection.sourceBlockId);
-                const targetBlock = blockFactory.getBlock(connection.targetBlockId);
+                const sourceBlock = this.getBlock(connection.sourceBlockId);
+                const targetBlock = this.getBlock(connection.targetBlockId);
                 
                 if (!sourceBlock || !targetBlock) return;
                 
@@ -1322,8 +1428,8 @@
                 
                 if (!sourcePort || !targetPort) return;
                 
-                const start = getPortPosition(sourceBlock, sourcePort.name, 'output');
-                const end = getPortPosition(targetBlock, targetPort.name, 'input');
+                const start = this.getPortPosition(sourceBlock, sourcePort.name, 'output');
+                const end = this.getPortPosition(targetBlock, targetPort.name, 'input');
                 
                 if (!start || !end) return;
                 
@@ -1398,373 +1504,449 @@
             }
         }
         
-        // Helper to get block element (works with both id and data-block-id)
-        function getBlockElement(blockId) {
-            return document.getElementById(`block-${blockId}`) || 
-                   document.querySelector(`[data-block-id="${blockId}"]`);
-        }
-        
-        // Helper to get port position - calculates from flat edge (where it touches border)
-        // Works with BlockRendererFactory port structure
-        function getPortPosition(block, portName, portType) {
-            const blockEl = getBlockElement(block.id);
-            if (!blockEl) {
-                console.warn(`Block element not found for block ${block.id}`);
-                return null;
-            }
-            
-            // BlockRendererFactory uses data-port and data-port-type on port-row or port-input-tab
-            // Try multiple selectors to find the port
-            let portRow = blockEl.querySelector(`[data-port="${portName}"][data-port-type="${portType}"]`);
-            
-            // Fallback: try finding by port name only (for End blocks)
-            if (!portRow) {
-                portRow = blockEl.querySelector(`[data-port="${portName}"]`);
-            }
-            
-            if (!portRow) {
-                console.warn(`Port row not found for port ${portName} (${portType}) on block ${block.id}`);
-                return null;
-            }
-            
-            // Find the actual port-tab element inside the port row
-            const portTab = portRow.querySelector('.port-tab');
-            if (!portTab) {
-                console.warn(`Port tab not found for port ${portName} (${portType}) on block ${block.id}`);
-                return null;
-            }
-            
-            const portRect = portTab.getBoundingClientRect();
-            const blockRect = blockEl.getBoundingClientRect();
-            const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
-            
-            // Get the border width (2px)
-            const borderWidth = 2;
-            
-            // Calculate position on the flat edge (border line)
-            let x, y;
-            
-            if (portType === 'input') {
-                // Input port: flat edge is on the left border
-                // Position is at the left edge of the port tab (which aligns with block border)
-                x = portRect.left - wrapperRect.left;
-            } else {
-                // Output port: flat edge is on the right border
-                // Position is at the right edge of the port tab (which aligns with block border)
-                x = portRect.right - wrapperRect.left;
-            }
-            
-            // Y position is the center of the port tab (vertical center of flat edge)
-            y = portRect.top - wrapperRect.top + portRect.height / 2;
-            
-            return { x, y };
-        }
-        
-        
-        // Block dragging handlers
-        function handleBlockMouseDown(e, blockId) {
-            e.stopPropagation();
-            const block = blockFactory.getBlock(blockId);
-            if (!block) return;
-            
-            const blockEl = getBlockElement(blockId);
-            if (!blockEl) return;
-            
-            const rect = blockEl.getBoundingClientRect();
-            const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
-            
-            isDragging = true;
-            draggedBlock = block;
-            dragOffset = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
-            };
-            
-            blockEl.classList.add('selected');
-        }
-        
-        function handleMouseMove(e) {
-            if (isPanning) {
-                const deltaX = e.clientX - panStart.x;
-                const deltaY = e.clientY - panStart.y;
-                panOffset.x += deltaX;
-                panOffset.y += deltaY;
-                panStart.x = e.clientX;
-                panStart.y = e.clientY;
+        // ============================================================================
+        // CANVAS MANAGER - Main class that coordinates canvas interactions
+        // ============================================================================
+        class CanvasManager {
+            /**
+             * Creates a canvas manager instance
+             * @param {HTMLElement} canvasWrapper - The canvas wrapper element
+             * @param {HTMLElement} canvasLayer - The canvas layer element
+             * @param {Object} blockFactory - Block factory instance
+             * @param {Object} connectionFactory - Connection factory instance
+             * @param {Object} blockRenderer - Block renderer instance
+             * @param {Object} connectionRenderer - Connection renderer instance
+             * @param {Function} onInfoUpdate - Callback for info panel updates
+             */
+            constructor(canvasWrapper, canvasLayer, blockFactory, connectionFactory, blockRenderer, connectionRenderer, onInfoUpdate) {
+                this.canvasWrapper = canvasWrapper;
+                this.canvasLayer = canvasLayer;
+                this.blockFactory = blockFactory;
+                this.connectionFactory = connectionFactory;
+                this.blockRenderer = blockRenderer;
+                this.connectionRenderer = connectionRenderer;
+                this.onInfoUpdate = onInfoUpdate;
                 
-                const canvasWrapper = document.querySelector('.canvas-wrapper');
-                canvasWrapper.style.transform = `translate(calc(-50% + ${panOffset.x}px), calc(-50% + ${panOffset.y}px))`;
-            } else if (isDragging && draggedBlock) {
-                const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
-                draggedBlock.position.x = e.clientX - wrapperRect.left - dragOffset.x;
-                draggedBlock.position.y = e.clientY - wrapperRect.top - dragOffset.y;
+                // Drag state
+                this.isDragging = false;
+                this.draggedBlock = null;
+                this.dragOffset = { x: 0, y: 0 };
                 
-                const blockEl = getBlockElement(draggedBlock.id);
-                if (blockEl) {
-                    HTMLBlockRenderer.update(draggedBlock, blockEl);
-                }
+                // Connection creation state
+                this.isCreatingConnection = false;
+                this.connectionStart = null;
+                this.previewConnection = null;
                 
-                updateConnectionsForBlock(draggedBlock.id, true);
-            } else if (isCreatingConnection && connectionStart) {
-                const wrapperRect = document.querySelector('.canvas-wrapper').getBoundingClientRect();
-                const endX = e.clientX - wrapperRect.left;
-                const endY = e.clientY - wrapperRect.top;
-                updatePreviewConnection(endX, endY);
+                // Pan state
+                this.isPanning = false;
+                this.panStart = { x: 0, y: 0 };
+                this.panOffset = { x: 0, y: 0 };
+                
+                this.setupEventListeners();
             }
-        }
-        
-        function handleMouseUp(e) {
-            if (isPanning) {
-                isPanning = false;
-                const canvasWrapper = document.querySelector('.canvas-wrapper');
-                canvasWrapper.classList.remove('panning');
-            } else if (isDragging && draggedBlock) {
-                const blockEl = getBlockElement(draggedBlock.id);
-                if (blockEl) {
-                    blockEl.classList.remove('selected');
-                }
-                isDragging = false;
-                draggedBlock = null;
-            } else if (isCreatingConnection && connectionStart) {
-                // Cancel connection if mouse up outside of a port
+            
+            /**
+             * Sets up event listeners for canvas interactions
+             */
+            setupEventListeners() {
+                this.canvasWrapper.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
+                document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+                
+                // Prevent text selection while panning
+                this.canvasWrapper.addEventListener('selectstart', (e) => {
+                    if (this.isPanning) {
+                        e.preventDefault();
+                    }
+                });
+            }
+            
+            /**
+             * Handles canvas mouse down events (panning)
+             */
+            handleCanvasMouseDown(e) {
                 const target = e.target;
-                if (!target.closest('.port-tab')) {
-                    cancelConnection();
+                if (target.closest('.workflow-block') || 
+                    target.closest('.port-tab') || 
+                    target.closest('.connection-line') ||
+                    target.closest('.connection-delete')) {
+                    return;
+                }
+                
+                if (e.button === 0) {
+                    e.preventDefault();
+                    this.isPanning = true;
+                    this.panStart.x = e.clientX;
+                    this.panStart.y = e.clientY;
+                    this.canvasWrapper.classList.add('panning');
                 }
             }
-        }
-        
-        // Handle canvas panning
-        function handleCanvasMouseDown(e) {
-            // Only start panning if clicking on canvas background (not on blocks, ports, or connections)
-            const target = e.target;
-            if (target.closest('.workflow-block') || 
-                target.closest('.port-tab') || 
-                target.closest('.connection-line') ||
-                target.closest('.connection-delete')) {
-                return;
+            
+            /**
+             * Handles block mouse down events (dragging)
+             */
+            handleBlockMouseDown(e, blockId) {
+                e.stopPropagation();
+                const block = this.blockFactory.getBlock(blockId);
+                if (!block) return;
+                
+                const blockEl = PortPositionCalculator.getBlockElement(blockId);
+                if (!blockEl) return;
+                
+                const rect = blockEl.getBoundingClientRect();
+                const wrapperRect = this.canvasWrapper.getBoundingClientRect();
+                
+                this.isDragging = true;
+                this.draggedBlock = block;
+                this.dragOffset = {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+                
+                blockEl.classList.add('selected');
             }
             
-            // Left-click (button 0) on empty canvas for panning
-            if (e.button === 0) {
-                e.preventDefault();
-                isPanning = true;
-                panStart.x = e.clientX;
-                panStart.y = e.clientY;
-                const canvasWrapper = document.querySelector('.canvas-wrapper');
-                canvasWrapper.classList.add('panning');
+            /**
+             * Handles mouse move events
+             */
+            handleMouseMove(e) {
+                if (this.isPanning) {
+                    const deltaX = e.clientX - this.panStart.x;
+                    const deltaY = e.clientY - this.panStart.y;
+                    this.panOffset.x += deltaX;
+                    this.panOffset.y += deltaY;
+                    this.panStart.x = e.clientX;
+                    this.panStart.y = e.clientY;
+                    
+                    this.canvasWrapper.style.transform = `translate(calc(-50% + ${this.panOffset.x}px), calc(-50% + ${this.panOffset.y}px))`;
+                } else if (this.isDragging && this.draggedBlock) {
+                    const wrapperRect = this.canvasWrapper.getBoundingClientRect();
+                    this.draggedBlock.position.x = e.clientX - wrapperRect.left - this.dragOffset.x;
+                    this.draggedBlock.position.y = e.clientY - wrapperRect.top - this.dragOffset.y;
+                    
+                    const blockEl = PortPositionCalculator.getBlockElement(this.draggedBlock.id);
+                    if (blockEl) {
+                        this.blockRenderer.update(this.draggedBlock, blockEl);
+                    }
+                    
+                    this.updateConnectionsForBlock(this.draggedBlock.id, true);
+                } else if (this.isCreatingConnection && this.connectionStart) {
+                    const wrapperRect = this.canvasWrapper.getBoundingClientRect();
+                    const endX = e.clientX - wrapperRect.left;
+                    const endY = e.clientY - wrapperRect.top;
+                    this.updatePreviewConnection(endX, endY);
+                }
             }
-        }
-        
-        // Update connections when block moves
-        function updateConnectionsForBlock(blockId, isDragging = false) {
-            const relatedConnections = connectionFactory.getConnectionsForBlock(blockId);
-            relatedConnections.forEach(connection => {
-                const connectionEl = document.querySelector(`[data-connection-id="${connection.id}"]`);
-                if (connectionEl) {
-                    HTMLConnectionRenderer.update(connection, connectionEl, isDragging);
+            
+            /**
+             * Handles mouse up events
+             */
+            handleMouseUp(e) {
+                if (this.isPanning) {
+                    this.isPanning = false;
+                    this.canvasWrapper.classList.remove('panning');
+                } else if (this.isDragging && this.draggedBlock) {
+                    const blockEl = PortPositionCalculator.getBlockElement(this.draggedBlock.id);
+                    if (blockEl) {
+                        blockEl.classList.remove('selected');
+                    }
+                    this.isDragging = false;
+                    this.draggedBlock = null;
+                } else if (this.isCreatingConnection && this.connectionStart) {
+                    const target = e.target;
+                    if (!target.closest('.port-tab')) {
+                        this.cancelConnection();
+                    }
+                }
+            }
+            
+            /**
+             * Handles keyboard events
+             */
+            handleKeyDown(e) {
+                if (e.key === 'Escape' && this.isCreatingConnection) {
+                    this.cancelConnection();
+                }
+            }
+            
+            /**
+             * Handles port mouse down (start connection)
+             */
+            handlePortMouseDown(e, blockId, portName, portType) {
+                e.stopPropagation();
+                
+                if (portType !== 'output') return;
+                
+                const block = this.blockFactory.getBlock(blockId);
+                if (!block) return;
+                
+                const start = this.getPortPosition(block, portName, portType);
+                if (!start) return;
+                
+                this.isCreatingConnection = true;
+                this.connectionStart = {
+                    blockId: blockId,
+                    portName: portName,
+                    portType: portType,
+                    x: start.x,
+                    y: start.y
+                };
+                
+                this.previewConnection = document.createElement('div');
+                this.previewConnection.className = 'html-connection';
+                this.previewConnection.style.pointerEvents = 'none';
+                this.previewConnection.style.opacity = '0.6';
+                
+                const firstBlock = this.canvasLayer.querySelector('.workflow-block');
+                if (firstBlock) {
+                    this.canvasLayer.insertBefore(this.previewConnection, firstBlock);
                 } else {
-                    const newEl = HTMLConnectionRenderer.render(connection);
-                    if (newEl) {
-                        // Insert connections at the beginning so blocks appear on top
-                        const firstBlock = canvasLayer.querySelector('.workflow-block');
+                    this.canvasLayer.appendChild(this.previewConnection);
+                }
+            }
+            
+            /**
+             * Handles port mouse up (complete connection)
+             */
+            handlePortMouseUp(e, blockId, portName, portType) {
+                e.stopPropagation();
+                
+                if (!this.isCreatingConnection || !this.connectionStart) return;
+                if (portType !== 'input') {
+                    this.cancelConnection();
+                    return;
+                }
+                
+                const connection = this.connectionFactory.createConnection({
+                    sourceBlockId: this.connectionStart.blockId,
+                    targetBlockId: blockId,
+                    sourcePortName: this.connectionStart.portName,
+                    targetPortName: portName
+                });
+                
+                if (connection) {
+                    const connectionEl = this.connectionRenderer.render(connection);
+                    if (connectionEl) {
+                        const firstBlock = this.canvasLayer.querySelector('.workflow-block');
                         if (firstBlock) {
-                            canvasLayer.insertBefore(newEl, firstBlock);
+                            this.canvasLayer.insertBefore(connectionEl, firstBlock);
                         } else {
-                            canvasLayer.appendChild(newEl);
+                            this.canvasLayer.appendChild(connectionEl);
                         }
                     }
                 }
-            });
-        }
-        
-        // Handle port mouse down (start connection)
-        function handlePortMouseDown(e, blockId, portName, portType) {
-            e.stopPropagation();
-            
-            if (portType !== 'output') return;
-            
-            const block = blockFactory.getBlock(blockId);
-            if (!block) return;
-            
-            const start = getPortPosition(block, portName, portType);
-            if (!start) return;
-            
-            isCreatingConnection = true;
-            connectionStart = {
-                blockId: blockId,
-                portName: portName,
-                portType: portType,
-                x: start.x,
-                y: start.y
-            };
-            
-            previewConnection = document.createElement('div');
-            previewConnection.className = 'html-connection';
-            previewConnection.style.pointerEvents = 'none';
-            previewConnection.style.opacity = '0.6';
-            // Insert preview at the beginning so blocks appear on top
-            const firstBlock = canvasLayer.querySelector('.workflow-block');
-            if (firstBlock) {
-                canvasLayer.insertBefore(previewConnection, firstBlock);
-            } else {
-                canvasLayer.appendChild(previewConnection);
-            }
-        }
-        
-        // Handle port mouse up (complete connection)
-        function handlePortMouseUp(e, blockId, portName, portType) {
-            e.stopPropagation();
-            
-            if (!isCreatingConnection || !connectionStart) return;
-            if (portType !== 'input') {
-                cancelConnection();
-                return;
+                
+                this.cancelConnection();
+                if (this.onInfoUpdate) {
+                    this.onInfoUpdate();
+                }
             }
             
-            const connection = connectionFactory.createConnection({
-                sourceBlockId: connectionStart.blockId,
-                targetBlockId: blockId,
-                sourcePortName: connectionStart.portName,
-                targetPortName: portName
-            });
+            /**
+             * Updates preview connection during creation
+             */
+            updatePreviewConnection(endX, endY) {
+                if (!this.previewConnection || !this.connectionStart) return;
+                
+                const start = { x: this.connectionStart.x, y: this.connectionStart.y };
+                const end = { x: endX, y: endY };
+                
+                const outputStraight = 60;
+                const inputStraight = 60;
+                const outEndX = start.x + outputStraight;
+                const outEndY = start.y;
+                const inStartX = end.x - inputStraight;
+                const inStartY = end.y;
+                const horizontalGap = inStartX - outEndX;
+                const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
+                
+                const cp1x = outEndX + curveDistance;
+                const cp1y = outEndY;
+                const cp2x = inStartX - curveDistance;
+                const cp2y = inStartY;
+                
+                const minX = Math.min(start.x, outEndX, inStartX, end.x) - 10;
+                const maxX = Math.max(start.x, outEndX, inStartX, end.x) + 10;
+                const minY = Math.min(start.y, outEndY, inStartY, end.y) - 10;
+                const maxY = Math.max(start.y, outEndY, inStartY, end.y) + 10;
+                const svgWidth = maxX - minX;
+                const svgHeight = maxY - minY;
+                
+                this.previewConnection.innerHTML = '';
+                
+                const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svgEl.setAttribute('class', 'connection-line preview-connection');
+                svgEl.style.cssText = `
+                    position: absolute;
+                    left: ${minX}px;
+                    top: ${minY}px;
+                    width: ${svgWidth}px;
+                    height: ${svgHeight}px;
+                    pointer-events: none;
+                    overflow: visible;
+                `;
+                
+                const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const pathData = `M ${start.x - minX} ${start.y - minY} L ${outEndX - minX} ${outEndY - minY} C ${cp1x - minX} ${cp1y - minY}, ${cp2x - minX} ${cp2y - minY}, ${inStartX - minX} ${inStartY - minY} L ${end.x - minX} ${end.y - minY}`;
+                pathEl.setAttribute('d', pathData);
+                pathEl.setAttribute('stroke', 'var(--accent-primary)');
+                pathEl.setAttribute('stroke-width', '3');
+                pathEl.setAttribute('fill', 'none');
+                pathEl.setAttribute('stroke-linecap', 'round');
+                pathEl.setAttribute('stroke-dasharray', '8, 4');
+                pathEl.style.opacity = '0.7';
+                pathEl.style.pointerEvents = 'none';
+                
+                svgEl.appendChild(pathEl);
+                this.previewConnection.appendChild(svgEl);
+            }
             
-            if (connection) {
-                const connectionEl = HTMLConnectionRenderer.render(connection);
-                if (connectionEl) {
-                    // Insert connections at the beginning so blocks appear on top
-                    const firstBlock = canvasLayer.querySelector('.workflow-block');
-                    if (firstBlock) {
-                        canvasLayer.insertBefore(connectionEl, firstBlock);
-                    } else {
-                        canvasLayer.appendChild(connectionEl);
+            /**
+             * Cancels connection creation
+             */
+            cancelConnection() {
+                this.isCreatingConnection = false;
+                this.connectionStart = null;
+                if (this.previewConnection) {
+                    this.previewConnection.remove();
+                    this.previewConnection = null;
+                }
+            }
+            
+            /**
+             * Deletes a connection
+             */
+            deleteConnection(connectionId) {
+                if (this.connectionFactory.deleteConnection(connectionId)) {
+                    const connectionEl = document.querySelector(`[data-connection-id="${connectionId}"]`);
+                    if (connectionEl) {
+                        connectionEl.remove();
+                    }
+                    if (this.onInfoUpdate) {
+                        this.onInfoUpdate();
                     }
                 }
             }
             
-            cancelConnection();
-            updateInfo();
-        }
-        
-        function updatePreviewConnection(endX, endY) {
-            if (!previewConnection || !connectionStart) return;
-            
-            const start = {
-                x: connectionStart.x,
-                y: connectionStart.y
-            };
-            const end = {
-                x: endX,
-                y: endY
-            };
-            
-            // Create smooth bezier curve path (same logic as actual connections)
-            const outputStraight = 60;
-            const inputStraight = 60;
-            const outEndX = start.x + outputStraight;
-            const outEndY = start.y;
-            const inStartX = end.x - inputStraight;
-            const inStartY = end.y;
-            const horizontalGap = inStartX - outEndX;
-            const curveDistance = Math.min(Math.abs(horizontalGap) / 2, 80);
-            
-            const cp1x = outEndX + curveDistance;
-            const cp1y = outEndY;
-            const cp2x = inStartX - curveDistance;
-            const cp2y = inStartY;
-            
-            // Calculate bounding box for SVG
-            const minX = Math.min(start.x, outEndX, inStartX, end.x) - 10;
-            const maxX = Math.max(start.x, outEndX, inStartX, end.x) + 10;
-            const minY = Math.min(start.y, outEndY, inStartY, end.y) - 10;
-            const maxY = Math.max(start.y, outEndY, inStartY, end.y) + 10;
-            const svgWidth = maxX - minX;
-            const svgHeight = maxY - minY;
-            
-            // Clear previous content
-            previewConnection.innerHTML = '';
-            
-            // Create SVG element for smooth preview line
-            const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svgEl.setAttribute('class', 'connection-line preview-connection');
-            svgEl.style.cssText = `
-                position: absolute;
-                left: ${minX}px;
-                top: ${minY}px;
-                width: ${svgWidth}px;
-                height: ${svgHeight}px;
-                pointer-events: none;
-                overflow: visible;
-            `;
-            
-            // Create dashed preview path
-            const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const pathData = `M ${start.x - minX} ${start.y - minY} L ${outEndX - minX} ${outEndY - minY} C ${cp1x - minX} ${cp1y - minY}, ${cp2x - minX} ${cp2y - minY}, ${inStartX - minX} ${inStartY - minY} L ${end.x - minX} ${end.y - minY}`;
-            pathEl.setAttribute('d', pathData);
-            pathEl.setAttribute('stroke', 'var(--accent-primary)');
-            pathEl.setAttribute('stroke-width', '3');
-            pathEl.setAttribute('fill', 'none');
-            pathEl.setAttribute('stroke-linecap', 'round');
-            pathEl.setAttribute('stroke-dasharray', '8, 4');
-            pathEl.style.opacity = '0.7';
-            pathEl.style.pointerEvents = 'none';
-            
-            svgEl.appendChild(pathEl);
-            previewConnection.appendChild(svgEl);
-        }
-        
-        function cancelConnection() {
-            isCreatingConnection = false;
-            connectionStart = null;
-            if (previewConnection) {
-                previewConnection.remove();
-                previewConnection = null;
+            /**
+             * Updates connections when a block moves
+             */
+            updateConnectionsForBlock(blockId, isDragging = false) {
+                const relatedConnections = this.connectionFactory.getConnectionsForBlock(blockId);
+                relatedConnections.forEach(connection => {
+                    const connectionEl = document.querySelector(`[data-connection-id="${connection.id}"]`);
+                    if (connectionEl) {
+                        this.connectionRenderer.update(connection, connectionEl, isDragging);
+                    } else {
+                        const newEl = this.connectionRenderer.render(connection);
+                        if (newEl) {
+                            const firstBlock = this.canvasLayer.querySelector('.workflow-block');
+                            if (firstBlock) {
+                                this.canvasLayer.insertBefore(newEl, firstBlock);
+                            } else {
+                                this.canvasLayer.appendChild(newEl);
+                            }
+                        }
+                    }
+                });
             }
-        }
-        
-        // Delete connection
-        function deleteConnection(connectionId) {
-            if (connectionFactory.deleteConnection(connectionId)) {
-                const connectionEl = document.querySelector(`[data-connection-id="${connectionId}"]`);
-                if (connectionEl) {
-                    connectionEl.remove();
+            
+            /**
+             * Gets port position helper
+             */
+            getPortPosition(block, portName, portType) {
+                return PortPositionCalculator.getPortPosition(block, portName, portType, this.canvasWrapper);
+            }
+            
+            /**
+             * Adds a block to the canvas
+             */
+            addBlock(block) {
+                const blockElement = this.blockRenderer.render(block);
+                this.canvasLayer.appendChild(blockElement);
+                if (this.onInfoUpdate) {
+                    this.onInfoUpdate();
                 }
-                updateInfo();
+            }
+            
+            /**
+             * Clears the canvas
+             */
+            clear() {
+                this.blockFactory.clearAll();
+                this.connectionFactory.clearAll();
+                this.canvasLayer.innerHTML = '';
+                if (this.onInfoUpdate) {
+                    this.onInfoUpdate();
+                }
             }
         }
         
-        // Clear canvas
-        window.clearCanvas = function() {
-            blockFactory.clearAll();
-            connectionFactory.clearAll();
-            canvasLayer.innerHTML = ''; // Clear combined layer
-            updateInfo();
-        };
+        // ============================================================================
+        // INITIALIZATION - Set up factories, renderers, and canvas manager
+        // ============================================================================
         
-        // Update info panel
+        // Initialize factories
+        const blockFactory = new BlockFactory(blocks, blockColors);
+        const connectionFactory = new ConnectionFactory(connections, blocks);
+        
+        // Get canvas elements
+        const canvasWrapper = document.querySelector('.canvas-wrapper');
+        
+        // Update info panel function
         function updateInfo() {
             document.getElementById('block-count').textContent = blockFactory.getAllBlocks().size;
             document.getElementById('connection-count').textContent = connectionFactory.getAllConnections().size;
         }
         
-        // Add random block
+        // Initialize renderers (will be wired to canvasManager after creation)
+        let blockRenderer, connectionRenderer, canvasManager;
+        
+        // Create renderers with temporary callbacks (will be updated after canvasManager creation)
+        blockRenderer = new HTMLBlockRenderer(
+            blockColors,
+            (e, blockId, portName, portType) => canvasManager?.handlePortMouseDown(e, blockId, portName, portType),
+            (e, blockId, portName, portType) => canvasManager?.handlePortMouseUp(e, blockId, portName, portType),
+            (e, blockId) => canvasManager?.handleBlockMouseDown(e, blockId)
+        );
+        
+        connectionRenderer = new HTMLConnectionRenderer(
+            (blockId) => blockFactory.getBlock(blockId),
+            (block, portName, portType) => {
+                return PortPositionCalculator.getPortPosition(block, portName, portType, canvasWrapper);
+            },
+            (connectionId) => canvasManager?.deleteConnection(connectionId)
+        );
+        
+        // Initialize canvas manager
+        canvasManager = new CanvasManager(
+            canvasWrapper,
+            canvasLayer,
+            blockFactory,
+            connectionFactory,
+            blockRenderer,
+            connectionRenderer,
+            updateInfo
+        );
+        
+        // Wire renderers to canvasManager (fix circular dependency)
+        blockRenderer.onPortMouseDown = (e, blockId, portName, portType) => canvasManager.handlePortMouseDown(e, blockId, portName, portType);
+        blockRenderer.onPortMouseUp = (e, blockId, portName, portType) => canvasManager.handlePortMouseUp(e, blockId, portName, portType);
+        blockRenderer.onBlockMouseDown = (e, blockId) => canvasManager.handleBlockMouseDown(e, blockId);
+        connectionRenderer.onDelete = (connectionId) => canvasManager.deleteConnection(connectionId);
+        
+        // Global functions for UI buttons
+        window.clearCanvas = function() {
+            canvasManager.clear();
+        };
+        
         window.addRandomBlock = function() {
             const block = blockFactory.createRandomBlock();
             if (!block) return;
-            
-            const blockElement = HTMLBlockRenderer.render(block);
-            // Attach drag handler to header (since block has pointer-events: none)
-            const header = blockElement.querySelector('.block-header');
-            if (header) {
-                header.addEventListener('mousedown', (e) => handleBlockMouseDown(e, block.id));
-            }
-            // Add block to canvas layer (after connections, so blocks appear on top)
-            canvasLayer.appendChild(blockElement);
-            
-            updateInfo();
+            canvasManager.addBlock(block);
         };
         
-        // Add random connection
         window.addRandomConnection = function() {
             const connection = connectionFactory.createRandomConnection();
             if (!connection) {
@@ -1772,9 +1954,8 @@
                 return;
             }
             
-            const connectionElement = HTMLConnectionRenderer.render(connection);
+            const connectionElement = connectionRenderer.render(connection);
             if (connectionElement) {
-                // Insert connections at the beginning so blocks appear on top
                 const firstBlock = canvasLayer.querySelector('.workflow-block');
                 if (firstBlock) {
                     canvasLayer.insertBefore(connectionElement, firstBlock);
@@ -1785,28 +1966,6 @@
             
             updateInfo();
         };
-        
-        // Handle keyboard events
-        function handleKeyDown(e) {
-            // Cancel connection creation on Escape key
-            if (e.key === 'Escape' && isCreatingConnection) {
-                cancelConnection();
-            }
-        }
-        
-        // Event listeners
-        const canvasWrapper = document.querySelector('.canvas-wrapper');
-        canvasWrapper.addEventListener('mousedown', handleCanvasMouseDown);
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        document.addEventListener('keydown', handleKeyDown);
-        
-        // Prevent text selection while panning
-        canvasWrapper.addEventListener('selectstart', (e) => {
-            if (isPanning) {
-                e.preventDefault();
-            }
-        });
         
         // Add some initial blocks for demo
         setTimeout(() => {
