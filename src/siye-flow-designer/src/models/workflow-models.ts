@@ -1,247 +1,81 @@
 /**
  * SiyeFlow Workflow Schema - Source of Truth
- * 
- * This file contains the complete workflow schema definitions for SiyeFlow.
- * All workflow models, block types, and configurations are defined here.
- * 
- * This is the authoritative source for workflow schema definitions.
- * When schema changes are needed, update this file directly.
- * 
- * Note: Legacy properties (onSuccess, onFailure, onComplete) are maintained
- * for backward compatibility with existing workflows.
  */
 
 export enum BlockType {
     Start = 'start',
     End = 'end',
-    HttpRequest = 'http-request',
+    Variable = 'variable',
     Evaluate = 'evaluate',
-    Condition = 'condition',
+    Log = 'log',
+    HttpRequest = 'http-request',
+    WebhookTrigger = 'webhook-trigger',
+    Switch = 'switch',
     Loop = 'loop',
     Delay = 'delay',
-    Variable = 'variable',
-    Log = 'log',
-    Collect = 'collect',
-    TryCatch = 'try-catch',
-    Workflow = 'workflow',
+    BatchProcess = 'batch-process',
+    SubWorkflow = 'sub-workflow',
+    Condition = 'condition',
+}
+
+export enum EdgeType {
+    Execution = 'execution',
+    Data = 'data'
 }
 
 export interface WorkflowDefinition {
+    id: string;
     name: string;
-    description: string;
+    description?: string;
     version: string;
-    metadata?: Record<string, any>;
-    inputs?: Record<string, InputDefinition>;
-    outputs?: Record<string, OutputDefinition>;
-    blocks?: WorkflowBlock[];
+    meta?: Record<string, unknown>;
+    nodes: Node[];
+    edges: Edge[];
 }
 
-export interface InputDefinition {
-    type: string;
-    required: boolean;
-    description: string;
-    default?: any;
-    value?: any;
+export interface Node {
+    id: string;
+    type: BlockType;
+    label?: string;
+    data: Record<string, unknown>;
+    interface?: NodeInterface;
 }
 
-export interface OutputDefinition {
-    type: string;
-    value: string;
-    description: string;
-}
-
-export interface InputProfile {
-    name: string;
-    description: string;
-    default: boolean;
-    inputs?: Record<string, InputDefinition>;
+export interface NodeInterface {
+    inputs: PortDefinition[];
+    outputs: PortDefinition[];
 }
 
 export interface PortDefinition {
     name: string;
     type: string;
-    description: string;
-    required: boolean;
-    multiple: boolean;
+    required?: boolean;
+    label?: string;
 }
 
-export interface PortConnection {
-    fromBlock: string;
-    fromPort: string;
-    toBlock: string;
-    toPort: string;
+export interface Edge {
+    id: string;
+    type: EdgeType;
+    source: string;
+    sourceHandle: string;
+    target: string;
+    targetHandle: string;
 }
 
-export abstract class WorkflowBlock {
-    id: string = '';
-    abstract type: BlockType;
-    name: string = '';
-    description?: string;
-    inputs?: Record<string, string>;
-    outputs?: Record<string, string>;
-    onSuccess?: string;
-    onFailure?: string;
-    onComplete?: string;
-    inputPorts?: PortDefinition[];
-    outputPorts?: PortDefinition[];
-    connections?: PortConnection[];
-}
-
-export class StartConfig {
-    inputs?: Record<string, InputDefinition>;
-    profiles?: InputProfile[];
-    selectedProfile: string = '';
-    overrides?: Record<string, any>;
-}
-
-export class StartBlock extends WorkflowBlock {
-    type = BlockType.Start;
-    config: StartConfig = new StartConfig();
-}
-
-export class EndConfig {
-    outputs?: Record<string, OutputDefinition>;
-    inputs?: Record<string, any>;  // Separate inputs for receiving final outputs
-    finalOutputs?: Record<string, any>; // Separate final outputs
-}
-
-export class EndBlock extends WorkflowBlock {
-    type = BlockType.End;
-    config: EndConfig = new EndConfig();
-}
-
-export class HttpRequestConfig {
-    method: string = '';
-    url: string = '';
-    headers?: Record<string, string>;
-    inputs?: Record<string, any>;  // Separate inputs for receiving headers
-    outputs?: Record<string, any>; // Separate outputs for sending headers
-    body?: any;
-    timeout?: number;
-    retries?: number;
-    successCodes?: number[];
-    successEvaluator?: string;  // TypeScript/JavaScript code to evaluate success
-    evaluatorLanguage?: string; // 'typescript' or 'javascript'
-}
-
-export class HttpRequestBlock extends WorkflowBlock {
-    type = BlockType.HttpRequest;
-    config: HttpRequestConfig = new HttpRequestConfig();
-}
-
-export class VariableConfig {
-    operation: string = '';
-    variables?: Record<string, any>;
-    inputs?: Record<string, any>;  // Separate inputs for receiving data
-    outputs?: Record<string, any>; // Separate outputs for sending data
-}
-
-export class VariableBlock extends WorkflowBlock {
-    type = BlockType.Variable;
-    config: VariableConfig = new VariableConfig();
-}
-
-export class ConditionConfig {
-    expression: string = '';
-    onTrue: string = '';
-    onFalse: string = '';
-}
-
-export class ConditionBlock extends WorkflowBlock {
-    type = BlockType.Condition;
-    config: ConditionConfig = new ConditionConfig();
-}
-
-export class DelayConfig {
-    milliseconds: number = 0;
-    message: string = '';
-}
-
-export class DelayBlock extends WorkflowBlock {
-    type = BlockType.Delay;
-    config: DelayConfig = new DelayConfig();
-}
-
-export class LogConfig {
-    message: string = '';
-    level: string = '';
-}
-
-export class LogBlock extends WorkflowBlock {
-    type = BlockType.Log;
-    config: LogConfig = new LogConfig();
-}
-
-export class EvaluateConfig {
-    language: string = '';
-    expression: string = '';
-    data: string = '';
-}
-
-export class EvaluateBlock extends WorkflowBlock {
-    type = BlockType.Evaluate;
-    config: EvaluateConfig = new EvaluateConfig();
-}
-
-export class LoopConfig {
-    items: string = '';
-    itemVariable: string = '';
-    indexVariable: string = '';
-    loopBlock: string = '';
-    maxIterations?: number;
-}
-
-export class LoopBlock extends WorkflowBlock {
-    type = BlockType.Loop;
-    config: LoopConfig = new LoopConfig();
-}
-
-export class CollectConfig {
-    fromLoop: string = '';
-    collectExpression: string = '';
-    outputVariable: string = '';
-}
-
-export class CollectBlock extends WorkflowBlock {
-    type = BlockType.Collect;
-    config: CollectConfig = new CollectConfig();
-}
-
-export class TryCatchConfig {
-    tryBlock: string = '';
-    catchBlock: string = '';
-    finallyBlock: string = '';
-    retries?: number;
-    retryDelay?: number;
-}
-
-export class TryCatchBlock extends WorkflowBlock {
-    type = BlockType.TryCatch;
-    config: TryCatchConfig = new TryCatchConfig();
-}
-
-export class SubWorkflowConfig {
-    workflowId: string = '';
-    inputs?: Record<string, any>;
-    outputMapping?: Record<string, string>;
-}
-
-export class SubWorkflowBlock extends WorkflowBlock {
-    type = BlockType.Workflow;
-    config: SubWorkflowConfig = new SubWorkflowConfig();
-}
-
-export type AnyWorkflowBlock = 
-    | StartBlock
-    | EndBlock
-    | HttpRequestBlock
-    | VariableBlock
-    | ConditionBlock
-    | DelayBlock
-    | LogBlock
-    | EvaluateBlock
-    | LoopBlock
-    | CollectBlock
-    | TryCatchBlock
-    | SubWorkflowBlock;
+// Block colors
+export const BLOCK_COLORS: Record<BlockType, string> = {
+    [BlockType.Start]: '#4CAF50',
+    [BlockType.End]: '#f44336',
+    [BlockType.HttpRequest]: '#2196F3',
+    [BlockType.Variable]: '#FF9800',
+    [BlockType.Switch]: '#9C27B0',
+    [BlockType.Condition]: '#9C27B0',
+    [BlockType.Delay]: '#00BCD4',
+    [BlockType.Log]: '#607D8B',
+    [BlockType.Evaluate]: '#795548',
+    [BlockType.Loop]: '#E91E63',
+    [BlockType.BatchProcess]: '#3F51B5',
+    [BlockType.SubWorkflow]: '#009688',
+    [BlockType.WebhookTrigger]: '#FF5722',
+};
 

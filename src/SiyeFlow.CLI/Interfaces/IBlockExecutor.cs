@@ -16,10 +16,10 @@ namespace SiyeFlow.CLI.Interfaces
         BlockType BlockType { get; }
 
         /// <summary>
-        /// Executes a workflow block
+        /// Executes a workflow block (Node)
         /// </summary>
         Task<BlockExecutionResult> ExecuteAsync(
-            WorkflowBlock block, 
+            Node node, 
             ExecutionContext context,
             CancellationToken cancellationToken = default);
 
@@ -27,9 +27,7 @@ namespace SiyeFlow.CLI.Interfaces
         /// Validates if a block can be executed
         /// </summary>
         Task<ValidationResult> ValidateAsync(
-            WorkflowBlock block,
+            Node node,
             ExecutionContext context);
     }
-
-
 }

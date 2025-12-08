@@ -1,0 +1,97 @@
+{
+  "id": "test-jokes",
+  "name": "Random Joke API Test",
+  "description": "Fetches a random joke from JokeAPI",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start1",
+      "type": "start",
+      "label": "Joke Config",
+      "data": {
+        "profiles": [
+          {
+            "name": "Safe Jokes",
+            "default": true,
+            "inputs": {
+              "category": { "type": "string", "value": "Programming" },
+              "safe": { "type": "boolean", "value": true }
+            }
+          },
+          {
+            "name": "All Jokes",
+            "inputs": {
+              "category": { "type": "string", "value": "Any" },
+              "safe": { "type": "boolean", "value": false }
+            }
+          }
+        ],
+        "inputs": {
+          "category": { "type": "string", "value": "Programming" },
+          "safe": { "type": "boolean", "value": true }
+        },
+        "selectedProfile": "Safe Jokes"
+      }
+    },
+    {
+      "id": "http1",
+      "type": "http-request",
+      "label": "Fetch Joke",
+      "data": {
+        "method": "GET",
+        "url": "https://v2.jokeapi.dev/joke/{{category}}?safe-mode",
+        "headers": {},
+        "outputs": {
+          "jokeType": "$.type",
+          "setup": "$.setup",
+          "delivery": "$.delivery",
+          "joke": "$.joke"
+        }
+      }
+    },
+    {
+      "id": "log1",
+      "type": "log",
+      "label": "Log Joke",
+      "data": {
+        "message": "😂 Joke Type: {{jokeType}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "log2",
+      "type": "log",
+      "label": "Log Punchline",
+      "data": {
+        "message": "Setup: {{setup}} | Delivery: {{delivery}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "end1",
+      "type": "end",
+      "label": "Done",
+      "data": {
+        "outputs": {
+          "jokeType": { "value": "{{jokeType}}", "type": "string" },
+          "fullJoke": { "value": "{{setup}} ... {{delivery}}", "type": "string" }
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "type": "execution", "source": "start1", "sourceHandle": "default", "target": "http1", "targetHandle": "trigger" },
+    { "id": "e2", "type": "execution", "source": "http1", "sourceHandle": "success", "target": "log1", "targetHandle": "trigger" },
+    { "id": "e3", "type": "execution", "source": "log1", "sourceHandle": "success", "target": "log2", "targetHandle": "trigger" },
+    { "id": "e4", "type": "execution", "source": "log2", "sourceHandle": "success", "target": "end1", "targetHandle": "trigger" },
+    { "id": "d1", "type": "data", "source": "start1", "sourceHandle": "category", "target": "http1", "targetHandle": "category" }
+  ],
+  "layout": {
+    "start1": { "x": 100, "y": 200 },
+    "http1": { "x": 400, "y": 200 },
+    "log1": { "x": 700, "y": 150 },
+    "log2": { "x": 700, "y": 300 },
+    "end1": { "x": 1000, "y": 200 }
+  }
+}
+

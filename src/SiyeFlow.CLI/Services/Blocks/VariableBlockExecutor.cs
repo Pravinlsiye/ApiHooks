@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SiyeFlow.CLI.Interfaces;
 using SiyeFlow.Core.Models;
 using System.Collections.Generic;
@@ -16,67 +17,60 @@ namespace SiyeFlow.CLI.Services.Blocks
         
         public override BlockType BlockType => BlockType.Variable;
         
-        protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
+        protected override Task<BlockExecutionResult> ExecuteInternalAsync(
+            Node node,
+            Dictionary<string, object>? inputs,
+            Interfaces.ExecutionContext context,
+            CancellationToken cancellationToken)
         {
-            var variableBlock = CastBlock<VariableBlock>(block);
-            var operation = variableBlock.Config.Operation?.ToLower() ?? "set";
+            var config = GetConfig<VariableConfig>(node);
+            var operation = config.Operation?.ToLower() ?? "set";
             var outputs = new Dictionary<string, object>();
 
-            // First, store port inputs in the variable store so they can be referenced
+            // Store port inputs into variable store
             if (inputs != null)
             {
                 foreach (var input in inputs)
                 {
                     _variableStore.SetVariable(input.Key, input.Value);
-                    _console.Debug($"Stored port input '{input.Key}' in variable store");
                 }
             }
 
-            switch (operation)
+            if (config.Values != null)
             {
-                case "set":
-                    foreach (var kvp in variableBlock.Config.Variables)
-                    {
-                        object value;
-                        if (kvp.Value is string strValue)
+                switch (operation)
+                {
+                    case "set":
+                        foreach (var kvp in config.Values)
                         {
-                            // Replace variables in string values
-                            value = _variableStore.ReplaceVariables(strValue);
+                            object value;
+                            if (kvp.Value is JValue jVal && jVal.Type == JTokenType.String)
+                            {
+                                value = _variableStore.ReplaceVariables(jVal.ToString());
+                            }
+                            else if (kvp.Value is string strValue)
+                            {
+                                value = _variableStore.ReplaceVariables(strValue);
+                            }
+                            else
+                            {
+                                value = kvp.Value;
+                            }
+                            
+                            _variableStore.SetVariable(kvp.Key, value);
+                            outputs[kvp.Key] = value;
+                            _console.Info($"Set variable '{kvp.Key}' = {value}");
                         }
-                        else
+                        break;
+
+                    case "delete":
+                        foreach (var kvp in config.Values)
                         {
-                            // Keep objects/arrays as-is
-                            value = kvp.Value;
+                            _variableStore.SetVariable(kvp.Key, null!);
+                            _console.Info($"Deleted variable '{kvp.Key}'");
                         }
-                        
-                        _variableStore.SetVariable(kvp.Key, value);
-                        outputs[kvp.Key] = value;
-                        _console.Info($"Set variable '{kvp.Key}' = {JsonConvert.SerializeObject(value)}");
-                    }
-                    break;
-
-                case "get":
-                    foreach (var kvp in variableBlock.Config.Variables)
-                    {
-                        var varName = kvp.Key;
-                        var value = _variableStore.GetVariable(varName);
-                        outputs[varName] = value ?? null!;
-                        _console.Info($"Get variable '{varName}' = {JsonConvert.SerializeObject(value)}");
-                    }
-                    break;
-
-                case "delete":
-                    foreach (var kvp in variableBlock.Config.Variables)
-                    {
-                        var varName = kvp.Key;
-                        _variableStore.SetVariable(varName, null!);
-                        _console.Info($"Deleted variable '{varName}'");
-                    }
-                    break;
-
-                default:
-                    _console.Error($"Unknown variable operation: {operation}");
-                    return Task.FromResult(new BlockExecutionResult { Success = false });
+                        break;
+                }
             }
 
             return Task.FromResult(new BlockExecutionResult 
@@ -86,26 +80,25 @@ namespace SiyeFlow.CLI.Services.Blocks
             });
         }
         
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
+            var config = GetConfig<VariableConfig>(node);
             var result = new ValidationResult { IsValid = true };
-            var variableBlock = CastBlock<VariableBlock>(block);
-            var operation = variableBlock.Config.Operation?.ToLower() ?? "set";
 
-            var validOperations = new[] { "set", "get", "delete" };
-            if (!validOperations.Contains(operation))
+            if (config.Values == null || !config.Values.Any())
             {
                 result.IsValid = false;
-                result.Errors.Add($"Invalid variable operation: {operation}. Must be one of: set, get, delete");
-            }
-
-            if (variableBlock.Config.Variables == null || !variableBlock.Config.Variables.Any())
-            {
-                result.IsValid = false;
-                result.Errors.Add("Variable block must have at least one variable");
+                result.Errors.Add("Variable block must have values defined.");
             }
 
             return Task.FromResult(result);
+        }
+
+        // DTOs
+        public class VariableConfig
+        {
+            public string Operation { get; set; } = "set";
+            public Dictionary<string, object>? Values { get; set; }
         }
     }
 }

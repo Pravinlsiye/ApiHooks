@@ -61,12 +61,12 @@ namespace SiyeFlow.CLI.Services
             return null;
         }
 
-        public IBlockExecutor? GetExecutor(WorkflowBlock block)
+        public IBlockExecutor? GetExecutor(Node node)
         {
-            if (block == null)
-                throw new ArgumentNullException(nameof(block));
+            if (node == null)
+                throw new ArgumentNullException(nameof(node));
 
-            return GetExecutor(block.Type);
+            return GetExecutor(node.Type);
         }
 
         public bool IsRegistered(BlockType blockType)

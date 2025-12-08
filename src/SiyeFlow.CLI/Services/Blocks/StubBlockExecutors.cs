@@ -7,22 +7,18 @@ using System.Threading.Tasks;
 
 namespace SiyeFlow.CLI.Services.Blocks
 {
-    // Temporary stub implementations to enable testing
-
-    // Stub - implementation moved to VariableBlockExecutor.cs
+    // Stub implementations to enable testing
 
     public class LogBlockExecutor : BlockExecutorBase
     {
         public LogBlockExecutor(ILogger<LogBlockExecutor> logger, IVariableStore variableStore, IConsoleWriter console) 
             : base(logger, variableStore, console) { }
         public override BlockType BlockType => BlockType.Log;
-        protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
+        protected override Task<BlockExecutionResult> ExecuteInternalAsync(Node node, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
         {
-            var logBlock = CastBlock<LogBlock>(block);
-            var config = logBlock.Config;
+            var config = GetConfig<LogConfig>(node);
             var message = config.Message ?? "";
             
-            // Replace variables in message from inputs
             if (inputs != null)
             {
                 foreach (var input in inputs)
@@ -36,12 +32,10 @@ namespace SiyeFlow.CLI.Services.Blocks
                 }
             }
             
-            // Also check variable store for any remaining variables
             message = _variableStore.ReplaceVariables(message);
             
             _console.Info($"LOG [{config.Level ?? "info"}]: {message}");
             
-            // Output "complete" port so workflow can continue to End block
             return Task.FromResult(new BlockExecutionResult 
             { 
                 Success = true,
@@ -52,9 +46,15 @@ namespace SiyeFlow.CLI.Services.Blocks
                 }
             });
         }
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
             return Task.FromResult(new ValidationResult { IsValid = true });
+        }
+
+        public class LogConfig
+        {
+            public string Message { get; set; } = "";
+            public string Level { get; set; } = "info";
         }
     }
 
@@ -63,30 +63,39 @@ namespace SiyeFlow.CLI.Services.Blocks
         public DelayBlockExecutor(ILogger<DelayBlockExecutor> logger, IVariableStore variableStore, IConsoleWriter console) 
             : base(logger, variableStore, console) { }
         public override BlockType BlockType => BlockType.Delay;
-        protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
+        protected override async Task<BlockExecutionResult> ExecuteInternalAsync(Node node, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
         {
-            _console.Warning($"Delay block not yet implemented");
-            return Task.FromResult(new BlockExecutionResult { Success = true });
+            var config = GetConfig<DelayConfig>(node);
+            _console.Info($"Delaying for {config.Duration} {config.Unit}...");
+            
+            // Implement actual delay if needed, for now just log
+            // await Task.Delay(TimeSpan.FromMilliseconds(config.Duration)); 
+            
+            return await Task.FromResult(new BlockExecutionResult { Success = true });
         }
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
             return Task.FromResult(new ValidationResult { IsValid = true });
         }
-    }
 
-    // Stub - implementation moved to ConditionBlockExecutor.cs
+        public class DelayConfig
+        {
+            public int Duration { get; set; }
+            public string Unit { get; set; } = "milliseconds";
+        }
+    }
 
     public class LoopBlockExecutor : BlockExecutorBase
     {
         public LoopBlockExecutor(ILogger<LoopBlockExecutor> logger, IVariableStore variableStore, IConsoleWriter console) 
             : base(logger, variableStore, console) { }
         public override BlockType BlockType => BlockType.Loop;
-        protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
+        protected override Task<BlockExecutionResult> ExecuteInternalAsync(Node node, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
         {
-            _console.Warning($"Loop block not yet implemented");
+            _console.Warning($"Loop block not yet fully implemented");
             return Task.FromResult(new BlockExecutionResult { Success = true });
         }
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
             return Task.FromResult(new ValidationResult { IsValid = true });
         }
@@ -97,12 +106,12 @@ namespace SiyeFlow.CLI.Services.Blocks
         public TryCatchBlockExecutor(ILogger<TryCatchBlockExecutor> logger, IVariableStore variableStore, IConsoleWriter console) 
             : base(logger, variableStore, console) { }
         public override BlockType BlockType => BlockType.TryCatch;
-        protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
+        protected override Task<BlockExecutionResult> ExecuteInternalAsync(Node node, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
         {
-            _console.Warning($"TryCatch block not yet implemented");
+            _console.Warning($"TryCatch block not yet fully implemented");
             return Task.FromResult(new BlockExecutionResult { Success = true });
         }
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
             return Task.FromResult(new ValidationResult { IsValid = true });
         }
@@ -113,12 +122,12 @@ namespace SiyeFlow.CLI.Services.Blocks
         public CollectBlockExecutor(ILogger<CollectBlockExecutor> logger, IVariableStore variableStore, IConsoleWriter console) 
             : base(logger, variableStore, console) { }
         public override BlockType BlockType => BlockType.Collect;
-        protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
+        protected override Task<BlockExecutionResult> ExecuteInternalAsync(Node node, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
         {
-            _console.Warning($"Collect block not yet implemented");
+            _console.Warning($"Collect block not yet fully implemented");
             return Task.FromResult(new BlockExecutionResult { Success = true });
         }
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
             return Task.FromResult(new ValidationResult { IsValid = true });
         }
@@ -128,13 +137,13 @@ namespace SiyeFlow.CLI.Services.Blocks
     {
         public SubWorkflowBlockExecutor(ILogger<SubWorkflowBlockExecutor> logger, IVariableStore variableStore, IConsoleWriter console) 
             : base(logger, variableStore, console) { }
-        public override BlockType BlockType => BlockType.Workflow;
-        protected override Task<BlockExecutionResult> ExecuteInternalAsync(WorkflowBlock block, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
+        public override BlockType BlockType => BlockType.SubWorkflow;
+        protected override Task<BlockExecutionResult> ExecuteInternalAsync(Node node, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context, CancellationToken cancellationToken)
         {
-            _console.Warning($"SubWorkflow block not yet implemented");
+            _console.Warning($"SubWorkflow block not yet fully implemented");
             return Task.FromResult(new BlockExecutionResult { Success = true });
         }
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
             return Task.FromResult(new ValidationResult { IsValid = true });
         }

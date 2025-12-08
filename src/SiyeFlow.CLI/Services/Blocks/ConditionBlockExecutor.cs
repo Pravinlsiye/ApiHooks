@@ -25,13 +25,13 @@ namespace SiyeFlow.CLI.Services.Blocks
         public override BlockType BlockType => BlockType.Condition;
         
         protected override Task<BlockExecutionResult> ExecuteInternalAsync(
-            WorkflowBlock block, 
+            Node node, 
             Dictionary<string, object>? inputs, 
             Interfaces.ExecutionContext context, 
             CancellationToken cancellationToken)
         {
-            var conditionBlock = CastBlock<ConditionBlock>(block);
-            var expression = conditionBlock.Config.Expression;
+            var config = GetConfig<ConditionConfig>(node);
+            var expression = config.Expression;
 
             _console.Info($"Evaluating condition: {expression}");
 
@@ -52,64 +52,36 @@ namespace SiyeFlow.CLI.Services.Blocks
 
             _console.Info($"Condition result: {result}");
 
-            // Output to the appropriate port based on condition result
-            var outputs = new Dictionary<string, object>
-            {
-                ["result"] = result
-            };
+            var outputs = new Dictionary<string, object> { ["result"] = result };
             
-            // Output to "true" or "false" port based on condition
-            // The execution engine will follow connections from the port that has output
-            if (result)
-            {
-                outputs["true"] = true;
-            }
-            else
-            {
-                outputs["false"] = false;
-            }
+            if (result) outputs["true"] = true;
+            else outputs["false"] = false;
 
-            var executionResult = new BlockExecutionResult 
+            return Task.FromResult(new BlockExecutionResult 
             { 
                 Success = true,
-                Outputs = outputs
-            };
-
-            return Task.FromResult(executionResult);
+                Outputs = outputs,
+                NextHandle = result ? "true" : "false"
+            });
         }
         
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
+            var config = GetConfig<ConditionConfig>(node);
             var result = new ValidationResult { IsValid = true };
-            var conditionBlock = CastBlock<ConditionBlock>(block);
 
-            if (string.IsNullOrWhiteSpace(conditionBlock.Config.Expression))
+            if (string.IsNullOrWhiteSpace(config.Expression))
             {
                 result.IsValid = false;
                 result.Errors.Add("Condition expression is required");
             }
 
-            // Validate that condition block has connections from true/false ports
-            if (conditionBlock.Connections == null || !conditionBlock.Connections.Any())
-            {
-                result.Warnings.Add("Condition block has no output connections");
-            }
-            else
-            {
-                var hasTrueConnection = conditionBlock.Connections.Any(c => c.FromPort == "true");
-                var hasFalseConnection = conditionBlock.Connections.Any(c => c.FromPort == "false");
-                
-                if (!hasTrueConnection)
-                {
-                    result.Warnings.Add("No connection from 'true' port");
-                }
-                if (!hasFalseConnection)
-                {
-                    result.Warnings.Add("No connection from 'false' port");
-                }
-            }
-
             return Task.FromResult(result);
+        }
+
+        public class ConditionConfig
+        {
+            public string Expression { get; set; } = "";
         }
     }
 }

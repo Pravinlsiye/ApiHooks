@@ -1,4 +1,6 @@
 using SiyeFlow.Core.Models;
+using System;
+using System.Collections.Generic;
 
 namespace SiyeFlow.CLI.Interfaces
 {
@@ -23,9 +25,9 @@ namespace SiyeFlow.CLI.Interfaces
         IBlockExecutor? GetExecutor(BlockType blockType);
 
         /// <summary>
-        /// Gets an executor for a workflow block
+        /// Gets an executor for a workflow node
         /// </summary>
-        IBlockExecutor? GetExecutor(WorkflowBlock block);
+        IBlockExecutor? GetExecutor(Node node);
 
         /// <summary>
         /// Checks if an executor is registered for a block type
@@ -41,13 +43,5 @@ namespace SiyeFlow.CLI.Interfaces
         /// Unregisters a block type
         /// </summary>
         bool Unregister(BlockType blockType);
-
-        /// <summary>
-        /// Creates a default registry with all built-in block executors
-        /// </summary>
-        static IBlockRegistry CreateDefault(IServiceProvider serviceProvider) 
-        {
-            throw new NotImplementedException("Implementation will be in BlockRegistry class");
-        }
     }
 }

@@ -207,11 +207,10 @@ namespace SiyeFlow.CLI
 
                 // Load workflow
                 var workflowJson = await File.ReadAllTextAsync(workflowPath);
-                var settings = new Newtonsoft.Json.JsonSerializerSettings();
-                settings.Converters.Add(new WorkflowBlockConverter());
-                var workflow = Newtonsoft.Json.JsonConvert.DeserializeObject<WorkflowDefinition>(workflowJson, settings);
+                var workflow = Newtonsoft.Json.JsonConvert.DeserializeObject<WorkflowDefinition>(workflowJson);
 
                 if (workflow == null)
+                
                 {
                     console.Error("Failed to parse workflow file");
                     Environment.Exit(1);

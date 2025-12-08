@@ -1,16 +1,15 @@
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using SiyeFlow.CLI.Interfaces;
 using SiyeFlow.Core.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace SiyeFlow.CLI.Services.Blocks
 {
-    /// <summary>
-    /// Executor for End blocks
-    /// </summary>
     public class EndBlockExecutor : BlockExecutorBase
     {
         public EndBlockExecutor(
@@ -24,57 +23,51 @@ namespace SiyeFlow.CLI.Services.Blocks
         public override BlockType BlockType => BlockType.End;
 
         protected override async Task<BlockExecutionResult> ExecuteInternalAsync(
-            WorkflowBlock block,
+            Node node,
             Dictionary<string, object>? inputs,
             Interfaces.ExecutionContext context,
             CancellationToken cancellationToken)
         {
-            var endBlock = CastBlock<EndBlock>(block);
+            var config = GetConfig<EndConfig>(node);
             var result = new BlockExecutionResult { Success = true };
 
             _console.Info("=== Workflow Completed ===");
 
             var outputs = new Dictionary<string, object>();
 
-            if (endBlock.Config?.Outputs != null)
+            if (config.Outputs != null)
             {
-                foreach (var outputDef in endBlock.Config.Outputs)
+                foreach (var outputDef in config.Outputs)
                 {
                     var outputName = outputDef.Key;
                     var outputConfig = outputDef.Value;
 
-                    // Replace variables in the output value
                     object? processedValue;
 
-                    // Try to get the actual variable value
-                    if (outputConfig.Value.StartsWith("{{") && outputConfig.Value.EndsWith("}}"))
+                    if (outputConfig.Value == null) 
                     {
+                        processedValue = null;
+                    }
+                    else if (outputConfig.Value.StartsWith("{{") && outputConfig.Value.EndsWith("}}"))
+                    {
+                        // Direct variable reference
                         var varName = outputConfig.Value.Trim('{', '}', ' ');
                         var value = _variableStore.GetVariable(varName);
-                        if (value != null)
-                        {
-                            processedValue = value;
-                        }
-                        else
-                        {
-                            processedValue = outputConfig.Value;
-                        }
+                        processedValue = value ?? outputConfig.Value; // Fallback to string if not found
                     }
                     else
                     {
-                        // Replace variables and try to parse the value based on type
+                        // Replace variables within string
                         var replacedValue = _variableStore.ReplaceVariables(outputConfig.Value);
                         processedValue = ParseValue(replacedValue, outputConfig.Type);
                     }
 
                     outputs[outputName] = processedValue ?? outputConfig.Value;
-                    
                     _console.Debug($"Output '{outputName}': {processedValue}");
                 }
             }
 
-            // Add execution metadata
-            outputs["$executionPath"] = context.ExecutionPath;
+            // System outputs
             outputs["$executionId"] = context.ExecutionId;
             outputs["$completedAt"] = DateTime.UtcNow;
 
@@ -82,74 +75,39 @@ namespace SiyeFlow.CLI.Services.Blocks
             
             _console.Success($"Workflow completed with {outputs.Count} outputs");
 
-            // No next block from End
-            result.NextBlockId = null;
-            
-            return result;
+            return await Task.FromResult(result);
         }
 
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
             var result = new ValidationResult { IsValid = true };
-
-            try
-            {
-                var endBlock = CastBlock<EndBlock>(block);
-
-                // End blocks should not have output connections
-                if (block.Connections != null && block.Connections.Any())
-                {
-                    result.Warnings.Add("End block should not have output connections");
-                }
-
-                // Validate output definitions
-                if (endBlock.Config?.Outputs != null)
-                {
-                    foreach (var output in endBlock.Config.Outputs)
-                    {
-                        if (string.IsNullOrEmpty(output.Key))
-                        {
-                            result.IsValid = false;
-                            result.Errors.Add("Output name cannot be empty");
-                        }
-
-                        if (string.IsNullOrEmpty(output.Value.Type))
-                        {
-                            result.IsValid = false;
-                            result.Errors.Add($"Output '{output.Key}' must have a type");
-                        }
-
-                        if (string.IsNullOrEmpty(output.Value.Value))
-                        {
-                            result.IsValid = false;
-                            result.Errors.Add($"Output '{output.Key}' must have a value");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                result.IsValid = false;
-                result.Errors.Add($"Invalid End block configuration: {ex.Message}");
-            }
-
             return Task.FromResult(result);
         }
 
         private object ParseValue(object value, string type)
         {
-            if (value == null)
-                return null!;
-
+            if (value == null) return null!;
             var stringValue = value.ToString();
 
-            return type.ToLower() switch
+            return type?.ToLower() switch
             {
                 "number" => double.TryParse(stringValue, out var d) ? d : value,
                 "boolean" => bool.TryParse(stringValue, out var b) ? b : value,
                 "integer" => int.TryParse(stringValue, out var i) ? i : value,
                 _ => value
             };
+        }
+
+        // DTOs
+        public class EndConfig
+        {
+            public Dictionary<string, OutputDefinition>? Outputs { get; set; }
+        }
+
+        public class OutputDefinition
+        {
+            public string Type { get; set; } = "string";
+            public string? Value { get; set; }
         }
     }
 }

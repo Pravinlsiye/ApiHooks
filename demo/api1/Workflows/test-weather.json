@@ -1,0 +1,92 @@
+{
+  "id": "test-weather",
+  "name": "Weather API Test",
+  "description": "Fetches weather data from wttr.in (no API key needed)",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start1",
+      "type": "start",
+      "label": "Weather Config",
+      "data": {
+        "profiles": [
+          {
+            "name": "New York",
+            "default": true,
+            "inputs": {
+              "city": { "type": "string", "value": "New+York" }
+            }
+          },
+          {
+            "name": "London",
+            "inputs": {
+              "city": { "type": "string", "value": "London" }
+            }
+          },
+          {
+            "name": "Tokyo",
+            "inputs": {
+              "city": { "type": "string", "value": "Tokyo" }
+            }
+          }
+        ],
+        "inputs": {
+          "city": { "type": "string", "value": "New+York" }
+        },
+        "selectedProfile": "New York"
+      }
+    },
+    {
+      "id": "http1",
+      "type": "http-request",
+      "label": "Get Weather",
+      "data": {
+        "method": "GET",
+        "url": "https://wttr.in/{{city}}?format=j1",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "outputs": {
+          "temp_C": "$.current_condition[0].temp_C",
+          "temp_F": "$.current_condition[0].temp_F",
+          "humidity": "$.current_condition[0].humidity",
+          "weatherDesc": "$.current_condition[0].weatherDesc[0].value"
+        }
+      }
+    },
+    {
+      "id": "log1",
+      "type": "log",
+      "label": "Log Weather",
+      "data": {
+        "message": "🌤️ Weather in {{city}}: {{weatherDesc}}, {{temp_C}}°C ({{temp_F}}°F), Humidity: {{humidity}}%",
+        "level": "info"
+      }
+    },
+    {
+      "id": "end1",
+      "type": "end",
+      "label": "Complete",
+      "data": {
+        "outputs": {
+          "temperature": { "value": "{{temp_C}}", "type": "number" },
+          "description": { "value": "{{weatherDesc}}", "type": "string" },
+          "humidity": { "value": "{{humidity}}", "type": "number" }
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "type": "execution", "source": "start1", "sourceHandle": "default", "target": "http1", "targetHandle": "trigger" },
+    { "id": "e2", "type": "execution", "source": "http1", "sourceHandle": "success", "target": "log1", "targetHandle": "trigger" },
+    { "id": "e3", "type": "execution", "source": "log1", "sourceHandle": "success", "target": "end1", "targetHandle": "trigger" },
+    { "id": "d1", "type": "data", "source": "start1", "sourceHandle": "city", "target": "http1", "targetHandle": "city" }
+  ],
+  "layout": {
+    "start1": { "x": 100, "y": 200 },
+    "http1": { "x": 400, "y": 200 },
+    "log1": { "x": 700, "y": 200 },
+    "end1": { "x": 1000, "y": 200 }
+  }
+}
+

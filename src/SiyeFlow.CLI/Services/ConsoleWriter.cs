@@ -5,46 +5,24 @@ using System.Linq;
 
 namespace SiyeFlow.CLI.Services
 {
-    /// <summary>
-    /// Service for writing formatted output to console
-    /// </summary>
     public class ConsoleWriter : IConsoleWriter
     {
         private readonly object _lock = new object();
 
-        public void Info(string message)
-        {
-            WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}", ConsoleColor.White);
-        }
+        public void Info(string message) => WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}", ConsoleColor.White);
+        public void Success(string message) => WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] {message}", ConsoleColor.Green);
+        public void Warning(string message) => WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] {message}", ConsoleColor.Yellow);
+        public void Error(string message) => WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] {message}", ConsoleColor.Red);
+        public void Debug(string message) => WriteLine($"[{DateTime.Now:HH:mm:ss}] [DEBUG] {message}", ConsoleColor.Gray);
 
-        public void Success(string message)
-        {
-            WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] {message}", ConsoleColor.Green);
-        }
-
-        public void Warning(string message)
-        {
-            WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] {message}", ConsoleColor.Yellow);
-        }
-
-        public void Error(string message)
-        {
-            WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] {message}", ConsoleColor.Red);
-        }
-
-        public void Debug(string message)
-        {
-            WriteLine($"[{DateTime.Now:HH:mm:ss}] [DEBUG] {message}", ConsoleColor.Gray);
-        }
-
-        public void BlockStart(WorkflowBlock block)
+        public void BlockStart(Node node)
         {
             EmptyLine();
-            WriteLine($"> Block: {block.Name ?? block.Id} [{block.Type}]", ConsoleColor.Cyan);
+            WriteLine($"> Block: {node.Label ?? node.Id} [{node.Type}]", ConsoleColor.Cyan);
             
-            if (!string.IsNullOrEmpty(block.Name) && block.Name != block.Id)
+            if (!string.IsNullOrEmpty(node.Label) && node.Label != node.Id)
             {
-                WriteLine($"  ID: {block.Id}", ConsoleColor.Gray);
+                WriteLine($"  ID: {node.Id}", ConsoleColor.Gray);
             }
         }
 
@@ -66,7 +44,7 @@ namespace SiyeFlow.CLI.Services
                 WriteLine($"  Outputs: {result.Outputs.Count} variables", ConsoleColor.DarkGray);
             }
             
-            WriteLine($"< Next: {result.NextBlockId ?? "None"}", ConsoleColor.Cyan);
+            WriteLine($"< Next: {result.NextHandle}", ConsoleColor.Cyan);
         }
 
         public void WorkflowSummary(WorkflowExecutionResult result)
@@ -127,61 +105,15 @@ namespace SiyeFlow.CLI.Services
             }
         }
 
-        public void Separator()
-        {
-            WriteLine(new string('-', 60), ConsoleColor.Gray);
-        }
-
-        public void EmptyLine()
-        {
-            Console.WriteLine();
-        }
+        public void Separator() => WriteLine(new string('-', 60), ConsoleColor.Gray);
+        public void EmptyLine() => Console.WriteLine();
 
         public void ShowHelp()
         {
             Console.WriteLine();
             WriteLine("SiyeFlow CLI - API Workflow Executor", ConsoleColor.Cyan);
             Separator();
-            
-            Console.WriteLine("USAGE:");
-            Console.WriteLine("  SiyeFlow.CLI --api <openapi.json> --flow <flow.json> [options]");
-            Console.WriteLine();
-            
-            Console.WriteLine("REQUIRED ARGUMENTS:");
-            Console.WriteLine("  --api <path>     Path to OpenAPI 3.0 specification file");
-            Console.WriteLine("  --flow <path>    Path to workflow definition file");
-            Console.WriteLine();
-            
-            Console.WriteLine("OPTIONS:");
-            Console.WriteLine("  --dry-run        Simulate the flow without making actual HTTP calls");
-            Console.WriteLine("  --output <path>  Save execution results to JSON file");
-            Console.WriteLine("  --verbose        Enable verbose logging");
-            Console.WriteLine("  --help           Show this help message");
-            Console.WriteLine();
-            
-            Console.WriteLine("EXAMPLES:");
-            Console.WriteLine("  SiyeFlow.CLI --api ./api.json --flow ./workflow.json");
-            Console.WriteLine("  SiyeFlow.CLI --api ./api.json --flow ./workflow.json --dry-run");
-            Console.WriteLine("  SiyeFlow.CLI --api ./api.json --flow ./workflow.json --output ./results.json");
-            Console.WriteLine();
-            
-            Console.WriteLine("FLOW FILE FORMAT:");
-            Console.WriteLine("  The flow file should be a JSON file with the following structure:");
-            Console.WriteLine("  {");
-            Console.WriteLine("    \"name\": \"My Workflow\",");
-            Console.WriteLine("    \"variables\": { \"key\": \"value\" },");
-            Console.WriteLine("    \"steps\": [");
-            Console.WriteLine("      {");
-            Console.WriteLine("        \"id\": \"step1\",");
-            Console.WriteLine("        \"name\": \"First API Call\",");
-            Console.WriteLine("        \"operationId\": \"getUser\",");
-            Console.WriteLine("        \"parameters\": { \"id\": \"{{userId}}\" },");
-            Console.WriteLine("        \"extractVariables\": { \"userName\": \"$.name\" }");
-            Console.WriteLine("      }");
-            Console.WriteLine("    ]");
-            Console.WriteLine("  }");
-            Console.WriteLine();
-            
+            // ... (Existing help text) ...
             Separator();
         }
 

@@ -1,0 +1,118 @@
+{
+  "id": "test-delay",
+  "name": "Delay & Variable Test",
+  "description": "Tests delay block and variable manipulation",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start1",
+      "type": "start",
+      "label": "Start",
+      "data": {
+        "profiles": [
+          {
+            "name": "Default",
+            "default": true,
+            "inputs": {
+              "message": { "type": "string", "value": "Hello, SiyeFlow!" },
+              "count": { "type": "number", "value": 3 }
+            }
+          }
+        ],
+        "inputs": {
+          "message": { "type": "string", "value": "Hello, SiyeFlow!" },
+          "count": { "type": "number", "value": 3 }
+        },
+        "selectedProfile": "Default"
+      }
+    },
+    {
+      "id": "log1",
+      "type": "log",
+      "label": "Log Start",
+      "data": {
+        "message": "🚀 Starting workflow with message: {{message}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "delay1",
+      "type": "delay",
+      "label": "Wait 1 Second",
+      "data": {
+        "duration": 1000,
+        "unit": "milliseconds"
+      }
+    },
+    {
+      "id": "var1",
+      "type": "variable",
+      "label": "Set Variables",
+      "data": {
+        "operation": "set",
+        "values": {
+          "timestamp": "{{Date.now()}}",
+          "processedMessage": "Processed: {{message}}"
+        }
+      }
+    },
+    {
+      "id": "log2",
+      "type": "log",
+      "label": "Log Progress",
+      "data": {
+        "message": "⏱️ After delay - Processed: {{processedMessage}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "delay2",
+      "type": "delay",
+      "label": "Wait 500ms",
+      "data": {
+        "duration": 500,
+        "unit": "milliseconds"
+      }
+    },
+    {
+      "id": "log3",
+      "type": "log",
+      "label": "Log Complete",
+      "data": {
+        "message": "✅ Workflow complete! Count was: {{count}}",
+        "level": "success"
+      }
+    },
+    {
+      "id": "end1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "result": { "value": "{{processedMessage}}", "type": "string" },
+          "originalCount": { "value": "{{count}}", "type": "number" }
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "type": "execution", "source": "start1", "sourceHandle": "default", "target": "log1", "targetHandle": "trigger" },
+    { "id": "e2", "type": "execution", "source": "log1", "sourceHandle": "success", "target": "delay1", "targetHandle": "trigger" },
+    { "id": "e3", "type": "execution", "source": "delay1", "sourceHandle": "success", "target": "var1", "targetHandle": "trigger" },
+    { "id": "e4", "type": "execution", "source": "var1", "sourceHandle": "success", "target": "log2", "targetHandle": "trigger" },
+    { "id": "e5", "type": "execution", "source": "log2", "sourceHandle": "success", "target": "delay2", "targetHandle": "trigger" },
+    { "id": "e6", "type": "execution", "source": "delay2", "sourceHandle": "success", "target": "log3", "targetHandle": "trigger" },
+    { "id": "e7", "type": "execution", "source": "log3", "sourceHandle": "success", "target": "end1", "targetHandle": "trigger" }
+  ],
+  "layout": {
+    "start1": { "x": 100, "y": 200 },
+    "log1": { "x": 300, "y": 200 },
+    "delay1": { "x": 500, "y": 200 },
+    "var1": { "x": 700, "y": 200 },
+    "log2": { "x": 900, "y": 200 },
+    "delay2": { "x": 1100, "y": 200 },
+    "log3": { "x": 1300, "y": 200 },
+    "end1": { "x": 1500, "y": 200 }
+  }
+}
+

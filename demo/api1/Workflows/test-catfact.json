@@ -1,0 +1,70 @@
+{
+  "id": "test-catfact",
+  "name": "Cat Fact API Test",
+  "description": "Fetches a random cat fact from catfact.ninja API",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start1",
+      "type": "start",
+      "label": "Start",
+      "data": {
+        "profiles": [
+          {
+            "name": "Default",
+            "default": true,
+            "inputs": {}
+          }
+        ],
+        "inputs": {},
+        "selectedProfile": "Default"
+      }
+    },
+    {
+      "id": "http1",
+      "type": "http-request",
+      "label": "Get Cat Fact",
+      "data": {
+        "method": "GET",
+        "url": "https://catfact.ninja/fact",
+        "headers": {},
+        "outputs": {
+          "fact": "$.fact",
+          "length": "$.length"
+        }
+      }
+    },
+    {
+      "id": "log1",
+      "type": "log",
+      "label": "Log Result",
+      "data": {
+        "message": "🐱 Cat Fact: {{fact}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "end1",
+      "type": "end",
+      "label": "Complete",
+      "data": {
+        "outputs": {
+          "catFact": { "value": "{{fact}}", "type": "string" },
+          "factLength": { "value": "{{length}}", "type": "number" }
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "type": "execution", "source": "start1", "sourceHandle": "default", "target": "http1", "targetHandle": "trigger" },
+    { "id": "e2", "type": "execution", "source": "http1", "sourceHandle": "success", "target": "log1", "targetHandle": "trigger" },
+    { "id": "e3", "type": "execution", "source": "log1", "sourceHandle": "success", "target": "end1", "targetHandle": "trigger" }
+  ],
+  "layout": {
+    "start1": { "x": 100, "y": 200 },
+    "http1": { "x": 400, "y": 200 },
+    "log1": { "x": 700, "y": 200 },
+    "end1": { "x": 1000, "y": 200 }
+  }
+}
+

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using SiyeFlow.CLI.Interfaces;
 using SiyeFlow.Core.Models;
 using System;
@@ -9,9 +10,6 @@ using System.Threading.Tasks;
 
 namespace SiyeFlow.CLI.Services.Blocks
 {
-    /// <summary>
-    /// Executor for Start blocks
-    /// </summary>
     public class StartBlockExecutor : BlockExecutorBase
     {
         public StartBlockExecutor(
@@ -25,28 +23,26 @@ namespace SiyeFlow.CLI.Services.Blocks
         public override BlockType BlockType => BlockType.Start;
 
         protected override async Task<BlockExecutionResult> ExecuteInternalAsync(
-            WorkflowBlock block,
+            Node node,
             Dictionary<string, object>? inputs,
             Interfaces.ExecutionContext context,
             CancellationToken cancellationToken)
         {
-            var startBlock = CastBlock<StartBlock>(block);
+            var config = GetConfig<StartConfig>(node);
             var result = new BlockExecutionResult { Success = true };
 
             _console.Info("=== Workflow Started ===");
             
-            // Process workflow inputs from WorkflowInputs context
             var outputs = new Dictionary<string, object>();
-            var effectiveInputs = GetEffectiveInputs(startBlock.Config, context.WorkflowInputs, context);
+            var effectiveInputs = GetEffectiveInputs(config, context.WorkflowInputs);
             
             foreach (var (inputName, value) in effectiveInputs)
             {
-                // Outputs are keyed by port name (input name matches port name)
                 outputs[inputName] = value;
                 _console.Debug($"Input '{inputName}': {value}");
             }
 
-            // Add system variables
+            // System variables
             outputs["$timestamp"] = DateTime.UtcNow;
             outputs["$workflowId"] = context.WorkflowId;
             outputs["$executionId"] = context.ExecutionId;
@@ -55,209 +51,114 @@ namespace SiyeFlow.CLI.Services.Blocks
             
             _console.Success($"Initialized workflow with {outputs.Count} inputs");
             
-            return result;
+            return await Task.FromResult(result);
         }
 
         private Dictionary<string, object> GetEffectiveInputs(
-            StartConfig? config, 
-            Dictionary<string, object>? runtimeInputs,
-            Interfaces.ExecutionContext context)
+            StartConfig config, 
+            Dictionary<string, object>? runtimeInputs)
         {
             var result = new Dictionary<string, object>();
-            var selectedInputDefinitions = new Dictionary<string, InputDefinition>();
             
             if (config == null) return result;
+
+            // 1. Get Default Profile
+            Dictionary<string, object>? selectedProfileValues = null;
             
-            // Get inputs from selected profile
-            if (config.Profiles != null && config.Profiles.Any())
+            // Determine active profile name
+            string? profileName = config.SelectedProfile;
+            if (runtimeInputs?.ContainsKey("$selectedProfile") == true)
             {
-                InputProfile? selectedProfile = null;
-                string? profileName = config.SelectedProfile;
-                
-                // Check if profile is specified in runtime inputs
-                if (runtimeInputs?.ContainsKey("$selectedProfile") == true)
+                profileName = runtimeInputs["$selectedProfile"]?.ToString();
+            }
+
+            if (config.Profiles != null)
+            {
+                // Find matching profile
+                var profile = config.Profiles.FirstOrDefault(p => p.Name == profileName)
+                           ?? config.Profiles.FirstOrDefault(p => p.Default)
+                           ?? config.Profiles.FirstOrDefault();
+
+                if (profile != null)
                 {
-                    profileName = runtimeInputs["$selectedProfile"]?.ToString();
+                    selectedProfileValues = profile.Values;
+                    _console.Info($"Using profile: {profile.Name}");
                 }
-                
-                // Find the selected profile
-                if (!string.IsNullOrEmpty(profileName))
+            }
+
+            // 2. Fill Defaults from Schema if value missing
+            if (config.Inputs != null)
+            {
+                foreach (var (key, def) in config.Inputs)
                 {
-                    selectedProfile = config.Profiles.FirstOrDefault(p => p.Name == profileName);
-                    if (selectedProfile != null)
+                    object? val = null;
+
+                    // Priority 1: Runtime Override
+                    if (runtimeInputs?.TryGetValue(key, out var runtimeVal) == true)
                     {
-                        _console.Info($"Using profile: {selectedProfile.Name}");
+                        val = runtimeVal;
                     }
-                }
-                
-                // Use default profile if none selected
-                if (selectedProfile == null)
-                {
-                    selectedProfile = config.Profiles.FirstOrDefault(p => p.Default) ?? config.Profiles.First();
-                    if (selectedProfile != null)
+                    // Priority 2: Profile Value
+                    else if (selectedProfileValues?.TryGetValue(key, out var profileVal) == true)
                     {
-                        _console.Info($"Using profile: {selectedProfile.Name}");
+                        val = profileVal;
                     }
-                }
-                
-                // Copy profile inputs
-                if (selectedProfile != null)
-                {
-                    foreach (var (key, input) in selectedProfile.Inputs)
+                    // Priority 3: Schema Default
+                    else if (def.Default != null)
                     {
-                        selectedInputDefinitions[key] = input;
-                        if (input.Value != null)
-                        {
-                            result[key] = input.Value;
-                        }
-                        else if (input.Default != null)
-                        {
-                            result[key] = input.Default;
-                        }
+                        val = def.Default;
+                    }
+
+                    // Validation
+                    if (def.Required && val == null)
+                    {
+                        throw new InvalidOperationException($"Required input '{key}' is missing.");
+                    }
+
+                    if (val != null)
+                    {
+                        result[key] = val;
                     }
                 }
             }
-            // Fall back to direct inputs format if no profiles
-            else if (config.Inputs != null && config.Inputs.Any())
-            {
-                selectedInputDefinitions = config.Inputs;
-                foreach (var (key, input) in config.Inputs)
-                {
-                    // Support both "value" and "default" properties
-                    if (input.Value != null)
-                    {
-                        result[key] = input.Value;
-                    }
-                    else if (input.Default != null)
-                    {
-                        result[key] = input.Default;
-                    }
-                }
-            }
-            
-            // Apply overrides from config
-            if (config.Overrides != null)
-            {
-                foreach (var (key, value) in config.Overrides)
-                {
-                    result[key] = value;
-                    _console.Debug($"Applied override: {key} = {value}");
-                }
-            }
-            
-            // Apply runtime inputs (highest priority)
-            if (runtimeInputs != null)
-            {
-                foreach (var (key, value) in runtimeInputs)
-                {
-                    if (key != "$selectedProfile") // Skip profile selector
-                    {
-                        result[key] = value;
-                        _console.Debug($"Applied runtime input: {key} = {value}");
-                    }
-                }
-            }
-            
-            // Validate required inputs
-            foreach (var (key, inputDef) in selectedInputDefinitions)
-            {
-                if (inputDef.Required && !result.ContainsKey(key))
-                {
-                    throw new InvalidOperationException($"Required input '{key}' not provided");
-                }
-                
-                if (result.ContainsKey(key) && !ValidateType(result[key], inputDef.Type))
-                {
-                    _console.Warning($"Input '{key}' type mismatch. Expected: {inputDef.Type}");
-                }
-            }
-            
+
             return result;
         }
 
-        public override Task<ValidationResult> ValidateAsync(WorkflowBlock block, Interfaces.ExecutionContext context)
+        public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
+            var config = GetConfig<StartConfig>(node);
             var result = new ValidationResult { IsValid = true };
 
-            try
-            {
-                var startBlock = CastBlock<StartBlock>(block);
-                
-                // Start block must have either profiles or inputs
-                if ((startBlock.Config?.Profiles == null || !startBlock.Config.Profiles.Any()) &&
-                    (startBlock.Config?.Inputs == null || !startBlock.Config.Inputs.Any()))
-                {
-                    result.IsValid = false;
-                    result.Errors.Add("Start block must have at least one profile or input definition");
-                }
-
-                // Start block should have output connections
-                if (startBlock.Connections == null || !startBlock.Connections.Any())
-                {
-                    result.Warnings.Add("Start block has no output connections");
-                }
-
-                // Validate input definitions in profiles
-                if (startBlock.Config?.Profiles != null)
-                {
-                    foreach (var profile in startBlock.Config.Profiles)
-                    {
-                        foreach (var input in profile.Inputs)
-                        {
-                            if (string.IsNullOrEmpty(input.Key))
-                            {
-                                result.IsValid = false;
-                                result.Errors.Add($"Profile '{profile.Name}': Input name cannot be empty");
-                            }
-
-                            if (string.IsNullOrEmpty(input.Value.Type))
-                            {
-                                result.IsValid = false;
-                                result.Errors.Add($"Profile '{profile.Name}': Input '{input.Key}' must have a type");
-                            }
-                        }
-                    }
-                }
-                
-                // Validate inputs if no profiles
-                if (startBlock.Config?.Inputs != null && (startBlock.Config?.Profiles == null || !startBlock.Config.Profiles.Any()))
-                {
-                    foreach (var input in startBlock.Config.Inputs)
-                    {
-                        if (string.IsNullOrEmpty(input.Key))
-                        {
-                            result.IsValid = false;
-                            result.Errors.Add("Input name cannot be empty");
-                        }
-
-                        if (string.IsNullOrEmpty(input.Value.Type))
-                        {
-                            result.IsValid = false;
-                            result.Errors.Add($"Input '{input.Key}' must have a type");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
+            if (config.Inputs == null && config.Profiles == null)
             {
                 result.IsValid = false;
-                result.Errors.Add($"Invalid Start block configuration: {ex.Message}");
+                result.Errors.Add("Start block must have inputs or profiles defined.");
             }
 
             return Task.FromResult(result);
         }
 
-        private bool ValidateType(object value, string expectedType)
+        // DTOs
+        public class StartConfig
         {
-            return expectedType.ToLower() switch
-            {
-                "string" => value is string,
-                "number" => value is int or long or float or double or decimal,
-                "boolean" => value is bool,
-                "object" => value is not null,
-                "array" => value is System.Collections.IEnumerable,
-                _ => true // Unknown type, allow
-            };
+            public Dictionary<string, InputDefinition>? Inputs { get; set; }
+            public List<ProfileDefinition>? Profiles { get; set; }
+            public string? SelectedProfile { get; set; }
+        }
+
+        public class InputDefinition
+        {
+            public string Type { get; set; } = "string";
+            public bool Required { get; set; }
+            public object? Default { get; set; }
+        }
+
+        public class ProfileDefinition
+        {
+            public string Name { get; set; } = string.Empty;
+            public bool Default { get; set; }
+            public Dictionary<string, object> Values { get; set; } = new();
         }
     }
 }
