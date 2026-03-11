@@ -33,6 +33,7 @@ export * from './models/workflow-models';
 export * from './models/visual-models';
 export { renderBlock, getPortPosition } from './renderers/block-renderer';
 export { renderConnection, updateConnection } from './renderers/connection-renderer';
+export { apiManager } from './api/api-definition-manager';
 
 export interface DesignerOptions {
     canvasContainerId: string;
@@ -59,7 +60,6 @@ export class WorkflowDesigner {
     private inspector: VariableInspector;
     private blocks: Map<string, VisualBlock> = new Map();
     private connections: Map<string, VisualConnection> = new Map();
-    private selectedBlockId: string | null = null;
     private blockHighlights: Map<string, 'executing' | 'success' | 'fail'> = new Map();
 
     constructor(options: DesignerOptions | string, paletteContainerId?: string) {
@@ -595,8 +595,8 @@ export class WorkflowDesigner {
             this.canvas.removeConnection(data.connectionId);
         });
 
-        this.canvas.on('blockSelect', (data: { blockId: string }) => {
-            this.selectedBlockId = data.blockId;
+        this.canvas.on('blockSelect', (_data: { blockId: string }) => {
+            void _data;
         });
 
         this.canvas.on('breakpointToggle', (data: { blockId: string }) => {
@@ -617,6 +617,14 @@ export class WorkflowDesigner {
         this.canvas.on('fieldChange', (data: { blockId: string; fieldName: string; value: string }) => {
             const block = this.blocks.get(data.blockId);
             if (block) {
+                // Parse JSON for keyvalue fields
+                try {
+                    const parsed = JSON.parse(data.value);
+                    if (typeof parsed === 'object' && parsed !== null) {
+                        block.fieldValues[data.fieldName] = parsed;
+                        return;
+                    }
+                } catch { /* not JSON, store as string */ }
                 block.fieldValues[data.fieldName] = data.value;
             }
         });
@@ -724,12 +732,44 @@ export class WorkflowDesigner {
             const blockType = e.dataTransfer?.getData('text/plain') as BlockType;
             if (!blockType) return;
 
-            // Calculate drop position relative to canvas
             const rect = canvasWrapper.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            // Add block at drop position
+            // Check for API endpoint data
+            const jsonData = e.dataTransfer?.getData('application/json');
+            if (jsonData && blockType === BlockType.HttpRequest) {
+                try {
+                    const endpoint = JSON.parse(jsonData);
+                    const block = this.addBlock(blockType, { x, y }, endpoint.summary || endpoint.path);
+
+                    const url = (endpoint.baseUrl || '') + endpoint.path;
+                    block.fieldValues['method'] = endpoint.method || 'GET';
+                    block.fieldValues['url'] = url;
+
+                    if (endpoint.parameters) {
+                        const params: Record<string, string> = {};
+                        for (const p of endpoint.parameters) {
+                            params[p.name] = `{{${p.name}}}`;
+                        }
+                        if (Object.keys(params).length > 0) {
+                            block.fieldValues['parameters'] = params;
+                        }
+                    }
+
+                    if (endpoint.requestBody) {
+                        block.fieldValues['body'] = endpoint.requestBody;
+                    }
+
+                    if (endpoint.summary) {
+                        block.fieldValues['description'] = endpoint.summary;
+                    }
+
+                    this.render();
+                    return;
+                } catch { /* fall through to plain block */ }
+            }
+
             this.addBlock(blockType, { x, y });
         });
     }
@@ -820,8 +860,12 @@ function createDefaultBlock(type: BlockType, position: Position, name?: string):
     const id = generateId('block');
 
     const defaultFields: Record<BlockType, BlockField[]> = {
-        [BlockType.Start]: [],
-        [BlockType.End]: [],
+        [BlockType.Start]: [
+            { name: 'values', label: 'Variables', type: 'keyvalue' }
+        ],
+        [BlockType.End]: [
+            { name: 'outputs', label: 'Outputs', type: 'keyvalue' }
+        ],
         [BlockType.HttpRequest]: [
             { name: 'method', label: 'Method', type: 'select', options: ['GET', 'POST', 'PUT', 'DELETE'], value: 'GET' },
             { name: 'url', label: 'URL', type: 'text', placeholder: 'https://api.example.com' }
@@ -961,8 +1005,8 @@ function getBlockTypeName(type: BlockType): string {
     return names[type] || type;
 }
 
-// Auto-initialize if container exists
-if (typeof document !== 'undefined') {
+// Auto-initialize only in standalone dev mode (not when embedded via UMD)
+if (typeof document !== 'undefined' && !(window as any).SiyeFlowConfig) {
     document.addEventListener('DOMContentLoaded', () => {
         const canvasContainer = document.getElementById('canvas-container');
         const paletteContainer = document.getElementById('palette-container');

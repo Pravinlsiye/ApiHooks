@@ -32,8 +32,9 @@ export interface ApiDefinition {
     baseUrl: string;
     description?: string;
     endpoints: ApiEndpoint[];
-    source?: string; // URL where it was loaded from
+    source?: string;
     tags?: string[];
+    locked?: boolean;
 }
 
 export class ApiDefinitionLoader {
@@ -100,13 +101,21 @@ export class ApiDefinitionLoader {
         const servers = spec.servers || [];
         const tags = spec.tags?.map((t: any) => t.name) || [];
         
-        // Get base URL
+        // Get base URL - prefer full URL, fall back to source origin
         let baseUrl = '';
         if (servers.length > 0) {
             baseUrl = servers[0].url;
         } else if (spec.host) {
             const scheme = spec.schemes?.[0] || 'https';
             baseUrl = `${scheme}://${spec.host}${spec.basePath || ''}`;
+        }
+
+        // If baseUrl is relative or empty, derive from the source URL
+        if (source && (!baseUrl || baseUrl === '/' || !baseUrl.startsWith('http'))) {
+            try {
+                const srcUrl = new URL(source, window.location.origin);
+                baseUrl = srcUrl.origin + (baseUrl === '/' ? '' : baseUrl);
+            } catch { /* keep as-is */ }
         }
         
         // Parse endpoints

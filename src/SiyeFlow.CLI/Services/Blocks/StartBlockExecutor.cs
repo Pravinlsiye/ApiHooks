@@ -28,18 +28,88 @@ namespace SiyeFlow.CLI.Services.Blocks
             Interfaces.ExecutionContext context,
             CancellationToken cancellationToken)
         {
-            var config = GetConfig<StartConfig>(node);
-            var result = new BlockExecutionResult { Success = true };
+            var result = new BlockExecutionResult { Success = true, NextHandle = "default" };
+            var outputs = new Dictionary<string, object>();
 
             _console.Info("=== Workflow Started ===");
-            
-            var outputs = new Dictionary<string, object>();
-            var effectiveInputs = GetEffectiveInputs(config, context.WorkflowInputs);
-            
-            foreach (var (inputName, value) in effectiveInputs)
+
+            var data = node.Data;
+
+            // Handle flat values: data.values = { "key": "value" }
+            var valuesToken = data?["values"];
+            if (valuesToken is JObject valuesObj)
             {
-                outputs[inputName] = value;
-                _console.Debug($"Input '{inputName}': {value}");
+                foreach (var prop in valuesObj.Properties())
+                {
+                    var val = prop.Value.Type == JTokenType.Object || prop.Value.Type == JTokenType.Array
+                        ? prop.Value.ToObject<object>()
+                        : prop.Value.ToString();
+                    outputs[prop.Name] = val!;
+                    _variableStore.SetVariable(prop.Name, val!);
+                    _console.Debug($"Variable '{prop.Name}': {val}");
+                }
+            }
+
+            // Handle structured inputs: data.inputs = { "key": { "type": "string", "required": true } }
+            var inputsToken = data?["inputs"];
+            if (inputsToken is JObject inputsObj)
+            {
+                foreach (var prop in inputsObj.Properties())
+                {
+                    object? val = null;
+
+                    // Check runtime inputs first
+                    if (context.WorkflowInputs?.TryGetValue(prop.Name, out var runtimeVal) == true)
+                    {
+                        val = runtimeVal;
+                    }
+                    else if (prop.Value.Type == JTokenType.Object)
+                    {
+                        // Structured: { type, required, value/default }
+                        var def = prop.Value.ToObject<JObject>();
+                        val = def?["value"]?.ToObject<object>() ?? def?["default"]?.ToObject<object>();
+                    }
+                    else
+                    {
+                        val = prop.Value.ToObject<object>();
+                    }
+
+                    if (val != null)
+                    {
+                        outputs[prop.Name] = val;
+                        _variableStore.SetVariable(prop.Name, val);
+                        _console.Debug($"Input '{prop.Name}': {val}");
+                    }
+                }
+            }
+
+            // Handle profiles: data.profiles = [{ name, values }]
+            var profilesToken = data?["profiles"];
+            if (profilesToken is JArray profilesArray && profilesArray.Count > 0)
+            {
+                var selectedName = data?["selectedProfile"]?.ToString();
+                var profile = profilesArray.FirstOrDefault(p => p["name"]?.ToString() == selectedName)
+                           ?? profilesArray.First();
+
+                var profileValues = profile["values"] as JObject;
+                if (profileValues != null)
+                {
+                    _console.Info($"Using profile: {profile["name"]}");
+                    foreach (var prop in profileValues.Properties())
+                    {
+                        var val = prop.Value.ToObject<object>();
+                        if (val != null)
+                        {
+                            // Runtime inputs override profile values
+                            if (context.WorkflowInputs?.TryGetValue(prop.Name, out var runtimeVal) == true)
+                                val = runtimeVal;
+
+                            outputs[prop.Name] = val;
+                            _variableStore.SetVariable(prop.Name, val);
+                            _console.Debug($"Profile '{prop.Name}': {val}");
+                        }
+                    }
+                }
             }
 
             // System variables
@@ -48,117 +118,14 @@ namespace SiyeFlow.CLI.Services.Blocks
             outputs["$executionId"] = context.ExecutionId;
 
             result.Outputs = outputs;
-            
-            _console.Success($"Initialized workflow with {outputs.Count} inputs");
-            
+            _console.Success($"Initialized workflow with {outputs.Count} variables");
+
             return await Task.FromResult(result);
-        }
-
-        private Dictionary<string, object> GetEffectiveInputs(
-            StartConfig config, 
-            Dictionary<string, object>? runtimeInputs)
-        {
-            var result = new Dictionary<string, object>();
-            
-            if (config == null) return result;
-
-            // 1. Get Default Profile
-            Dictionary<string, object>? selectedProfileValues = null;
-            
-            // Determine active profile name
-            string? profileName = config.SelectedProfile;
-            if (runtimeInputs?.ContainsKey("$selectedProfile") == true)
-            {
-                profileName = runtimeInputs["$selectedProfile"]?.ToString();
-            }
-
-            if (config.Profiles != null)
-            {
-                // Find matching profile
-                var profile = config.Profiles.FirstOrDefault(p => p.Name == profileName)
-                           ?? config.Profiles.FirstOrDefault(p => p.Default)
-                           ?? config.Profiles.FirstOrDefault();
-
-                if (profile != null)
-                {
-                    selectedProfileValues = profile.Values;
-                    _console.Info($"Using profile: {profile.Name}");
-                }
-            }
-
-            // 2. Fill Defaults from Schema if value missing
-            if (config.Inputs != null)
-            {
-                foreach (var (key, def) in config.Inputs)
-                {
-                    object? val = null;
-
-                    // Priority 1: Runtime Override
-                    if (runtimeInputs?.TryGetValue(key, out var runtimeVal) == true)
-                    {
-                        val = runtimeVal;
-                    }
-                    // Priority 2: Profile Value
-                    else if (selectedProfileValues?.TryGetValue(key, out var profileVal) == true)
-                    {
-                        val = profileVal;
-                    }
-                    // Priority 3: Schema Default
-                    else if (def.Default != null)
-                    {
-                        val = def.Default;
-                    }
-
-                    // Validation
-                    if (def.Required && val == null)
-                    {
-                        throw new InvalidOperationException($"Required input '{key}' is missing.");
-                    }
-
-                    if (val != null)
-                    {
-                        result[key] = val;
-                    }
-                }
-            }
-
-            return result;
         }
 
         public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
-            var config = GetConfig<StartConfig>(node);
-            var result = new ValidationResult { IsValid = true };
-
-            if (config.Inputs == null && config.Profiles == null)
-            {
-                result.IsValid = false;
-                result.Errors.Add("Start block must have inputs or profiles defined.");
-            }
-
-            return Task.FromResult(result);
-        }
-
-        // DTOs
-        public class StartConfig
-        {
-            public Dictionary<string, InputDefinition>? Inputs { get; set; }
-            public List<ProfileDefinition>? Profiles { get; set; }
-            public string? SelectedProfile { get; set; }
-        }
-
-        public class InputDefinition
-        {
-            public string Type { get; set; } = "string";
-            public bool Required { get; set; }
-            public object? Default { get; set; }
-        }
-
-        public class ProfileDefinition
-        {
-            public string Name { get; set; } = string.Empty;
-            public bool Default { get; set; }
-            public Dictionary<string, object> Values { get; set; } = new();
+            return Task.FromResult(new ValidationResult { IsValid = true });
         }
     }
 }

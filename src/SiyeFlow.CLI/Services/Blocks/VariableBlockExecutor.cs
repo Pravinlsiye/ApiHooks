@@ -76,6 +76,7 @@ namespace SiyeFlow.CLI.Services.Blocks
             return Task.FromResult(new BlockExecutionResult 
             { 
                 Success = true,
+                NextHandle = "success",
                 Outputs = outputs
             });
         }

@@ -13,9 +13,6 @@ using System.Threading.Tasks;
 
 namespace SiyeFlow.CLI.Services
 {
-    /// <summary>
-    /// Main workflow execution engine (Graph Based)
-    /// </summary>
     public class WorkflowExecutor : IWorkflowExecutor
     {
         private readonly ILogger<WorkflowExecutor> _logger;
@@ -23,6 +20,10 @@ namespace SiyeFlow.CLI.Services
         private readonly IVariableStore _variableStore;
         private readonly IConsoleWriter _console;
         private readonly IApiDefinitionLoader _apiLoader;
+
+        private Dictionary<string, Node> _nodeMap = new();
+        private Dictionary<string, List<Edge>> _outgoingEdges = new();
+        private Dictionary<string, List<Edge>> _incomingDataEdges = new();
 
         public WorkflowExecutor(
             ILogger<WorkflowExecutor> logger,
@@ -69,137 +70,31 @@ namespace SiyeFlow.CLI.Services
             {
                 _console.Info($"Starting workflow: {workflow.Name}");
 
-                // 1. Index the Graph
-                var nodeMap = workflow.Nodes.ToDictionary(n => n.Id, n => n);
-                var outgoingEdges = workflow.Edges
+                _nodeMap = workflow.Nodes.ToDictionary(n => n.Id, n => n);
+                _outgoingEdges = workflow.Edges
                     .Where(e => e.Type == EdgeType.Execution)
                     .GroupBy(e => e.Source)
                     .ToDictionary(g => g.Key, g => g.ToList());
-                
-                var incomingDataEdges = workflow.Edges
+                _incomingDataEdges = workflow.Edges
                     .Where(e => e.Type == EdgeType.Data)
                     .GroupBy(e => e.Target)
                     .ToDictionary(g => g.Key, g => g.ToList());
 
-                // 2. Find Start Node
                 var startNode = workflow.Nodes.FirstOrDefault(n => n.Type == BlockType.Start);
                 if (startNode == null) throw new InvalidOperationException("Workflow must have a Start node");
 
-                // 3. BFS / Traversal Queue
-                var nodesToExecute = new Queue<string>();
-                nodesToExecute.Enqueue(startNode.Id);
-                
-                while (nodesToExecute.Count > 0)
+                await ExecuteNodeAsync(startNode, context, result, cancellationToken);
+
+                if (!result.ExecutionPath.Any(r => !r.Success))
                 {
-                    if (cancellationToken.IsCancellationRequested) throw new OperationCanceledException();
-
-                    var currentNodeId = nodesToExecute.Dequeue();
-                    if (!nodeMap.TryGetValue(currentNodeId, out var currentNode)) continue;
-
-                    // 4. Data Injection (Hydrate Node)
-                    // We create a COPY of the node's data so we don't mutate the definition
-                    var runtimeData = (JObject)currentNode.Data.DeepClone();
-                    
-                    if (incomingDataEdges.TryGetValue(currentNodeId, out var dataEdges))
-                    {
-                        foreach (var edge in dataEdges)
-                        {
-                            // Get value from source node output
-                            if (context.BlockOutputs.TryGetValue(edge.Source, out var sourceOutputs))
-                            {
-                                // Handle array indexing in source handle (e.g. "body[0].id")
-                                // For now, assuming simple keys or direct matching
-                                // TODO: Implement robust path resolution
-                                
-                                if (sourceOutputs.TryGetValue(edge.SourceHandle, out var val))
-                                {
-                                    InjectValue(runtimeData, edge.TargetHandle, val);
-                                }
-                                else
-                                {
-                                    // Try to resolve complex path from sourceOutputs
-                                    // This is a simplified check
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Temporarily assign runtime data to node for execution
-                    var originalData = currentNode.Data;
-                    currentNode.Data = runtimeData;
-
-                    // 5. Execute Node
-                    _logger.LogDebug("Executing Node {Id} ({Type})", currentNode.Id, currentNode.Type);
-                    var executor = _blockRegistry.GetExecutor(currentNode);
-                    if (executor == null) throw new InvalidOperationException($"No executor for type {currentNode.Type}");
-
-                    BlockExecutionResult blockResult;
-                    try
-                    {
-                        blockResult = await executor.ExecuteAsync(currentNode, context, cancellationToken);
-                    }
-                    finally
-                    {
-                        // Restore static config
-                        currentNode.Data = originalData;
-                    }
-
-                    // 6. Store Outputs
-                    if (blockResult.Outputs != null)
-                    {
-                        context.BlockOutputs[currentNode.Id] = blockResult.Outputs;
-                        
-                        // FIX: Push outputs to global variable store so {{...}} resolution works
-                        foreach (var kvp in blockResult.Outputs)
-                        {
-                            // We prefix with node ID to avoid collisions? 
-                            // Actually, the VariableStore seems to be a flat map in legacy code.
-                            // For backward compatibility with blocks that use _variableStore.ReplaceVariables(),
-                            // we must put them in the root.
-                            // NOTE: This means last-write-wins for variables with same name!
-                            _variableStore.SetVariable(kvp.Key, kvp.Value);
-                        }
-                    }
-
-                    // 7. Record History
-                    result.ExecutionPath.Add(new BlockExecutionRecord
-                    {
-                        BlockId = currentNode.Id,
-                        BlockName = currentNode.Label ?? currentNode.Id,
-                        BlockType = currentNode.Type.ToString(),
-                        Success = blockResult.Success,
-                        Outputs = blockResult.Outputs,
-                        Duration = blockResult.Duration
-                    });
-
-                    // 8. Handle Flow Control (Next Steps)
-                    if (!blockResult.Success)
-                    {
-                        result.Success = false;
-                        result.Error = blockResult.Error;
-                        break; 
-                    }
-
-                    if (currentNode.Type == BlockType.End)
-                    {
-                        result.Success = true;
-                        result.Outputs = blockResult.Outputs;
-                        break; // Workflow Complete
-                    }
-
-                    // Find next node
-                    if (outgoingEdges.TryGetValue(currentNodeId, out var possibleNextEdges))
-                    {
-                        var nextEdge = possibleNextEdges.FirstOrDefault(e => 
-                            e.SourceHandle == blockResult.NextHandle || 
-                            (blockResult.NextHandle == "default" && string.IsNullOrEmpty(e.SourceHandle)));
-
-                        if (nextEdge != null)
-                        {
-                            nodesToExecute.Enqueue(nextEdge.Target);
-                        }
-                    }
+                    result.Success = true;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                result.Success = false;
+                result.Error = "Execution cancelled";
+                _console.Warning("Workflow cancelled");
             }
             catch (Exception ex)
             {
@@ -211,28 +106,199 @@ namespace SiyeFlow.CLI.Services
             {
                 result.CompletedAt = DateTime.UtcNow;
                 result.Duration = result.CompletedAt - result.StartedAt;
+                _console.WorkflowSummary(result);
             }
 
             return result;
         }
 
+        private async Task ExecuteNodeAsync(
+            Node node,
+            Interfaces.ExecutionContext context,
+            WorkflowExecutionResult result,
+            CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                throw new OperationCanceledException();
+
+            // Data injection
+            var runtimeData = (JObject)node.Data.DeepClone();
+            if (_incomingDataEdges.TryGetValue(node.Id, out var dataEdges))
+            {
+                foreach (var edge in dataEdges)
+                {
+                    if (context.BlockOutputs.TryGetValue(edge.Source, out var sourceOutputs) &&
+                        sourceOutputs.TryGetValue(edge.SourceHandle, out var val))
+                    {
+                        InjectValue(runtimeData, edge.TargetHandle, val);
+                    }
+                }
+            }
+
+            var originalData = node.Data;
+            node.Data = runtimeData;
+
+            var executor = _blockRegistry.GetExecutor(node);
+            if (executor == null)
+                throw new InvalidOperationException($"No executor for type {node.Type}");
+
+            BlockExecutionResult blockResult;
+            try
+            {
+                blockResult = await executor.ExecuteAsync(node, context, cancellationToken);
+            }
+            finally
+            {
+                node.Data = originalData;
+            }
+
+            // Store outputs
+            if (blockResult.Outputs != null)
+            {
+                context.BlockOutputs[node.Id] = blockResult.Outputs;
+                foreach (var kvp in blockResult.Outputs)
+                {
+                    _variableStore.SetVariable(kvp.Key, kvp.Value);
+                }
+            }
+
+            result.ExecutionPath.Add(new BlockExecutionRecord
+            {
+                BlockId = node.Id,
+                BlockName = node.Label ?? node.Id,
+                BlockType = node.Type.ToString(),
+                Success = blockResult.Success,
+                Outputs = blockResult.Outputs,
+                Duration = blockResult.Duration
+            });
+
+            if (!blockResult.Success)
+            {
+                result.Success = false;
+                result.Error = blockResult.Error;
+
+                var failEdges = GetOutgoingEdges(node.Id, "fail");
+                if (failEdges.Count > 0)
+                {
+                    foreach (var edge in failEdges)
+                    {
+                        if (_nodeMap.TryGetValue(edge.Target, out var failNode))
+                            await ExecuteNodeAsync(failNode, context, result, cancellationToken);
+                    }
+                }
+                return;
+            }
+
+            if (node.Type == BlockType.End)
+            {
+                result.Success = true;
+                result.Outputs = blockResult.Outputs;
+                return;
+            }
+
+            // Loop: iterate body nodes via "each" edges, then follow "done"
+            if (node.Type == BlockType.Loop || node.Type == BlockType.BatchProcess)
+            {
+                await ExecuteLoopBodyAsync(node, blockResult, context, result, cancellationToken);
+                return;
+            }
+
+            // Follow next edges
+            var nextHandle = blockResult.NextHandle ?? "default";
+            var nextEdges = GetOutgoingEdges(node.Id, nextHandle);
+
+            foreach (var edge in nextEdges)
+            {
+                if (_nodeMap.TryGetValue(edge.Target, out var nextNode))
+                {
+                    await ExecuteNodeAsync(nextNode, context, result, cancellationToken);
+                }
+            }
+        }
+
+        private async Task ExecuteLoopBodyAsync(
+            Node loopNode,
+            BlockExecutionResult loopResult,
+            Interfaces.ExecutionContext context,
+            WorkflowExecutionResult result,
+            CancellationToken cancellationToken)
+        {
+            var eachEdges = GetOutgoingEdges(loopNode.Id, "each");
+            var doneEdges = GetOutgoingEdges(loopNode.Id, "done");
+
+            var items = new List<object>();
+            if (loopResult.Outputs.TryGetValue("items", out var itemsObj))
+            {
+                if (itemsObj is IEnumerable<object> enumerable)
+                    items = enumerable.ToList();
+                else if (itemsObj is JArray jArray)
+                    items = jArray.Select(t => (object)t).ToList();
+            }
+
+            _console.Info($"Loop: iterating {items.Count} items over {eachEdges.Count} body node(s)");
+
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    throw new OperationCanceledException();
+
+                context.LoopIndex = i;
+                context.LoopItem = items[i];
+                context.LoopTotal = items.Count;
+                _variableStore.SetVariable("loopIndex", i);
+                _variableStore.SetVariable("loopItem", items[i]);
+                _variableStore.SetVariable("loopCount", items.Count);
+
+                _console.Info($"  Iteration {i + 1}/{items.Count}");
+
+                foreach (var edge in eachEdges)
+                {
+                    if (_nodeMap.TryGetValue(edge.Target, out var bodyNode))
+                    {
+                        await ExecuteNodeAsync(bodyNode, context, result, cancellationToken);
+                    }
+                }
+            }
+
+            context.LoopIndex = null;
+            context.LoopItem = null;
+            context.LoopTotal = null;
+
+            // Follow "done" edges
+            foreach (var edge in doneEdges)
+            {
+                if (_nodeMap.TryGetValue(edge.Target, out var doneNode))
+                {
+                    await ExecuteNodeAsync(doneNode, context, result, cancellationToken);
+                }
+            }
+        }
+
+        private List<Edge> GetOutgoingEdges(string nodeId, string handle)
+        {
+            if (!_outgoingEdges.TryGetValue(nodeId, out var edges))
+                return new List<Edge>();
+
+            var matched = edges.Where(e => e.SourceHandle == handle).ToList();
+            if (matched.Count == 0 && handle != "default")
+                matched = edges.Where(e => e.SourceHandle == "default").ToList();
+
+            return matched;
+        }
+
         private void InjectValue(JObject data, string path, object value)
         {
-            try 
+            try
             {
                 var token = data.SelectToken(path);
-                if (token != null && token.Parent != null)
-                {
+                if (token?.Parent != null)
                     token.Replace(JToken.FromObject(value ?? ""));
-                }
                 else
-                {
                     data[path] = JToken.FromObject(value ?? "");
-                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"Failed to inject data into {path}: {ex.Message}");
+                _logger.LogWarning("Failed to inject data into {Path}: {Message}", path, ex.Message);
             }
         }
 
@@ -250,10 +316,16 @@ namespace SiyeFlow.CLI.Services
         {
             var json = await File.ReadAllTextAsync(workflowPath, cancellationToken);
             var workflow = JsonConvert.DeserializeObject<WorkflowDefinition>(json);
-            
+
             if (workflow == null) throw new InvalidOperationException("Failed to parse workflow");
 
-            return await ExecuteAsync(workflow, null, inputs, dryRun, cancellationToken);
+            OpenApiDocument? apiDoc = null;
+            if (!string.IsNullOrEmpty(apiPath))
+            {
+                apiDoc = await _apiLoader.LoadAsync(apiPath);
+            }
+
+            return await ExecuteAsync(workflow, apiDoc, inputs, dryRun, cancellationToken);
         }
     }
 }

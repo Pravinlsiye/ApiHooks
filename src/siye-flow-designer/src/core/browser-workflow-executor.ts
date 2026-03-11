@@ -539,17 +539,17 @@ export class BrowserWorkflowExecutor {
         return { success: true, outputs, nextHandle: 'success' };
     }
     
-    private async executeLogBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
+    private async executeLogBlock(node: Node, _context: ExecutionContext): Promise<BlockResult> {
         const data = node.data || {};
-        const message = this.resolveValue(data.message || '', context);
-        const level = data.level || 'info';
+        const message = this.resolveValue(String(data.message || ''), _context);
+        const level = String(data.level || 'info') as 'info' | 'warning' | 'error';
         
         this.terminal.logMessage(level, message);
         
         return { success: true, outputs: { message }, nextHandle: 'success' };
     }
     
-    private async executeDelayBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
+    private async executeDelayBlock(node: Node, _context: ExecutionContext): Promise<BlockResult> {
         const data = node.data || {};
         let duration = Number(data.duration) || 1000;
         
@@ -571,7 +571,7 @@ export class BrowserWorkflowExecutor {
     
     private async executeConditionBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
         const data = node.data || {};
-        const expression = this.resolveValue(data.expression || data.condition || 'true', context);
+        const expression = this.resolveValue(String(data.expression || data.condition || 'true'), context);
         
         this.terminal.log('debug', `   🔀 Evaluating: ${expression}`);
         
@@ -596,7 +596,7 @@ export class BrowserWorkflowExecutor {
     
     private async executeEvaluateBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
         const data = node.data || {};
-        const expression = this.resolveValue(data.expression || '', context);
+        const expression = this.resolveValue(String(data.expression || ''), context);
         
         this.terminal.log('debug', `   🧮 Evaluating: ${expression}`);
         

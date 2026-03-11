@@ -1099,6 +1099,85 @@ body {
     opacity: 0.6;
 }
 
+/* Key-Value Editor */
+.kv-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.kv-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.kv-key, .kv-val {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 11px;
+    min-width: 0;
+}
+
+.kv-key {
+    flex: 0.4;
+    font-weight: 500;
+}
+
+.kv-key:focus, .kv-val:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.kv-key::placeholder, .kv-val::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+.kv-del {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.kv-row:hover .kv-del { opacity: 1; }
+.kv-del:hover { color: var(--error-base); background: rgba(239, 68, 68, 0.1); }
+
+.kv-add {
+    border: 1px dashed var(--border-default);
+    background: none;
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+}
+
+.kv-add:hover {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.05);
+}
+
 /* Block Ports */
 .block-ports {
     display: flex;

@@ -106,9 +106,7 @@ namespace SiyeFlow.CLI.Services
             Register<ConditionBlockExecutor>(BlockType.Condition);
             Register<LoopBlockExecutor>(BlockType.Loop);
             Register<EvaluateBlockExecutor>(BlockType.Evaluate);
-            Register<TryCatchBlockExecutor>(BlockType.TryCatch);
-            Register<CollectBlockExecutor>(BlockType.Collect);
-            Register<SubWorkflowBlockExecutor>(BlockType.Workflow);
+            Register<SubWorkflowBlockExecutor>(BlockType.SubWorkflow);
         }
 
         public static IBlockRegistry CreateDefault(IServiceProvider serviceProvider)

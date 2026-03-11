@@ -3,7 +3,7 @@ using SiyeFlow.CLI.Interfaces;
 using SiyeFlow.Core.Models;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,16 +11,12 @@ namespace SiyeFlow.CLI.Services.Blocks
 {
     public class EvaluateBlockExecutor : BlockExecutorBase
     {
-        private readonly IExpressionEvaluator _expressionEvaluator;
-
         public EvaluateBlockExecutor(
             ILogger<EvaluateBlockExecutor> logger, 
             IVariableStore variableStore, 
-            IConsoleWriter console,
-            IExpressionEvaluator expressionEvaluator) 
+            IConsoleWriter console) 
             : base(logger, variableStore, console) 
         {
-            _expressionEvaluator = expressionEvaluator ?? throw new ArgumentNullException(nameof(expressionEvaluator));
         }
         
         public override BlockType BlockType => BlockType.Evaluate;
@@ -32,96 +28,68 @@ namespace SiyeFlow.CLI.Services.Blocks
             CancellationToken cancellationToken)
         {
             var config = GetConfig<EvaluateConfig>(node);
-            var language = config.Language?.ToLower() ?? "jsonpath";
-            var expression = config.Expression;
+            var rawExpression = config.Expression ?? "";
+            var expression = _variableStore.ReplaceVariables(rawExpression);
 
-            _console.Info($"Evaluating expression ({language}): {expression}");
-
-            object? result = null;
-            string? error = null;
+            _console.Info($"Evaluating: {expression}");
 
             try
             {
-                switch (language)
-                {
-                    case "jsonpath":
-                        result = EvaluateJsonPath(expression, inputs, context);
-                        break;
-                    default:
-                        throw new NotSupportedException($"Unsupported expression language: {language}");
-                }
-
-                _console.Success($"Expression evaluated successfully: {result}");
-
-                var outputs = new Dictionary<string, object>
-                {
-                    ["result"] = result ?? new { },
-                    ["success"] = result ?? new { }
-                };
+                var result = EvaluateExpression(expression);
+                _variableStore.SetVariable("result", result);
+                _console.Success($"Result: {result}");
 
                 return Task.FromResult(new BlockExecutionResult
                 {
                     Success = true,
-                    Outputs = outputs,
-                    NextHandle = "success"
+                    NextHandle = "success",
+                    Outputs = new Dictionary<string, object> { ["result"] = result }
                 });
             }
             catch (Exception ex)
             {
-                error = ex.Message;
-                _console.Error($"Failed to evaluate expression: {error}");
-
-                var outputs = new Dictionary<string, object>
-                {
-                    ["error"] = error,
-                    ["failure"] = new { message = error }
-                };
-
+                _console.Error($"Evaluate error: {ex.Message}");
                 return Task.FromResult(new BlockExecutionResult
                 {
-                    Success = true,
-                    Error = error,
-                    Outputs = outputs,
-                    NextHandle = "failure"
+                    Success = false,
+                    NextHandle = "fail",
+                    Error = ex.Message,
+                    Outputs = new Dictionary<string, object> { ["error"] = ex.Message }
                 });
             }
         }
 
-        private object? EvaluateJsonPath(string expression, Dictionary<string, object>? inputs, Interfaces.ExecutionContext context)
+        private object EvaluateExpression(string expr)
         {
-            object? data = null;
-            if (inputs != null && inputs.TryGetValue("data", out var inputData))
+            expr = expr.Trim();
+
+            // Try as math expression using DataTable.Compute
+            try
             {
-                data = inputData;
+                var dt = new DataTable();
+                var result = dt.Compute(expr, "");
+                if (result is decimal d) return (double)d;
+                if (result is int i) return i;
+                if (result is long l) return l;
+                return result;
             }
-            else
+            catch
             {
-                data = _variableStore.GetVariable(expression);
+                // Not a math expression - return as-is
             }
 
-            if (data == null) throw new InvalidOperationException($"No data available for JSONPath evaluation.");
-
-            var jsonPathResults = _variableStore.EvaluateJsonPathAsync(data, new Dictionary<string, string> { ["result"] = expression }).Result;
-            return jsonPathResults.TryGetValue("result", out var result) ? result : data;
+            if (double.TryParse(expr, out var num)) return num;
+            if (bool.TryParse(expr, out var b)) return b;
+            return expr;
         }
         
         public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
-            var config = GetConfig<EvaluateConfig>(node);
-            var result = new ValidationResult { IsValid = true };
-
-            if (string.IsNullOrWhiteSpace(config.Expression))
-            {
-                result.IsValid = false;
-                result.Errors.Add("Evaluate block expression is required");
-            }
-
-            return Task.FromResult(result);
+            return Task.FromResult(new ValidationResult { IsValid = true });
         }
 
-        public class EvaluateConfig
+        private class EvaluateConfig
         {
-            public string Language { get; set; } = "jsonpath";
             public string Expression { get; set; } = "";
         }
     }

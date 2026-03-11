@@ -6,7 +6,6 @@
 import { BaseComponent } from '../utils/base-component';
 import { VisualBlock, Position } from '../models/visual-models';
 import { DOMDiff } from '../utils/dom-diff';
-import { DOMUpdater } from '../utils/dom-updater';
 
 export class Minimap extends BaseComponent {
     private minimapElement: HTMLElement | null = null;

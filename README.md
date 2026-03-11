@@ -1,251 +1,171 @@
-# SiyeOps - API Workflow Automation
+# SiyeFlow - API Workflow Automation
 
-A comprehensive solution for executing and visualizing API workflows based on OpenAPI specifications.
+A visual workflow designer and execution engine for orchestrating API calls. Build, debug, and run multi-step API workflows in the browser or from the command line.
 
-## 🚀 What's Included
+## What's Included
 
-### 1. **SiyeFlow.CLI** - Command Line Tool
-Execute API workflows from the command line with powerful features like variable management, conditional logic, and detailed logging.
+### SiyeFlow Designer (TypeScript)
+A standalone browser-based workflow designer with a built-in execution engine.
 
 ```bash
-cd src/SiyeFlow.CLI
-dotnet run -- execute --workflow workflow.json [--api openapi.json]
+cd src/siye-flow-designer
+npm install
+npm run dev
+# Open http://localhost:3001
 ```
 
 Features:
-- Execute workflows with or without OpenAPI definitions
-- Variable management (set/get/delete)
-- Conditional branching logic
-- HTTP requests with JSONPath extraction
-- Detailed execution logging
+- Drag-and-drop block canvas with SVG connections
+- 10 block types: Start, End, HTTP Request, Variable, Condition, Log, Delay, Evaluate, Loop, Sub-Workflow
+- Import/Export workflow JSON files
+- In-browser workflow execution with real HTTP calls
+- Breakpoints and step-through debugging
+- Variable Inspector with tabbed JSON tree view (pin, detach, minimize)
+- Block detail view with runtime variable resolution
+- Dark/Light/System theme support
+- 6 sample workflows using public APIs
 
-### 2. **SiyeFlow.UI** - Visual Workflow Designer Middleware
-Add a visual workflow designer to any ASP.NET Core API with just two lines of code! Like Swagger, but for creating workflows.
-
-```csharp
-builder.Services.AddSiyeFlow();
-app.UseSiyeFlow();
-```
-
-[Learn more →](src/SiyeFlow.UI/README.md)
-
-## 📚 Documentation
-
-- **[Workflow Schema](docs/SCHEMA_DESIGN.md)** - Complete schema reference with examples
-- **[Progress Tracker](docs/PROGRESS.md)** - Implementation status
-- **[Working Examples](demo/api1/Workflows/)** - Real workflow JSON files
-
-## 🎯 Key Features
-
-- 🎨 **Visual Workflow Designer** - Drag & drop API endpoints to create workflows
-- 📊 **Port-Based Connections** - Visual port system for connecting workflow blocks
-- 🔄 **Profile System** - Multiple input profiles for Start blocks (Development/Production/etc.)
-- 🔄 **Variable Management** - Define variables and extract data from responses using JSONPath
-- 🎯 **Endpoint Discovery** - Automatically loads endpoints from your Swagger/OpenAPI
-- 📝 **JSON Export** - Save workflows as JSON files for use with CLI
-- 🔌 **Easy Integration** - Embed in any ASP.NET Core application
-- 🧩 **Block-Based Architecture** - Modular workflow blocks (HTTP, Condition, Loop, etc.)
-
-## 📦 Quick Start
-
-### Option 1: Command Line Interface
+### SiyeFlow.CLI (.NET)
+Execute workflows from the command line.
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/SiyeFlow.git
-cd SiyeFlow/src/SiyeFlow.CLI
-
-# Run a test workflow (with local API)
-cd ../../demo/api1 && dotnet run  # Start API first
-cd ../../src/SiyeFlow.CLI
-dotnet run -- execute --workflow ../../demo/api1/Workflows/test-http-block.json
-
-# Or run without API definition
-dotnet run -- execute --workflow ../../demo/api1/Workflows/test-variable-block.json
+cd src/SiyeFlow.CLI
+dotnet run -- execute --workflow ../../demo/api1/Workflows/test-catfact.json
 ```
 
-### Option 2: Add to Your API (Like Swagger)
+### SiyeFlow.UI (ASP.NET Middleware)
+Embed the workflow designer in any ASP.NET Core API.
 
 ```csharp
-// Install the package
-// dotnet add package SiyeFlow.UI
-
-// In your Program.cs
 builder.Services.AddSiyeFlow();
 app.UseSiyeFlow();
-
-// Navigate to /siyeflow in your browser
+// Navigate to /siyeflow
 ```
 
-## 🏗️ Project Structure
+## Workflow Schema (v2.0)
 
-```
-SiyeFlow/
-├── src/                      # All source code
-│   ├── SiyeFlow.CLI/        # Command-line workflow engine
-│   ├── SiyeFlow.Core/       # Shared models and interfaces
-│   ├── SiyeFlow.UI/         # Embeddable UI designer middleware
-│   └── siye-flow-designer/  # Standalone TypeScript designer (source)
-├── demo/                     # Demo projects
-│   └── api1/                # Sample API with test workflows
-│       └── Workflows/       # Test workflow files
-└── docs/                            # Documentation
-    ├── SCHEMA_DESIGN.md            # Workflow schema reference
-    └── PROGRESS.md                 # Implementation status
-```
-
-## 📋 Workflow Definition Format
-
-Workflows use a **port-based block structure** for maximum flexibility:
+Workflows use a node-edge graph with typed blocks and execution/data edges:
 
 ```json
 {
-  "name": "User Registration Workflow",
-  "description": "Register user and handle verification",
-  "version": "1.0",
-  "blocks": [
+  "id": "sample-cat-fact",
+  "name": "Cat Fact API",
+  "version": "2.0.0",
+  "nodes": [
     {
-      "id": "start",
+      "id": "start_1",
       "type": "start",
-      "name": "Start",
-      "config": {
-        "profiles": [
-          {
-            "name": "Development",
-            "inputs": {
-              "email": { "type": "string", "required": true },
-              "password": { "type": "string", "required": true }
-            }
-          }
-        ],
-        "selectedProfile": "Development"
-      },
-      "outputPorts": [
-        { "name": "success", "type": "success" }
-      ],
-      "connections": [
-        {
-          "from": { "blockId": "start", "portName": "success" },
-          "to": { "blockId": "register-user", "portName": "input" }
-        }
-      ]
+      "label": "Start",
+      "data": {}
     },
     {
-      "id": "register-user",
+      "id": "http_1",
       "type": "http-request",
-      "name": "Register User",
-      "config": {
-        "method": "POST",
-        "url": "https://api.example.com/users",
-        "body": {
-          "email": "{{email}}",
-          "password": "{{password}}"
-        }
-      },
-      "outputs": {
-        "userId": "$.id",
-        "status": "$.status"
-      },
-      "outputPorts": [
-        { "name": "success", "type": "success" },
-        { "name": "failure", "type": "failure" }
-      ]
+      "label": "Get Cat Fact",
+      "data": {
+        "method": "GET",
+        "url": "https://catfact.ninja/fact",
+        "outputs": { "catFact": "$.fact" }
+      }
     },
     {
-      "id": "end",
+      "id": "end_1",
       "type": "end",
-      "name": "End"
+      "label": "End",
+      "data": { "outputs": { "fact": "{{catFact}}" } }
     }
+  ],
+  "edges": [
+    { "id": "e1", "type": "execution", "source": "start_1", "sourceHandle": "default", "target": "http_1", "targetHandle": "trigger" },
+    { "id": "e2", "type": "execution", "source": "http_1", "sourceHandle": "success", "target": "end_1", "targetHandle": "trigger" }
   ]
 }
 ```
 
-**Key Features:**
-- **Port-Based Connections**: Visual port system for connecting blocks
-- **Profile System**: Multiple input configurations for Start blocks
-- **JSONPath Extraction**: Extract data using `$.path` syntax
-- **Variable Interpolation**: Use `{{variableName}}` in configs
+Key concepts:
+- **Nodes**: Workflow blocks with type-specific `data` configuration
+- **Edges**: Execution flow (`success`/`fail` branching) and data connections
+- **JSONPath extraction**: `$.field` syntax to extract values from HTTP responses
+- **Variable interpolation**: `{{variableName}}` in URLs, headers, bodies, expressions
 
-## 🖼️ Visual Workflow Designer
+## Debugging
 
-The SiyeFlow UI provides an intuitive interface for creating workflows:
+The designer includes a full debugging toolkit:
 
-- **Drag & Drop**: Simply drag API endpoints or blocks onto the canvas
-- **Port-Based Connections**: Connect blocks using visual input/output ports
-- **Profile Management**: Switch between different input profiles for Start blocks
-- **Properties Panel**: Configure each block's parameters, headers, and body
-- **Export to JSON**: Save your workflow for use with the CLI
-- **Import Workflows**: Load existing workflow JSON files
+- **Breakpoints**: Click the red dot on any block's left edge to set a breakpoint
+- **Pause/Resume/Step**: Space to pause/resume, S to step one block at a time
+- **Block Highlighting**: Blue = executing, Green = success, Red = failed
+- **Variable Inspector**: Tabbed panel showing all variables and block outputs as a JSON tree
+  - Pin tabs to persist across executions
+  - Detach tabs into floating windows
+  - Minimize to title bar
+- **Runtime Resolution**: Block detail rows show resolved `{{variable}}` values at breakpoints
+- **Copy JSON**: Click the copy button on any detail row to copy resolved data
 
-## 🔧 Advanced Features
+## Project Structure
 
-### Conditional Logic
-```json
-{
-  "id": "check-status",
-  "name": "Check User Status",
-  "operationId": "getUserStatus",
-  "onSuccess": {
-    "condition": "response.status === 'active'",
-    "goto": "send-notification"
-  },
-  "onFailure": {
-    "goto": "retry-later"
-  }
-}
+```
+SiyeFlow/
+├── src/
+│   ├── siye-flow-designer/    # TypeScript workflow designer + execution engine
+│   │   ├── src/
+│   │   │   ├── canvas/        # Canvas rendering (HTML blocks + SVG connections)
+│   │   │   ├── components/    # UI components (palette, toolbar, inspector, terminal)
+│   │   │   ├── core/          # Workflow engine + browser executor
+│   │   │   ├── models/        # TypeScript type definitions
+│   │   │   ├── renderers/     # Block and connection renderers
+│   │   │   ├── styles/        # CSS with theme variables
+│   │   │   └── utils/         # DOM helpers, animation, state management
+│   │   └── samples/           # 6 sample workflow JSON files
+│   ├── SiyeFlow.CLI/          # .NET command-line executor
+│   ├── SiyeFlow.Core/         # Shared models and interfaces
+│   └── SiyeFlow.UI/           # ASP.NET Core middleware
+├── demo/api1/Workflows/       # Test workflow files for CLI
+└── docs/
+    ├── WORKFLOW_SCHEMA.md      # Schema reference
+    └── PROGRESS.md             # Implementation status and roadmap
 ```
 
-### Variable Extraction
-```json
-{
-  "extractVariables": {
-    "token": "$.auth.token",
-    "userId": "$.user.id",
-    "permissions": "$.user.permissions[*]"
-  }
-}
+## Block Types
+
+| Block | Description | Ports |
+|-------|-------------|-------|
+| **Start** | Entry point, defines input variables | out |
+| **End** | Exit point, returns outputs | trigger |
+| **HTTP Request** | Makes REST API calls (GET/POST/PUT/DELETE) | trigger, success, fail |
+| **Variable** | Sets variables for downstream blocks | trigger, out |
+| **Condition** | Branches on expression (true/false) | trigger, success, fail |
+| **Log** | Logs messages to terminal | trigger, out |
+| **Delay** | Pauses execution (ms/seconds/minutes) | trigger, out |
+| **Evaluate** | Evaluates expressions, stores result | trigger, out |
+| **Loop** | Iterates over arrays, executes body per item | trigger, each, done |
+| **Sub-Workflow** | Nested workflow execution (stub) | trigger, success, fail |
+
+## Sample Workflows
+
+Import these from `src/siye-flow-designer/samples/`:
+
+1. **Cat Fact** - Simple GET request with JSONPath extraction
+2. **Users & Posts** - Chained API calls with variable passing
+3. **Status Check** - Condition branching on HTTP status
+4. **Chained APIs** - Multiple public APIs (Dog, Joke, Countries) combined
+5. **Loop Users** - Fetch users and iterate with Loop block
+6. **Evaluate + Delay** - Expression evaluation, delay, and branching
+
+## Development
+
+```bash
+# Designer (TypeScript + Vite)
+cd src/siye-flow-designer
+npm install
+npm run dev          # Dev server on port 3001
+npm run build        # Production build
+npm test             # Run tests
+
+# CLI (.NET)
+cd src/SiyeFlow.CLI
+dotnet run -- execute --workflow path/to/workflow.json
 ```
-
-### Dynamic Parameters
-```json
-{
-  "parameters": {
-    "userId": "{{userId}}",
-    "timestamp": "{{$timestamp}}",
-    "computed": "{{userName.toUpperCase()}}"
-  }
-}
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🎯 Use Cases
-
-- **API Testing**: Create complex test scenarios
-- **Integration Workflows**: Orchestrate multiple APIs
-- **Data Migration**: Move data between systems
-- **Monitoring**: Create health check workflows
-- **Automation**: Automate repetitive API tasks
-
-## 🚀 Future Enhancements
-
-- [x] Visual workflow designer (drag & drop) ✅
-- [x] Port-based connections ✅
-- [x] Profile system for Start blocks ✅
-- [ ] Workflow templates library
-- [ ] Parallel step execution
-- [ ] Webhook triggers  
-- [ ] Scheduled execution
-- [ ] Export to code generation
-- [ ] Step-by-step debugger
-- [ ] Undo/Redo in designer
-- [ ] Loop and Try/Catch block executors
 
 ---
 

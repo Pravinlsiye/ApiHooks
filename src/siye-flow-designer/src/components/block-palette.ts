@@ -150,12 +150,13 @@ export class BlockPalette extends BaseComponent {
     }
 
     private renderApiDefinition(api: ApiDefinition): string {
+        const removeBtn = api.locked ? '' : '<button class="btn-remove-api" title="Remove API">×</button>';
         return `
             <div class="api-definition" data-api-id="${api.id}" data-api-name="${api.name}">
                 <div class="api-header">
                     <span class="api-name">${api.name}</span>
                     <span class="api-version">${api.version || ''}</span>
-                    <button class="btn-remove-api" title="Remove API">×</button>
+                    ${removeBtn}
                 </div>
                 <div class="api-endpoints">
                     ${api.endpoints.map(endpoint => this.renderApiEndpoint(endpoint, api)).join('')}

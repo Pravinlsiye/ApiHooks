@@ -10,16 +10,12 @@ namespace SiyeFlow.CLI.Services.Blocks
 {
     public class ConditionBlockExecutor : BlockExecutorBase
     {
-        private readonly IExpressionEvaluator _expressionEvaluator;
-
         public ConditionBlockExecutor(
             ILogger<ConditionBlockExecutor> logger, 
             IVariableStore variableStore, 
-            IConsoleWriter console,
-            IExpressionEvaluator expressionEvaluator) 
+            IConsoleWriter console) 
             : base(logger, variableStore, console) 
         { 
-            _expressionEvaluator = expressionEvaluator;
         }
         
         public override BlockType BlockType => BlockType.Condition;
@@ -31,57 +27,113 @@ namespace SiyeFlow.CLI.Services.Blocks
             CancellationToken cancellationToken)
         {
             var config = GetConfig<ConditionConfig>(node);
-            var expression = config.Expression;
+            var rawExpression = config.Expression ?? config.Condition ?? "true";
+            var expression = _variableStore.ReplaceVariables(rawExpression);
 
             _console.Info($"Evaluating condition: {expression}");
 
             bool result;
             try
             {
-                result = _expressionEvaluator.EvaluateCondition(expression, inputs);
+                result = EvaluateSimpleExpression(expression);
             }
             catch (Exception ex)
             {
-                _console.Error($"Failed to evaluate condition: {ex.Message}");
+                _console.Error($"Condition evaluation failed: {ex.Message}");
                 return Task.FromResult(new BlockExecutionResult 
                 { 
-                    Success = false,
-                    Error = ex.Message 
+                    Success = true,
+                    NextHandle = "fail",
+                    Outputs = new Dictionary<string, object> { ["result"] = false }
                 });
             }
 
-            _console.Info($"Condition result: {result}");
-
-            var outputs = new Dictionary<string, object> { ["result"] = result };
-            
-            if (result) outputs["true"] = true;
-            else outputs["false"] = false;
+            _console.Info($"Condition result: {result} (taking {(result ? "success" : "fail")} path)");
 
             return Task.FromResult(new BlockExecutionResult 
             { 
                 Success = true,
-                Outputs = outputs,
-                NextHandle = result ? "true" : "false"
+                Outputs = new Dictionary<string, object> { ["result"] = result },
+                NextHandle = result ? "success" : "fail"
             });
+        }
+
+        private bool EvaluateSimpleExpression(string expr)
+        {
+            expr = expr.Trim();
+
+            if (bool.TryParse(expr, out var b)) return b;
+
+            // == comparison
+            if (expr.Contains("=="))
+            {
+                var parts = expr.Split("==", 2, StringSplitOptions.TrimEntries);
+                if (parts.Length == 2)
+                {
+                    if (double.TryParse(parts[0], out var left) && double.TryParse(parts[1], out var right))
+                        return left == right;
+                    return string.Equals(parts[0].Trim('"', '\''), parts[1].Trim('"', '\''), StringComparison.OrdinalIgnoreCase);
+                }
+            }
+
+            // != comparison
+            if (expr.Contains("!="))
+            {
+                var parts = expr.Split("!=", 2, StringSplitOptions.TrimEntries);
+                if (parts.Length == 2)
+                {
+                    if (double.TryParse(parts[0], out var left) && double.TryParse(parts[1], out var right))
+                        return left != right;
+                    return !string.Equals(parts[0].Trim('"', '\''), parts[1].Trim('"', '\''), StringComparison.OrdinalIgnoreCase);
+                }
+            }
+
+            // >= comparison
+            if (expr.Contains(">="))
+            {
+                var parts = expr.Split(">=", 2, StringSplitOptions.TrimEntries);
+                if (parts.Length == 2 && double.TryParse(parts[0], out var left) && double.TryParse(parts[1], out var right))
+                    return left >= right;
+            }
+
+            // <= comparison
+            if (expr.Contains("<="))
+            {
+                var parts = expr.Split("<=", 2, StringSplitOptions.TrimEntries);
+                if (parts.Length == 2 && double.TryParse(parts[0], out var left) && double.TryParse(parts[1], out var right))
+                    return left <= right;
+            }
+
+            // > comparison
+            if (expr.Contains(">") && !expr.Contains(">="))
+            {
+                var parts = expr.Split(">", 2, StringSplitOptions.TrimEntries);
+                if (parts.Length == 2 && double.TryParse(parts[0], out var left) && double.TryParse(parts[1], out var right))
+                    return left > right;
+            }
+
+            // < comparison
+            if (expr.Contains("<") && !expr.Contains("<="))
+            {
+                var parts = expr.Split("<", 2, StringSplitOptions.TrimEntries);
+                if (parts.Length == 2 && double.TryParse(parts[0], out var left) && double.TryParse(parts[1], out var right))
+                    return left < right;
+            }
+
+            // Non-empty/non-zero = truthy
+            if (double.TryParse(expr, out var num)) return num != 0;
+            return !string.IsNullOrWhiteSpace(expr) && expr != "null" && expr != "undefined";
         }
         
         public override Task<ValidationResult> ValidateAsync(Node node, Interfaces.ExecutionContext context)
         {
-            var config = GetConfig<ConditionConfig>(node);
-            var result = new ValidationResult { IsValid = true };
-
-            if (string.IsNullOrWhiteSpace(config.Expression))
-            {
-                result.IsValid = false;
-                result.Errors.Add("Condition expression is required");
-            }
-
-            return Task.FromResult(result);
+            return Task.FromResult(new ValidationResult { IsValid = true });
         }
 
-        public class ConditionConfig
+        private class ConditionConfig
         {
-            public string Expression { get; set; } = "";
+            public string? Expression { get; set; }
+            public string? Condition { get; set; }
         }
     }
 }
