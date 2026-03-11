@@ -1,0 +1,169 @@
+{
+  "id": "sample-evaluate-delay-switch",
+  "name": "Evaluate, Delay & Switch",
+  "description": "Fetches a post, evaluates its ID, waits 1 second, then branches with a condition",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "label": "Start",
+      "data": {
+        "values": {
+          "postId": "3"
+        }
+      }
+    },
+    {
+      "id": "http_1",
+      "type": "http-request",
+      "label": "Get Post",
+      "data": {
+        "method": "GET",
+        "url": "https://jsonplaceholder.typicode.com/posts/{{postId}}",
+        "outputs": {
+          "title": "$.title",
+          "userId": "$.userId"
+        }
+      }
+    },
+    {
+      "id": "eval_1",
+      "type": "evaluate",
+      "label": "Double User ID",
+      "data": {
+        "expression": "{{userId}} * 2"
+      }
+    },
+    {
+      "id": "log_eval",
+      "type": "log",
+      "label": "Log Result",
+      "data": {
+        "message": "userId={{userId}}, doubled={{result}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "delay_1",
+      "type": "delay",
+      "label": "Wait 1s",
+      "data": {
+        "duration": "1",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "condition_1",
+      "type": "condition",
+      "label": "Result > 5?",
+      "data": {
+        "expression": "result > 5"
+      }
+    },
+    {
+      "id": "log_high",
+      "type": "log",
+      "label": "High Value",
+      "data": {
+        "message": "Result {{result}} is greater than 5",
+        "level": "success"
+      }
+    },
+    {
+      "id": "log_low",
+      "type": "log",
+      "label": "Low Value",
+      "data": {
+        "message": "Result {{result}} is 5 or less",
+        "level": "warning"
+      }
+    },
+    {
+      "id": "end_1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "title": "{{title}}",
+          "originalUserId": "{{userId}}",
+          "doubled": "{{result}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "execution",
+      "source": "start_1",
+      "sourceHandle": "default",
+      "target": "http_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e2",
+      "type": "execution",
+      "source": "http_1",
+      "sourceHandle": "success",
+      "target": "eval_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e3",
+      "type": "execution",
+      "source": "eval_1",
+      "sourceHandle": "success",
+      "target": "log_eval",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e4",
+      "type": "execution",
+      "source": "log_eval",
+      "sourceHandle": "success",
+      "target": "delay_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e5",
+      "type": "execution",
+      "source": "delay_1",
+      "sourceHandle": "success",
+      "target": "condition_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e6",
+      "type": "execution",
+      "source": "condition_1",
+      "sourceHandle": "success",
+      "target": "log_high",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e7",
+      "type": "execution",
+      "source": "condition_1",
+      "sourceHandle": "fail",
+      "target": "log_low",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e8",
+      "type": "execution",
+      "source": "log_high",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e9",
+      "type": "execution",
+      "source": "log_low",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    }
+  ]
+}

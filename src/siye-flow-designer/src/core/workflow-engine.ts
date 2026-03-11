@@ -68,31 +68,25 @@ export class WorkflowEngine {
     ): WorkflowDefinition {
         const nodes: Node[] = [];
         const edges: Edge[] = [];
-        const layout: Record<string, { x: number; y: number }> = {};
         
-        // Convert blocks to nodes
         blocks.forEach(block => {
-            const node: Node = {
+            nodes.push({
                 id: block.id,
                 type: block.type,
                 label: block.name,
                 data: { ...block.fieldValues }
-            };
-            nodes.push(node);
-            layout[block.id] = { x: block.position.x, y: block.position.y };
+            });
         });
         
-        // Convert connections to edges
         connections.forEach(conn => {
-            const edge: Edge = {
+            edges.push({
                 id: conn.id,
                 type: conn.type,
                 source: conn.sourceBlockId,
                 sourceHandle: conn.sourcePortName,
                 target: conn.targetBlockId,
                 targetHandle: conn.targetPortName
-            };
-            edges.push(edge);
+            });
         });
         
         this.workflow = {
@@ -103,10 +97,7 @@ export class WorkflowEngine {
         
         this.indexNodes();
         
-        return {
-            ...this.workflow,
-            layout
-        } as WorkflowDefinition & { layout: typeof layout };
+        return { ...this.workflow };
     }
     
     private migrateLegacyWorkflow(legacyData: any): WorkflowDefinition {

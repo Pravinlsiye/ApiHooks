@@ -1,0 +1,122 @@
+{
+  "id": "sample-status-check",
+  "name": "API Status Check",
+  "description": "Calls an API and branches on success/failure using a condition block",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "label": "Start",
+      "data": {}
+    },
+    {
+      "id": "http_1",
+      "type": "http-request",
+      "label": "Check API",
+      "data": {
+        "method": "GET",
+        "url": "https://jsonplaceholder.typicode.com/posts/1",
+        "outputs": {
+          "postTitle": "$.title",
+          "postId": "$.id"
+        }
+      }
+    },
+    {
+      "id": "condition_1",
+      "type": "condition",
+      "label": "Got Data?",
+      "data": {
+        "expression": "statusCode == 200"
+      }
+    },
+    {
+      "id": "log_ok",
+      "type": "log",
+      "label": "Log Success",
+      "data": {
+        "message": "API is healthy! Got post: {{postTitle}}",
+        "level": "success"
+      }
+    },
+    {
+      "id": "log_fail",
+      "type": "log",
+      "label": "Log Failure",
+      "data": {
+        "message": "API call failed! Status: {{statusCode}}",
+        "level": "error"
+      }
+    },
+    {
+      "id": "end_1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "status": "{{statusCode}}",
+          "title": "{{postTitle}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "execution",
+      "source": "start_1",
+      "sourceHandle": "default",
+      "target": "http_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e2",
+      "type": "execution",
+      "source": "http_1",
+      "sourceHandle": "success",
+      "target": "condition_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e3",
+      "type": "execution",
+      "source": "condition_1",
+      "sourceHandle": "success",
+      "target": "log_ok",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e4",
+      "type": "execution",
+      "source": "condition_1",
+      "sourceHandle": "fail",
+      "target": "log_fail",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e5",
+      "type": "execution",
+      "source": "log_ok",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e6",
+      "type": "execution",
+      "source": "log_fail",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e7",
+      "type": "execution",
+      "source": "http_1",
+      "sourceHandle": "fail",
+      "target": "log_fail",
+      "targetHandle": "trigger"
+    }
+  ]
+}

@@ -9,15 +9,19 @@ import { DOMUpdater } from '../utils/dom-updater';
 
 type Theme = 'light' | 'dark' | 'system';
 
+export type InspectorMode = 'breakpoints' | 'always';
+
 export interface SettingsState {
     theme: Theme;
     minimapEnabled: boolean;
+    inspectorMode: InspectorMode;
 }
 
 export class SettingsDropdown extends BaseComponent {
     private isOpen: boolean = false;
     private currentTheme: Theme = 'light';
-    private minimapEnabled: boolean = false; // Default off
+    private minimapEnabled: boolean = false;
+    private inspectorMode: InspectorMode = 'breakpoints';
 
     constructor(containerId: string) {
         super(containerId);
@@ -32,9 +36,11 @@ export class SettingsDropdown extends BaseComponent {
         this.currentTheme = savedTheme || 'dark';
         this.applyTheme(this.currentTheme);
 
-        // Load minimap setting (default off)
         const savedMinimap = localStorage.getItem('siyeflow-minimap');
         this.minimapEnabled = savedMinimap === 'true';
+
+        const savedInspector = localStorage.getItem('siyeflow-inspector-mode') as InspectorMode;
+        this.inspectorMode = savedInspector === 'always' ? 'always' : 'breakpoints';
     }
 
     private applyTheme(theme: Theme): void {
@@ -96,6 +102,17 @@ export class SettingsDropdown extends BaseComponent {
                             </button>
                         </div>
                     </div>
+                    <div class="settings-divider"></div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">Debugging</div>
+                        <div class="settings-toggle-row">
+                            <span class="settings-toggle-label">Always show Inspector</span>
+                            <button class="settings-toggle ${this.inspectorMode === 'always' ? 'active' : ''}" id="inspector-mode-toggle">
+                                <span class="settings-toggle-slider"></span>
+                            </button>
+                        </div>
+                        <div class="settings-hint">When off, inspector only appears at breakpoints</div>
+                    </div>
                 </div>
             </div>
         `;
@@ -115,6 +132,13 @@ export class SettingsDropdown extends BaseComponent {
         if (minimapToggle) {
             this.addEventListener(minimapToggle, 'click', () => {
                 this.toggleMinimap();
+            });
+        }
+
+        const inspectorToggle = DOMUpdater.query<HTMLButtonElement>(this.container, '#inspector-mode-toggle');
+        if (inspectorToggle) {
+            this.addEventListener(inspectorToggle, 'click', () => {
+                this.toggleInspectorMode();
             });
         }
 
@@ -202,6 +226,26 @@ export class SettingsDropdown extends BaseComponent {
 
     isMinimapEnabled(): boolean {
         return this.minimapEnabled;
+    }
+
+    getInspectorMode(): InspectorMode {
+        return this.inspectorMode;
+    }
+
+    private toggleInspectorMode(): void {
+        this.inspectorMode = this.inspectorMode === 'always' ? 'breakpoints' : 'always';
+        localStorage.setItem('siyeflow-inspector-mode', this.inspectorMode);
+
+        const toggle = DOMUpdater.query<HTMLButtonElement>(this.container, '#inspector-mode-toggle');
+        if (toggle) {
+            if (this.inspectorMode === 'always') {
+                DOMUpdater.addClasses(toggle, 'active');
+            } else {
+                DOMUpdater.removeClasses(toggle, 'active');
+            }
+        }
+
+        this.emit('inspectorModeChange', { mode: this.inspectorMode });
     }
 
     setMinimapEnabled(enabled: boolean): void {

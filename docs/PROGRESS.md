@@ -1,26 +1,23 @@
 # SiyeFlow Progress
 
-**Last Updated**: 2025-01-20
+**Last Updated**: 2026-03-11
 
 ## Task Status
 
 | Task Name | Status | Priority | Description |
 |-----------|--------|----------|-------------|
-| **Migrate to All SVG Blocks and Lines** | ⏳ In Progress | 🔴 High | Convert all block renderers and connection renderers from HTML to SVG for better performance and scalability |
 | **New Schema Design** | 📋 Planned | 🔴 High | Design new workflow schema without backward compatibility constraints - clean slate approach |
-| **Complete Remaining Blocks** | ⏳ In Progress | 🟡 Medium | Implement renderers and executors for: Loop, Try/Catch, Sub-Workflow, Evaluate, Collect, Delay, Log |
+| **Complete Remaining Blocks** | ⏳ In Progress | 🟡 Medium | Implement executor for: Sub-Workflow |
 | **Start Block Executor** | ✅ Complete | - | Start block executor implementation |
 | **End Block Executor** | ✅ Complete | - | End block executor implementation |
 | **HTTP Request Block Executor** | ✅ Complete | - | HTTP Request block executor with API call support |
 | **Variable Block Executor** | ✅ Complete | - | Variable block executor for set/get/delete operations |
 | **Condition Block Executor** | ✅ Complete | - | Condition block executor with branching logic |
-| **Loop Block Executor** | ⏳ Stub | 🔴 High | Loop executor for iterating over items |
-| **Try/Catch Block Executor** | ⏳ Stub | 🔴 High | Try/Catch executor for error handling |
-| **Sub-Workflow Block Executor** | ⏳ Stub | 🔴 High | Sub-Workflow executor for nested workflows |
-| **Evaluate Block Executor** | ⏳ Stub | 🟡 Medium | Evaluate executor for expression evaluation |
-| **Collect Block Executor** | ⏳ Stub | 🟡 Medium | Collect executor for loop aggregation |
-| **Delay Block Executor** | ⏳ Stub | 🟡 Medium | Delay executor with progress indication |
-| **Log Block Executor** | ⏳ Stub | 🟢 Low | Log executor for console output |
+| **Log Block Executor** | ✅ Complete | - | Log executor for console output with level support |
+| **Delay Block Executor** | ✅ Complete | - | Delay executor with abort support, seconds/minutes |
+| **Evaluate Block Executor** | ✅ Complete | - | Evaluate executor for expression evaluation |
+| **Loop Block Executor** | ✅ Complete | - | Loop executor iterates body blocks, sets loopIndex/loopItem/loopCount |
+| **Sub-Workflow Block Executor** | ⏳ Stub | 🔴 High | Sub-Workflow executor - logs "not yet implemented" |
 | **TypeScript Designer** | ✅ Complete | - | Complete TypeScript workflow designer UI |
 | **.NET Integration** | ✅ Complete | - | Integration with .NET CLI and UI |
 | **Core Models** | ✅ Complete | - | Core workflow models and schema definitions |
@@ -28,23 +25,21 @@
 
 ## Block Implementation Status
 
-**Overall Progress**: 5/12 executors complete (42%) ████████░░░░░░░░░░░░
+**Overall Progress**: 9/10 executors complete (90%) ██████████████████░░
 
-### ✅ Complete Blocks (5)
+### ✅ Complete Blocks (9)
 - Start
 - End
 - HTTP Request
 - Variable
 - Condition
+- Log
+- Delay
+- Evaluate
+- Loop
 
-### ⏳ Remaining Blocks (7)
-- Loop (🔴 High Priority)
-- Try/Catch (🔴 High Priority)
-- Sub-Workflow (🔴 High Priority)
-- Evaluate (🟡 Medium Priority)
-- Collect (🟡 Medium Priority)
-- Delay (🟡 Medium Priority)
-- Log (🟢 Low Priority)
+### ⏳ Remaining Blocks (1)
+- Sub-Workflow (🔴 High Priority - stub, not yet implemented)
 
 ## Component Status
 
@@ -54,45 +49,53 @@
 | .NET Integration | ✅ Complete | 100% | Build scripts and integration |
 | Core Models | ✅ Complete | 100% | Schema definitions in TypeScript |
 | CLI Execution | ⏳ In Progress | ~50% | Port-based execution engine |
-| SVG Rendering | ⏳ In Progress | ~30% | Debug implementation complete, migration in progress |
-| HTML Rendering | ✅ Complete | 100% | Current production implementation |
+| Rendering | ✅ Complete | 100% | HTML blocks + SVG connections |
+| Debugging | ✅ Complete | 100% | Breakpoints, pause/step, inspector, variable resolution |
+| Block Details | ✅ Complete | 100% | Data rows, runtime resolution, copy to clipboard |
 
 ## Priority Summary
 
-- 🔴 **High Priority**: 6 tasks
-  - Migrate to All SVG Blocks and Lines
+- 🔴 **High Priority**: 2 tasks
   - New Schema Design
-  - Loop Block Executor
-  - Try/Catch Block Executor
   - Sub-Workflow Block Executor
 
-- 🟡 **Medium Priority**: 5 tasks
+- 🟡 **Medium Priority**: 2 tasks
   - Complete Remaining Blocks
-  - Evaluate Block Executor
-  - Collect Block Executor
-  - Delay Block Executor
   - CLI Execution
 
-- 🟢 **Low Priority**: 1 task
-  - Log Block Executor
+## Recent Updates (2026-03-10)
 
-## Recent Updates (2025-01-20)
+### Debugging & Inspector
+- ✅ Breakpoints on blocks (click red dot on left edge to toggle)
+- ✅ Pause/Resume/Step execution controls with toolbar buttons and keyboard shortcuts
+- ✅ Block highlighting during execution (blue=executing, green=success, red=fail)
+- ✅ Variable Inspector - tabbed floating panel with JSON tree view
+  - Tabs per breakpoint/step with block name
+  - Pin tabs to persist across executions (with timestamp label)
+  - Detach tabs into separate floating windows, re-attach back
+  - Minimize/restore inspector panel (minimized by default)
+  - Scroll arrows for tab overflow (Notepad++ style)
+  - Settings toggle: always show inspector vs breakpoints only
 
-### SVG Migration
-- ✅ Created SVG debug canvas with enhanced visual styling
-- ✅ Implemented SVG block renderer with gradients and shadows
-- ✅ SVG connection renderer with smooth bezier curves
-- ⏳ Migrating production code from HTML to SVG
+### Block Details View
+- ✅ Read-only data detail rows on each block showing values, outputs, headers
+- ✅ Runtime variable resolution: `{{variable}}` and JSONPath outputs show actual values at breakpoints (green text)
+- ✅ Resolved values on hover tooltip (full JSON with actual values)
+- ✅ Copy button on each detail row (copies resolved JSON to clipboard)
+
+### Samples
+- ✅ 6 sample workflow JSON files using public APIs
+- ✅ Covers all 10 implemented block types: Start, End, HTTP, Variable, Log, Condition, Loop, Evaluate, Delay, Switch
+- ✅ Demonstrates: GET requests, chaining, condition branching, variable interpolation, loops, expression evaluation, delays
+
+### Cleanup
+- Removed legacy `siye-flow-designer-old/` directory (fully superseded by v2.0.0)
+- Corrected executor statuses: Log, Delay, Evaluate were already implemented
+- Removed non-existent Try/Catch and Collect from tracker (not in current schema)
 
 ### Schema Management
 - Schema is managed in TypeScript (`src/siye-flow-designer/src/models/workflow-models.ts`)
 - Planning new schema design without backward compatibility constraints
-
-### Debug Tools
-- ✅ Created debug-ui directory with organized debug pages
-- ✅ SVG Canvas Debug page
-- ✅ HTML Canvas Debug page
-- ✅ Block Renderer Debug page
 
 ## Future Plans
 
@@ -111,29 +114,61 @@ A browser-based workflow execution engine that can run workflow JSON files direc
 - ✅ Basic error handling
 
 #### Phase 2: Advanced Blocks (1-2 weeks)
-- ⏳ Loop executor with iteration tracking
-- ⏳ Delay executor with progress indication
-- ⏳ Log executor for console output
-- ⏳ Evaluate executor for expression evaluation
-- ⏳ Try/Catch executor for error handling
-- ⏳ Collect executor for loop aggregation
+- ✅ Loop executor with iteration tracking (iterates body, sets loopIndex/loopItem)
+- ✅ Delay executor with abort support
+- ✅ Log executor with level support
+- ✅ Evaluate executor for expression evaluation
+- ✅ Pause/Resume/Step execution controls
+- ✅ Block highlighting during execution (executing/success/fail states)
 
 #### Phase 3: UI Integration (1-2 weeks)
-- ⏳ Execution visualizer (highlight executing blocks)
-- ⏳ Variable inspector (show variable values in real-time)
-- ⏳ Log viewer (display execution logs)
-- ⏳ Progress indicators
-- ⏳ Execution history
+- ✅ Execution visualizer (block highlighting: executing/success/fail)
+- ✅ Variable inspector (tabbed panel with JSON tree, pin, detach, minimize)
+- ✅ Log viewer (terminal panel with execution logs)
+- ✅ Block details view (data rows, runtime resolution, copy JSON)
+- ⏳ Property panel for editing block data (side panel or modal)
 
 #### Phase 4: Advanced Features (1-2 weeks)
+- ✅ Pause/Resume execution
+- ✅ Breakpoints for debugging
+- ⏳ Execution profiling (timing per block, bottleneck detection)
+- ⏳ Export execution logs (download as JSON/CSV)
 - ⏳ Web Worker support for long-running workflows
-- ⏳ Pause/Resume execution
-- ⏳ Breakpoints for debugging
-- ⏳ Execution profiling
-- ⏳ Export execution logs
+
+## Feature Suggestions
+
+### Designer UX
+| Feature | Priority | Description |
+|---------|----------|-------------|
+| **Property Panel** | 🔴 High | Side panel or modal to edit all block data (values, outputs, headers, expressions) - not just the 1-2 fields shown inline |
+| **Undo/Redo** | 🔴 High | Ctrl+Z/Ctrl+Y for block moves, connections, deletions |
+| **Block Search** | 🟡 Medium | Ctrl+F to search blocks by name, type, or data content |
+| **Auto-layout** | 🟡 Medium | One-click layout algorithm (dagre/elkjs) to arrange blocks neatly |
+| **Connection Labels** | 🟡 Medium | Show port name labels on connection lines |
+| **Keyboard Navigation** | 🟡 Medium | Arrow keys to move between blocks, Enter to open properties |
+| **Block Templates** | 🟢 Low | Save a group of blocks as a reusable template |
+| **Multi-select** | 🟢 Low | Shift+click or box-select to move/delete multiple blocks |
+
+### Execution & Debugging
+| Feature | Priority | Description |
+|---------|----------|-------------|
+| **Execution History** | 🔴 High | Log of past runs with timing, status, and variable snapshots - click to replay |
+| **Watch Expressions** | 🟡 Medium | Custom expressions evaluated at each breakpoint (like IDE watch window) |
+| **Conditional Breakpoints** | 🟡 Medium | Break only when a condition is true (e.g. `statusCode != 200`) |
+| **Execution Profiler** | 🟡 Medium | Flame chart / timing bars showing how long each block took |
+| **Export Logs** | 🟡 Medium | Download terminal output and variable snapshots as JSON |
+| **Mock HTTP Responses** | 🟢 Low | Intercept HTTP blocks with mock data for testing without real APIs |
+
+### Integration
+| Feature | Priority | Description |
+|---------|----------|-------------|
+| **Sub-Workflow Executor** | 🔴 High | Load and execute nested workflow definitions inline |
+| **Workflow Versioning** | 🟡 Medium | Track changes to workflow JSON, diff between versions |
+| **Embed Mode** | 🟡 Medium | Embeddable read-only viewer for documentation/sharing |
+| **REST API Catalog** | 🟢 Low | Browse and import endpoints from OpenAPI specs directly into HTTP blocks |
 
 ## Notes
 
 - **Status Legend**: ✅ Complete | ⏳ In Progress | 📋 Planned | 🔴 High Priority | 🟡 Medium Priority | 🟢 Low Priority
 - **Schema Changes**: New schema design will not maintain backward compatibility - clean break from legacy structure
-- **SVG Migration**: Moving from HTML-based rendering to SVG for better performance with 100+ blocks
+- **Rendering**: HTML blocks + SVG connections (current architecture)

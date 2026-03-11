@@ -1,0 +1,72 @@
+{
+  "id": "sample-cat-fact",
+  "name": "Cat Fact API",
+  "description": "Fetches a random cat fact from catfact.ninja and logs it",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "label": "Start",
+      "data": {}
+    },
+    {
+      "id": "http_1",
+      "type": "http-request",
+      "label": "Get Cat Fact",
+      "data": {
+        "method": "GET",
+        "url": "https://catfact.ninja/fact",
+        "outputs": {
+          "catFact": "$.fact",
+          "factLength": "$.length"
+        }
+      }
+    },
+    {
+      "id": "log_1",
+      "type": "log",
+      "label": "Log Fact",
+      "data": {
+        "message": "Cat Fact: {{catFact}} ({{factLength}} chars)",
+        "level": "info"
+      }
+    },
+    {
+      "id": "end_1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "fact": "{{catFact}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "execution",
+      "source": "start_1",
+      "sourceHandle": "default",
+      "target": "http_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e2",
+      "type": "execution",
+      "source": "http_1",
+      "sourceHandle": "success",
+      "target": "log_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e3",
+      "type": "execution",
+      "source": "log_1",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    }
+  ]
+}

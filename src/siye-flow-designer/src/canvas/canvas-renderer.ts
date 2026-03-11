@@ -62,6 +62,7 @@ export class CanvasRenderer extends BaseComponent {
     };
     private panState: PanState = { isPanning: false, start: { x: 0, y: 0 }, offset: { x: 0, y: 0 } };
     private selectedBlockId: string | null = null;
+    private runtimeVariables: Record<string, any> | null = null;
 
     constructor(containerId: string) {
         super(containerId);
@@ -232,20 +233,28 @@ export class CanvasRenderer extends BaseComponent {
         this.blockElements.clear();
         this.connectionElements.clear();
 
-        // Render connections first (so they appear behind blocks)
-        connections.forEach((connection, id) => {
-            const element = this.renderConnectionElement(connection);
-            if (element) {
-                this.canvasLayer.appendChild(element);
-                this.connectionElements.set(id, element);
-            }
-        });
-
-        // Render blocks
+        // Render blocks first (connections need block elements for port positions)
         blocks.forEach((block, id) => {
             const element = this.renderBlockElement(block);
             this.canvasLayer.appendChild(element);
             this.blockElements.set(id, element);
+        });
+
+        // Defer connection rendering until after browser layout pass,
+        // so getBoundingClientRect() returns accurate port positions
+        requestAnimationFrame(() => {
+            const firstBlock = this.canvasLayer.firstChild;
+            connections.forEach((connection, id) => {
+                const element = this.renderConnectionElement(connection);
+                if (element) {
+                    if (firstBlock) {
+                        this.canvasLayer.insertBefore(element, firstBlock);
+                    } else {
+                        this.canvasLayer.appendChild(element);
+                    }
+                    this.connectionElements.set(id, element);
+                }
+            });
         });
     }
 
@@ -267,10 +276,13 @@ export class CanvasRenderer extends BaseComponent {
             },
             onDelete: (blockId) => {
                 this.deleteBlock(blockId);
+            },
+            onBreakpointToggle: (blockId) => {
+                this.emit('breakpointToggle', { blockId });
             }
         };
 
-        return renderBlock(block, callbacks);
+        return renderBlock(block, callbacks, this.runtimeVariables);
     }
     
     /**
@@ -640,6 +652,10 @@ export class CanvasRenderer extends BaseComponent {
      */
     getBlocks(): Map<string, VisualBlock> {
         return this.blocks;
+    }
+
+    setRuntimeVariables(vars: Record<string, any> | null): void {
+        this.runtimeVariables = vars;
     }
 
     // =============================================

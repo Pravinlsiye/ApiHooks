@@ -12,6 +12,7 @@ import { TerminalPanel } from './components/terminal-panel';
 import { AlertModal } from './components/alert-modal';
 import { WorkflowEngine } from './core/workflow-engine';
 import { BrowserWorkflowExecutor } from './core/browser-workflow-executor';
+import { VariableInspector } from './components/variable-inspector';
 import { VisualBlock, VisualConnection, Position, BlockField, VisualPort } from './models/visual-models';
 import { BlockType, EdgeType } from './models/workflow-models';
 import { generateId } from './utils/dom-helpers';
@@ -55,9 +56,11 @@ export class WorkflowDesigner {
     private alertModal: AlertModal;
     private engine: WorkflowEngine;
     private executor: BrowserWorkflowExecutor | null = null;
+    private inspector: VariableInspector;
     private blocks: Map<string, VisualBlock> = new Map();
     private connections: Map<string, VisualConnection> = new Map();
     private selectedBlockId: string | null = null;
+    private blockHighlights: Map<string, 'executing' | 'success' | 'fail'> = new Map();
 
     constructor(options: DesignerOptions | string, paletteContainerId?: string) {
         // Support both old and new constructor signatures
@@ -68,6 +71,7 @@ export class WorkflowDesigner {
         this.canvas = new CanvasRenderer(opts.canvasContainerId);
         this.alertModal = new AlertModal();
         this.engine = new WorkflowEngine();
+        this.inspector = new VariableInspector();
         
         if (opts.paletteContainerId) {
             this.palette = new BlockPalette(opts.paletteContainerId);
@@ -85,7 +89,19 @@ export class WorkflowDesigner {
                 onZoomOut: () => this.canvas.zoomOut(),
                 onFitToScreen: () => this.canvas.fitToScreen(),
                 onRun: () => this.runWorkflow(),
-                onTerminalToggle: (visible) => this.toggleTerminal(visible)
+                onPause: () => this.executor?.pause(),
+                onResume: () => this.executor?.resume(),
+                onStep: () => this.executor?.step(),
+                onStop: () => this.executor?.stop(),
+                onTerminalToggle: (visible) => this.toggleTerminal(visible),
+                onInspectorToggle: () => this.inspector.toggle()
+            });
+
+            this.floatingToolbar.on('togglePauseResume', () => {
+                if (!this.executor) return;
+                const state = this.executor.getState();
+                if (state === 'running') this.executor.pause();
+                else if (state === 'paused') this.executor.resume();
             });
         }
 
@@ -119,10 +135,40 @@ export class WorkflowDesigner {
         if (opts.terminalContainerId) {
             this.terminal = new TerminalPanel(opts.terminalContainerId);
             this.executor = new BrowserWorkflowExecutor(this.terminal);
+
+            const savedMode = localStorage.getItem('siyeflow-inspector-mode');
+            if (savedMode === 'always') {
+                this.executor.setAlwaysInspect(true);
+            }
             
-            // Set up block highlighting during execution
-            this.executor.setBlockHighlightCallback((blockId) => {
-                this.canvas.selectBlock(blockId);
+            this.executor.setBlockHighlightCallback((blockId, state) => {
+                this.highlightBlock(blockId, state);
+            });
+
+            this.executor.setStateChangeCallback((state) => {
+                this.floatingToolbar?.updateExecutionState(state);
+                if (state === 'idle') {
+                    this.blockHighlights.clear();
+                    this.canvas.setRuntimeVariables(null);
+                    this.render();
+                }
+            });
+
+            this.executor.setContextUpdateCallback((variables, blockOutputs, currentBlockId) => {
+                const node = this.blocks.get(currentBlockId);
+                this.inspector.update({
+                    variables,
+                    blockOutputs,
+                    currentBlock: {
+                        id: currentBlockId,
+                        type: node?.type || 'unknown',
+                        label: node?.name || currentBlockId,
+                    }
+                });
+                this.inspector.show();
+
+                this.canvas.setRuntimeVariables(variables);
+                this.render();
             });
             
             // Handle terminal block click
@@ -161,6 +207,12 @@ export class WorkflowDesigner {
                 } else {
                     this.minimap.hide();
                 }
+            }
+        });
+
+        this.navbar.on('inspectorModeChange', (data: { mode: string }) => {
+            if (this.executor) {
+                this.executor.setAlwaysInspect(data.mode === 'always');
             }
         });
 
@@ -244,9 +296,7 @@ export class WorkflowDesigner {
             target: string;
             targetHandle: string;
         }>;
-        layout: Record<string, { x: number; y: number }>;
     } {
-        // Convert blocks to nodes
         const nodes = Array.from(this.blocks.values()).map(block => ({
             id: block.id,
             type: block.type,
@@ -254,7 +304,6 @@ export class WorkflowDesigner {
             data: block.fieldValues || {}
         }));
 
-        // Convert connections to edges
         const edges = Array.from(this.connections.values()).map(conn => ({
             id: conn.id,
             type: conn.type,
@@ -264,20 +313,13 @@ export class WorkflowDesigner {
             targetHandle: conn.targetPortName
         }));
 
-        // Create layout object with positions
-        const layout: Record<string, { x: number; y: number }> = {};
-        this.blocks.forEach(block => {
-            layout[block.id] = { x: block.position.x, y: block.position.y };
-        });
-
         return {
             id: generateId('workflow'),
             name: 'Workflow',
             description: '',
             version: '2.0.0',
             nodes,
-            edges,
-            layout
+            edges
         };
     }
 
@@ -299,13 +341,11 @@ export class WorkflowDesigner {
             target: string;
             targetHandle: string;
         }>;
-        layout?: Record<string, { x: number; y: number }>;
     }): void {
         // Clear existing
         this.blocks.clear();
         this.connections.clear();
 
-        const layout = data.layout || {};
         let autoX = 100;
         let autoY = 100;
         const spacing = 250;
@@ -313,15 +353,11 @@ export class WorkflowDesigner {
         // Load nodes as blocks
         if (data.nodes) {
             data.nodes.forEach(node => {
-                // Get position from layout or auto-position
-                let position = layout[node.id];
-                if (!position) {
-                    position = { x: autoX, y: autoY };
-                    autoX += spacing;
-                    if (autoX > 2000) {
-                        autoX = 100;
-                        autoY += 150;
-                    }
+                const position = { x: autoX, y: autoY };
+                autoX += spacing;
+                if (autoX > 2000) {
+                    autoX = 100;
+                    autoY += 150;
                 }
 
                 // Create visual block
@@ -464,10 +500,11 @@ export class WorkflowDesigner {
         }
         
         if (this.executor.getIsRunning()) {
-            // Stop the running workflow
             this.executor.stop();
             return;
         }
+
+        this.inspector.clearUnpinned();
         
         // Build workflow from visual blocks first (this syncs the engine state)
         const workflow = this.engine.buildFromVisual(this.blocks, this.connections);
@@ -497,6 +534,31 @@ export class WorkflowDesigner {
                 'error'
             );
         }
+    }
+
+    private highlightBlock(blockId: string, state: 'executing' | 'success' | 'fail' | 'clear'): void {
+        if (state === 'clear') {
+            this.blockHighlights.delete(blockId);
+        } else {
+            this.blockHighlights.set(blockId, state);
+        }
+        this.applyHighlight(blockId, state);
+    }
+
+    private applyHighlight(blockId: string, state: 'executing' | 'success' | 'fail' | 'clear'): void {
+        const blockEl = this.canvas.getCanvasLayer().querySelector(`[data-block-id="${blockId}"]`);
+        if (!blockEl) return;
+
+        blockEl.classList.remove('block-executing', 'block-success', 'block-fail');
+        if (state !== 'clear') {
+            blockEl.classList.add(`block-${state}`);
+        }
+    }
+
+    private reapplyHighlights(): void {
+        this.blockHighlights.forEach((state, blockId) => {
+            this.applyHighlight(blockId, state);
+        });
     }
 
     private toggleTerminal(visible: boolean): void {
@@ -533,10 +595,15 @@ export class WorkflowDesigner {
             this.canvas.removeConnection(data.connectionId);
         });
 
-        // blockSelect is handled internally by canvas-renderer, no need to call selectBlock again
         this.canvas.on('blockSelect', (data: { blockId: string }) => {
-            // Update internal state if needed (e.g., for property panel)
             this.selectedBlockId = data.blockId;
+        });
+
+        this.canvas.on('breakpointToggle', (data: { blockId: string }) => {
+            if (this.executor) {
+                const active = this.executor.toggleBreakpoint(data.blockId);
+                this.terminal?.log('info', `${active ? '🔴 Breakpoint set' : '⭕ Breakpoint removed'} on ${data.blockId}`);
+            }
         });
 
         this.canvas.on('blockMove', (data: { blockId: string; position: Position }) => {
@@ -732,9 +799,9 @@ export class WorkflowDesigner {
     render(): void {
         this.canvas.render(this.blocks, this.connections);
         
-        // Update minimap after render (with delay to ensure DOM is ready)
         requestAnimationFrame(() => {
             this.updateMinimap();
+            this.reapplyHighlights();
         });
     }
 
@@ -796,7 +863,7 @@ function createDefaultBlock(type: BlockType, position: Position, name?: string):
     const defaultPorts: Record<BlockType, { inputs: VisualPort[]; outputs: VisualPort[] }> = {
         [BlockType.Start]: {
             inputs: [],
-            outputs: [{ name: 'trigger', type: 'execution' }]
+            outputs: [{ name: 'default', type: 'execution', label: 'out' }]
         },
         [BlockType.End]: {
             inputs: [{ name: 'trigger', type: 'execution' }],
@@ -808,19 +875,19 @@ function createDefaultBlock(type: BlockType, position: Position, name?: string):
         },
         [BlockType.Variable]: {
             inputs: [{ name: 'trigger', type: 'execution' }],
-            outputs: [{ name: 'trigger', type: 'execution' }]
+            outputs: [{ name: 'success', type: 'execution', label: 'out' }]
         },
         [BlockType.Log]: {
             inputs: [{ name: 'trigger', type: 'execution' }],
-            outputs: [{ name: 'trigger', type: 'execution' }]
+            outputs: [{ name: 'success', type: 'execution', label: 'out' }]
         },
         [BlockType.Delay]: {
             inputs: [{ name: 'trigger', type: 'execution' }],
-            outputs: [{ name: 'trigger', type: 'execution' }]
+            outputs: [{ name: 'success', type: 'execution', label: 'out' }]
         },
         [BlockType.Condition]: {
             inputs: [{ name: 'trigger', type: 'execution' }],
-            outputs: [{ name: 'true', type: 'execution' }, { name: 'false', type: 'execution' }]
+            outputs: [{ name: 'success', type: 'execution', label: 'true' }, { name: 'fail', type: 'execution', label: 'false' }]
         },
         [BlockType.Switch]: {
             inputs: [{ name: 'trigger', type: 'execution' }],
@@ -832,7 +899,7 @@ function createDefaultBlock(type: BlockType, position: Position, name?: string):
         },
         [BlockType.Evaluate]: {
             inputs: [{ name: 'trigger', type: 'execution' }],
-            outputs: [{ name: 'trigger', type: 'execution' }]
+            outputs: [{ name: 'success', type: 'execution', label: 'out' }]
         },
         [BlockType.BatchProcess]: {
             inputs: [{ name: 'trigger', type: 'execution' }],
@@ -844,7 +911,7 @@ function createDefaultBlock(type: BlockType, position: Position, name?: string):
         },
         [BlockType.WebhookTrigger]: {
             inputs: [],
-            outputs: [{ name: 'trigger', type: 'execution' }]
+            outputs: [{ name: 'default', type: 'execution', label: 'out' }]
         }
     };
 

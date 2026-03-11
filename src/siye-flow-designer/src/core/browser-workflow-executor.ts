@@ -5,6 +5,8 @@
 import { Node, Edge, EdgeType, BlockType, WorkflowDefinition } from '../models/workflow-models';
 import { TerminalPanel } from '../components/terminal-panel';
 
+export type ExecutorState = 'idle' | 'running' | 'paused' | 'stepping';
+
 /**
  * Execution context passed between blocks
  */
@@ -31,36 +33,46 @@ export class BrowserWorkflowExecutor {
     private terminal: TerminalPanel;
     private nodes: Map<string, Node> = new Map();
     private edges: Edge[] = [];
-    private isRunning: boolean = false;
+    private state: ExecutorState = 'idle';
     private abortController: AbortController | null = null;
-    private onBlockHighlight?: (blockId: string) => void;
+    private onBlockHighlight?: (blockId: string, state: 'executing' | 'success' | 'fail' | 'clear') => void;
+    private onStateChange?: (state: ExecutorState) => void;
+    private onContextUpdate?: (variables: Record<string, any>, blockOutputs: Record<string, Record<string, any>>, currentBlockId: string) => void;
+
+    private pausePromise: Promise<void> | null = null;
+    private pauseResolve: (() => void) | null = null;
+    private stepMode: boolean = false;
+    private breakpoints: Set<string> = new Set();
+    private alwaysInspect: boolean = false;
     
     constructor(terminal: TerminalPanel) {
         this.terminal = terminal;
     }
     
-    /**
-     * Set callback for highlighting blocks during execution
-     */
-    setBlockHighlightCallback(callback: (blockId: string) => void): void {
+    setBlockHighlightCallback(callback: (blockId: string, state: 'executing' | 'success' | 'fail' | 'clear') => void): void {
         this.onBlockHighlight = callback;
     }
+
+    setStateChangeCallback(callback: (state: ExecutorState) => void): void {
+        this.onStateChange = callback;
+    }
+
+    setContextUpdateCallback(callback: (variables: Record<string, any>, blockOutputs: Record<string, Record<string, any>>, currentBlockId: string) => void): void {
+        this.onContextUpdate = callback;
+    }
     
-    /**
-     * Execute a workflow
-     */
     public async execute(workflow: WorkflowDefinition): Promise<boolean> {
-        if (this.isRunning) {
+        if (this.state !== 'idle') {
             this.terminal.log('warning', 'Workflow is already running');
             return false;
         }
         
-        this.isRunning = true;
+        this.setState('running');
         this.terminal.setRunning(true);
         this.terminal.expand();
         this.abortController = new AbortController();
+        this.stepMode = false;
         
-        // Load workflow data
         this.nodes.clear();
         
         if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
@@ -76,7 +88,6 @@ export class BrowserWorkflowExecutor {
         
         this.terminal.log('info', `Loaded ${this.nodes.size} nodes, ${this.edges.length} edges`);
         
-        // Find start node
         const startNode = this.findStartNode();
         if (!startNode) {
             this.terminal.log('error', 'No Start block found in workflow');
@@ -84,7 +95,6 @@ export class BrowserWorkflowExecutor {
             return false;
         }
         
-        // Create execution context
         const context: ExecutionContext = {
             variables: new Map(),
             blockOutputs: new Map(),
@@ -109,32 +119,109 @@ export class BrowserWorkflowExecutor {
         const duration = Date.now() - context.startTime;
         this.terminal.logWorkflowEnd(success, duration);
         
+        this.clearAllHighlights();
         this.cleanup();
         return success;
     }
     
-    /**
-     * Stop running workflow
-     */
     public stop(): void {
         if (this.abortController) {
             this.abortController.abort();
             this.terminal.log('warning', 'Workflow execution stopped by user');
         }
+        if (this.pauseResolve) {
+            this.pauseResolve();
+            this.pauseResolve = null;
+            this.pausePromise = null;
+        }
         this.cleanup();
     }
+
+    public pause(): void {
+        if (this.state !== 'running') return;
+        this.setState('paused');
+        this.terminal.log('info', '⏸ Workflow paused');
+        this.pausePromise = new Promise<void>(resolve => {
+            this.pauseResolve = resolve;
+        });
+    }
+
+    public resume(): void {
+        if (this.state !== 'paused') return;
+        this.stepMode = false;
+        this.setState('running');
+        this.terminal.log('info', '▶ Workflow resumed');
+        if (this.pauseResolve) {
+            this.pauseResolve();
+            this.pauseResolve = null;
+            this.pausePromise = null;
+        }
+    }
+
+    public step(): void {
+        if (this.state !== 'paused') return;
+        this.stepMode = true;
+        this.setState('stepping');
+        this.terminal.log('info', '⏭ Stepping to next block');
+        if (this.pauseResolve) {
+            this.pauseResolve();
+            this.pauseResolve = null;
+            this.pausePromise = null;
+        }
+    }
     
-    /**
-     * Check if workflow is running
-     */
     public getIsRunning(): boolean {
-        return this.isRunning;
+        return this.state !== 'idle';
+    }
+
+    public getState(): ExecutorState {
+        return this.state;
+    }
+
+    public toggleBreakpoint(blockId: string): boolean {
+        if (this.breakpoints.has(blockId)) {
+            this.breakpoints.delete(blockId);
+            return false;
+        }
+        this.breakpoints.add(blockId);
+        return true;
+    }
+
+    public hasBreakpoint(blockId: string): boolean {
+        return this.breakpoints.has(blockId);
+    }
+
+    public clearBreakpoints(): void {
+        this.breakpoints.clear();
+    }
+
+    public getBreakpoints(): Set<string> {
+        return this.breakpoints;
+    }
+
+    public setAlwaysInspect(enabled: boolean): void {
+        this.alwaysInspect = enabled;
+    }
+
+    private setState(state: ExecutorState): void {
+        this.state = state;
+        this.onStateChange?.(state);
     }
     
     private cleanup(): void {
-        this.isRunning = false;
+        this.setState('idle');
         this.terminal.setRunning(false);
         this.abortController = null;
+        this.pausePromise = null;
+        this.pauseResolve = null;
+        this.stepMode = false;
+        this.currentContext = null;
+    }
+
+    private clearAllHighlights(): void {
+        this.nodes.forEach((_, id) => {
+            this.onBlockHighlight?.(id, 'clear');
+        });
     }
     
     private findStartNode(): Node | undefined {
@@ -143,19 +230,51 @@ export class BrowserWorkflowExecutor {
             return nodeType === 'start' || nodeType === BlockType.Start.toLowerCase();
         });
     }
+
+    private currentContext: ExecutionContext | null = null;
+
+    private async waitIfPaused(nodeId?: string): Promise<void> {
+        if (this.abortController?.signal.aborted) {
+            throw new Error('Execution aborted');
+        }
+        if (this.pausePromise) {
+            await this.pausePromise;
+            if (this.abortController?.signal.aborted) {
+                throw new Error('Execution aborted');
+            }
+        }
+        if (nodeId && this.breakpoints.has(nodeId) && this.state === 'running') {
+            this.terminal.log('warning', `   ⏸ Breakpoint hit on block`);
+            this.onBlockHighlight?.(nodeId, 'executing');
+            this.setState('paused');
+            this.emitContextUpdate(this.currentContext!, nodeId);
+            this.pausePromise = new Promise<void>(resolve => {
+                this.pauseResolve = resolve;
+            });
+            await this.pausePromise;
+            if (this.abortController?.signal.aborted) {
+                throw new Error('Execution aborted');
+            }
+        }
+        if (this.stepMode) {
+            this.setState('paused');
+            if (nodeId && this.currentContext) {
+                this.emitContextUpdate(this.currentContext, nodeId);
+            }
+            this.pausePromise = new Promise<void>(resolve => {
+                this.pauseResolve = resolve;
+            });
+        }
+    }
     
-    /**
-     * Execute a single node and follow edges
-     */
     private async executeNode(node: Node, context: ExecutionContext): Promise<void> {
         if (this.abortController?.signal.aborted) {
             throw new Error('Execution aborted');
         }
-        
-        // Highlight the block being executed
-        if (this.onBlockHighlight) {
-            this.onBlockHighlight(node.id);
-        }
+
+        this.currentContext = context;
+        await this.waitIfPaused(node.id);
+        this.onBlockHighlight?.(node.id, 'executing');
         
         const startTime = Date.now();
         this.terminal.logBlockStart(node.id, node.label || node.id, String(node.type));
@@ -175,13 +294,17 @@ export class BrowserWorkflowExecutor {
         
         const duration = Date.now() - startTime;
         this.terminal.logBlockEnd(node.id, node.label || node.id, result.success, duration);
+        this.onBlockHighlight?.(node.id, result.success ? 'success' : 'fail');
         
-        // Store outputs
         if (result.outputs) {
             context.blockOutputs.set(node.id, result.outputs);
             for (const [key, value] of Object.entries(result.outputs)) {
                 context.variables.set(key, value);
             }
+        }
+
+        if (this.alwaysInspect) {
+            this.emitContextUpdate(context, node.id);
         }
         
         // Find next nodes
@@ -191,10 +314,9 @@ export class BrowserWorkflowExecutor {
         const outgoingEdges = this.edges.filter(e => 
             e.source === node.id && 
             e.type === EdgeType.Execution &&
-            (e.sourceHandle === handleToUse || e.sourceHandle === 'default' || e.sourceHandle === 'success')
+            (e.sourceHandle === handleToUse || e.sourceHandle === 'default')
         );
         
-        // Execute next nodes
         for (const edge of outgoingEdges) {
             const nextNode = this.nodes.get(edge.target);
             if (nextNode) {
@@ -202,17 +324,24 @@ export class BrowserWorkflowExecutor {
                 if (nodeType !== 'end') {
                     await this.executeNode(nextNode, context);
                 } else {
-                    // Execute End block
+                    this.onBlockHighlight?.(nextNode.id, 'executing');
                     await this.executeBlock(nextNode, context);
                     this.terminal.logBlockEnd(nextNode.id, nextNode.label || nextNode.id, true, 0);
+                    this.onBlockHighlight?.(nextNode.id, 'success');
                 }
             }
         }
     }
     
-    /**
-     * Execute a specific block type
-     */
+    private emitContextUpdate(context: ExecutionContext, currentBlockId: string): void {
+        if (!this.onContextUpdate) return;
+        const variables: Record<string, any> = {};
+        context.variables.forEach((v, k) => { variables[k] = v; });
+        const blockOutputs: Record<string, Record<string, any>> = {};
+        context.blockOutputs.forEach((v, k) => { blockOutputs[k] = v; });
+        this.onContextUpdate(variables, blockOutputs, currentBlockId);
+    }
+
     private async executeBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
         const nodeType = String(node.type).toLowerCase().replace(/-/g, '');
         
@@ -492,7 +621,6 @@ export class BrowserWorkflowExecutor {
         const data = node.data || {};
         let items: any[] = [];
         
-        // Get items to iterate
         const itemsValue = data.items || data.array || '[]';
         if (typeof itemsValue === 'string') {
             const resolved = this.resolveValue(itemsValue, context);
@@ -507,11 +635,39 @@ export class BrowserWorkflowExecutor {
         
         this.terminal.log('debug', `   🔄 Looping over ${items.length} items`);
         
-        const outputs: Record<string, any> = { items, count: items.length };
-        
-        // For now, just store items in context for connected blocks
         context.variables.set('loopItems', items);
         context.variables.set('loopCount', items.length);
+
+        const eachEdges = this.edges.filter(e =>
+            e.source === node.id &&
+            e.type === EdgeType.Execution &&
+            e.sourceHandle === 'each'
+        );
+
+        for (let i = 0; i < items.length; i++) {
+            if (this.abortController?.signal.aborted) {
+                throw new Error('Execution aborted');
+            }
+
+            context.variables.set('loopIndex', i);
+            context.variables.set('loopItem', items[i]);
+
+            this.terminal.log('info', `   🔄 Iteration ${i + 1}/${items.length}`);
+
+            for (const edge of eachEdges) {
+                const targetNode = this.nodes.get(edge.target);
+                if (targetNode) {
+                    await this.executeNode(targetNode, context);
+                }
+            }
+        }
+        
+        const outputs: Record<string, any> = {
+            items,
+            count: items.length,
+            loopIndex: items.length - 1,
+            loopItem: items[items.length - 1]
+        };
         
         return { success: true, outputs, nextHandle: 'done' };
     }
@@ -550,7 +706,7 @@ export class BrowserWorkflowExecutor {
      * Extract value using dot notation path
      */
     private extractValue(obj: any, path: string): any {
-        const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+        const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(p => p !== '');
         let current = obj;
         
         for (const part of parts) {

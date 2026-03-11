@@ -72,11 +72,19 @@ export class Navbar extends BaseComponent {
             this.settingsDropdown.on('minimapToggle', (data: { enabled: boolean }) => {
                 this.emit('minimapToggle', data);
             });
+
+            this.settingsDropdown.on('inspectorModeChange', (data: { mode: string }) => {
+                this.emit('inspectorModeChange', data);
+            });
         }
     }
 
     isMinimapEnabled(): boolean {
         return this.settingsDropdown?.isMinimapEnabled() ?? false;
+    }
+
+    getInspectorMode(): string {
+        return this.settingsDropdown?.getInspectorMode() ?? 'breakpoints';
     }
 
     private setupEventHandlers(): void {

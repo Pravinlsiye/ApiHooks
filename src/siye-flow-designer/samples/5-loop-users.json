@@ -1,0 +1,119 @@
+{
+  "id": "sample-loop-users",
+  "name": "Loop Over Users",
+  "description": "Fetches users from JSONPlaceholder and loops over each one, logging their details",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "label": "Start",
+      "data": {}
+    },
+    {
+      "id": "http_users",
+      "type": "http-request",
+      "label": "Get Users",
+      "data": {
+        "method": "GET",
+        "url": "https://jsonplaceholder.typicode.com/users"
+      }
+    },
+    {
+      "id": "var_items",
+      "type": "variable",
+      "label": "Store Users",
+      "data": {
+        "values": {
+          "users": "{{body}}"
+        }
+      }
+    },
+    {
+      "id": "loop_1",
+      "type": "loop",
+      "label": "Each User",
+      "data": {
+        "items": "{{users}}"
+      }
+    },
+    {
+      "id": "log_item",
+      "type": "log",
+      "label": "Log User",
+      "data": {
+        "message": "#{{loopIndex}} - {{loopItem}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "log_done",
+      "type": "log",
+      "label": "Loop Done",
+      "data": {
+        "message": "Processed {{loopCount}} users",
+        "level": "success"
+      }
+    },
+    {
+      "id": "end_1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "totalUsers": "{{loopCount}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "execution",
+      "source": "start_1",
+      "sourceHandle": "default",
+      "target": "http_users",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e2",
+      "type": "execution",
+      "source": "http_users",
+      "sourceHandle": "success",
+      "target": "var_items",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e3",
+      "type": "execution",
+      "source": "var_items",
+      "sourceHandle": "success",
+      "target": "loop_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e4",
+      "type": "execution",
+      "source": "loop_1",
+      "sourceHandle": "each",
+      "target": "log_item",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e5",
+      "type": "execution",
+      "source": "loop_1",
+      "sourceHandle": "done",
+      "target": "log_done",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e6",
+      "type": "execution",
+      "source": "log_done",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    }
+  ]
+}

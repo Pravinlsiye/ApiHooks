@@ -11,7 +11,12 @@ export interface FloatingToolbarCallbacks {
     onZoomOut?: () => void;
     onFitToScreen?: () => void;
     onRun?: () => void;
+    onPause?: () => void;
+    onResume?: () => void;
+    onStep?: () => void;
+    onStop?: () => void;
     onTerminalToggle?: (visible: boolean) => void;
+    onInspectorToggle?: () => void;
 }
 
 export class FloatingToolbar extends BaseComponent {
@@ -51,12 +56,32 @@ export class FloatingToolbar extends BaseComponent {
                     </button>
                 </div>
                 <div class="toolbar-separator"></div>
-                <div class="toolbar-group">
-                    <button class="toolbar-btn toolbar-btn-run" id="run-btn" title="Run Workflow">
+                <div class="toolbar-group toolbar-execution-group">
+                    <button class="toolbar-btn toolbar-btn-run" id="run-btn" title="Run Workflow (Ctrl+Enter)">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M4 2.5a.5.5 0 0 1 .724-.447l9 5.5a.5.5 0 0 1 0 .894l-9 5.5A.5.5 0 0 1 4 13.5v-11z"/>
                         </svg>
                         <span>Run</span>
+                    </button>
+                    <button class="toolbar-btn toolbar-btn-pause" id="pause-btn" title="Pause (Space)" style="display:none">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5 3h2v10H5zM9 3h2v10H9z"/>
+                        </svg>
+                    </button>
+                    <button class="toolbar-btn toolbar-btn-resume" id="resume-btn" title="Resume (Space)" style="display:none">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4 2.5a.5.5 0 0 1 .724-.447l9 5.5a.5.5 0 0 1 0 .894l-9 5.5A.5.5 0 0 1 4 13.5v-11z"/>
+                        </svg>
+                    </button>
+                    <button class="toolbar-btn toolbar-btn-step" id="step-btn" title="Step (S)" style="display:none">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4 3v10M8 8l4-3.5v7z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                    <button class="toolbar-btn toolbar-btn-stop" id="stop-btn" title="Stop (Esc)" style="display:none">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <rect x="3" y="3" width="10" height="10" rx="1"/>
+                        </svg>
                     </button>
                 </div>
                 <div class="toolbar-separator"></div>
@@ -68,13 +93,19 @@ export class FloatingToolbar extends BaseComponent {
                             <path d="M7.5 10h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                         </svg>
                     </button>
+                    <button class="toolbar-btn" id="inspector-toggle" title="Variable Inspector (I)" style="display:none">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="2" y="2" width="12" height="12" rx="2"/>
+                            <path d="M5 5h1M5 8h6M5 11h4"/>
+                            <circle cx="11" cy="5" r="1.5" fill="currentColor" stroke="none"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         `;
     }
 
     private setupEventHandlers(): void {
-        // Zoom buttons
         const zoomInBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#zoom-in');
         const zoomOutBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#zoom-out');
         const fitScreenBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#fit-screen');
@@ -98,16 +129,43 @@ export class FloatingToolbar extends BaseComponent {
             });
         }
 
-        // Run button
         const runBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#run-btn');
+        const pauseBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#pause-btn');
+        const resumeBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#resume-btn');
+        const stepBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#step-btn');
+        const stopBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#stop-btn');
+
         if (runBtn) {
             this.addEventListener(runBtn, 'click', () => {
                 this.callbacks.onRun?.();
                 this.emit('run', {});
             });
         }
+        if (pauseBtn) {
+            this.addEventListener(pauseBtn, 'click', () => {
+                this.callbacks.onPause?.();
+                this.emit('pause', {});
+            });
+        }
+        if (resumeBtn) {
+            this.addEventListener(resumeBtn, 'click', () => {
+                this.callbacks.onResume?.();
+                this.emit('resume', {});
+            });
+        }
+        if (stepBtn) {
+            this.addEventListener(stepBtn, 'click', () => {
+                this.callbacks.onStep?.();
+                this.emit('step', {});
+            });
+        }
+        if (stopBtn) {
+            this.addEventListener(stopBtn, 'click', () => {
+                this.callbacks.onStop?.();
+                this.emit('stop', {});
+            });
+        }
 
-        // Terminal toggle
         const terminalBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#terminal-toggle');
         if (terminalBtn) {
             this.addEventListener(terminalBtn, 'click', () => {
@@ -115,7 +173,14 @@ export class FloatingToolbar extends BaseComponent {
             });
         }
 
-        // Keyboard shortcuts
+        const inspectorBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#inspector-toggle');
+        if (inspectorBtn) {
+            this.addEventListener(inspectorBtn, 'click', () => {
+                this.callbacks.onInspectorToggle?.();
+                this.emit('inspectorToggle', {});
+            });
+        }
+
         this.addEventListener(document, 'keydown', (e: Event) => {
             const event = e as KeyboardEvent;
             if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
@@ -143,8 +208,66 @@ export class FloatingToolbar extends BaseComponent {
                         this.toggleTerminal();
                     }
                     break;
+                case ' ':
+                    event.preventDefault();
+                    this.emit('togglePauseResume', {});
+                    break;
+                case 's':
+                    if (!event.ctrlKey && !event.metaKey) {
+                        this.emit('step', {});
+                        this.callbacks.onStep?.();
+                    }
+                    break;
+                case 'i':
+                    if (!event.ctrlKey && !event.metaKey) {
+                        this.callbacks.onInspectorToggle?.();
+                        this.emit('inspectorToggle', {});
+                    }
+                    break;
             }
         });
+    }
+
+    updateExecutionState(state: 'idle' | 'running' | 'paused' | 'stepping'): void {
+        const runBtn = DOMUpdater.query<HTMLElement>(this.container, '#run-btn');
+        const pauseBtn = DOMUpdater.query<HTMLElement>(this.container, '#pause-btn');
+        const resumeBtn = DOMUpdater.query<HTMLElement>(this.container, '#resume-btn');
+        const stepBtn = DOMUpdater.query<HTMLElement>(this.container, '#step-btn');
+        const stopBtn = DOMUpdater.query<HTMLElement>(this.container, '#stop-btn');
+        const inspectorBtn = DOMUpdater.query<HTMLElement>(this.container, '#inspector-toggle');
+
+        if (!runBtn) return;
+
+        const show = (el: HTMLElement | null) => { if (el) el.style.display = ''; };
+        const hide = (el: HTMLElement | null) => { if (el) el.style.display = 'none'; };
+
+        switch (state) {
+            case 'idle':
+                show(runBtn);
+                hide(pauseBtn);
+                hide(resumeBtn);
+                hide(stepBtn);
+                hide(stopBtn);
+                hide(inspectorBtn);
+                break;
+            case 'running':
+                hide(runBtn);
+                show(pauseBtn);
+                hide(resumeBtn);
+                hide(stepBtn);
+                show(stopBtn);
+                hide(inspectorBtn);
+                break;
+            case 'paused':
+            case 'stepping':
+                hide(runBtn);
+                hide(pauseBtn);
+                show(resumeBtn);
+                show(stepBtn);
+                show(stopBtn);
+                show(inspectorBtn);
+                break;
+        }
     }
 
     private toggleTerminal(): void {
