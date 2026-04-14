@@ -4,10 +4,10 @@
  */
 
 import { BaseComponent } from '../utils/base-component';
-import { BlockType } from '../models/workflow-models';
+import { BlockType } from '../../models/workflow-models';
 import { getBlockIcon } from '../utils/icons';
-import { ApiDefinitionManager, apiManager } from '../api/api-definition-manager';
-import { ApiDefinition, ApiEndpoint } from '../api/api-definition-loader';
+import { ApiDefinitionManager, apiManager } from '../../api/api-definition-manager';
+import { ApiDefinition, ApiEndpoint } from '../../api/api-definition-loader';
 import { DOMDiff } from '../utils/dom-diff';
 import { DOMUpdater } from '../utils/dom-updater';
 

@@ -4,7 +4,7 @@
  */
 
 import { BaseComponent } from '../utils/base-component';
-import { VisualBlock, VisualConnection, Position } from '../models/visual-models';
+import { VisualBlock, VisualConnection, Position } from '../../models/visual-models';
 import {
     renderBlock,
     updateBlockPosition,

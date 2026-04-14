@@ -3,7 +3,7 @@
  */
 
 import { Node, Edge, EdgeType, BlockType, WorkflowDefinition } from '../models/workflow-models';
-import { TerminalPanel } from '../components/terminal-panel';
+import { TerminalPanel } from '../surface/components/terminal-panel';
 
 export type ExecutorState = 'idle' | 'running' | 'paused' | 'stepping';
 

@@ -3,8 +3,8 @@
  * Renders workflow blocks as HTML elements (divs) for better form handling
  */
 
-import { VisualBlock, VisualPort, BlockField } from '../models/visual-models';
-import { BLOCK_COLORS } from '../models/workflow-models';
+import { VisualBlock, VisualPort, BlockField } from '../../models/visual-models';
+import { BLOCK_COLORS } from '../../models/workflow-models';
 import { DOMUpdater } from '../utils/dom-updater';
 
 export interface BlockRenderCallbacks {

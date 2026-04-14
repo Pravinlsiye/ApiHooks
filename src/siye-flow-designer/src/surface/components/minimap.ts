@@ -4,7 +4,7 @@
  */
 
 import { BaseComponent } from '../utils/base-component';
-import { VisualBlock, Position } from '../models/visual-models';
+import { VisualBlock, Position } from '../../models/visual-models';
 import { DOMDiff } from '../utils/dom-diff';
 
 export class Minimap extends BaseComponent {

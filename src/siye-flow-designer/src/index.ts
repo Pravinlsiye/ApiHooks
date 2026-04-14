@@ -2,37 +2,37 @@
  * SiyeFlow Designer - Main Entry Point
  */
 
-import './styles/styles.css';
-import { CanvasRenderer } from './canvas/canvas-renderer';
-import { BlockPalette } from './components/block-palette';
-import { Navbar } from './components/navbar';
-import { FloatingToolbar } from './components/floating-toolbar';
-import { Minimap } from './components/minimap';
-import { TerminalPanel } from './components/terminal-panel';
-import { AlertModal } from './components/alert-modal';
+import './surface/styles/styles.css';
+import { CanvasRenderer } from './surface/canvas/canvas-renderer';
+import { BlockPalette } from './surface/components/block-palette';
+import { Navbar } from './surface/components/navbar';
+import { FloatingToolbar } from './surface/components/floating-toolbar';
+import { Minimap } from './surface/components/minimap';
+import { TerminalPanel } from './surface/components/terminal-panel';
+import { AlertModal } from './surface/components/alert-modal';
 import { WorkflowEngine } from './core/workflow-engine';
 import { BrowserWorkflowExecutor } from './core/browser-workflow-executor';
-import { VariableInspector } from './components/variable-inspector';
+import { VariableInspector } from './surface/components/variable-inspector';
 import { VisualBlock, VisualConnection, Position, BlockField, VisualPort } from './models/visual-models';
 import { BlockType, EdgeType } from './models/workflow-models';
-import { generateId } from './utils/dom-helpers';
+import { generateId } from './surface/utils/dom-helpers';
 
 // Export types and classes for library usage
-export { CanvasRenderer } from './canvas/canvas-renderer';
-export { BlockPalette } from './components/block-palette';
-export { Navbar } from './components/navbar';
-export { SettingsDropdown } from './components/settings-dropdown';
-export { FloatingToolbar } from './components/floating-toolbar';
-export { Minimap } from './components/minimap';
-export { TerminalPanel } from './components/terminal-panel';
-export { AlertModal } from './components/alert-modal';
-export { ConfirmModal } from './components/confirm-modal';
+export { CanvasRenderer } from './surface/canvas/canvas-renderer';
+export { BlockPalette } from './surface/components/block-palette';
+export { Navbar } from './surface/components/navbar';
+export { SettingsDropdown } from './surface/components/settings-dropdown';
+export { FloatingToolbar } from './surface/components/floating-toolbar';
+export { Minimap } from './surface/components/minimap';
+export { TerminalPanel } from './surface/components/terminal-panel';
+export { AlertModal } from './surface/components/alert-modal';
+export { ConfirmModal } from './surface/components/confirm-modal';
 export { WorkflowEngine } from './core/workflow-engine';
 export { BrowserWorkflowExecutor } from './core/browser-workflow-executor';
 export * from './models/workflow-models';
 export * from './models/visual-models';
-export { renderBlock, getPortPosition } from './renderers/block-renderer';
-export { renderConnection, updateConnection } from './renderers/connection-renderer';
+export { renderBlock, getPortPosition } from './surface/renderers/block-renderer';
+export { renderConnection, updateConnection } from './surface/renderers/connection-renderer';
 export { apiManager } from './api/api-definition-manager';
 
 export interface DesignerOptions {

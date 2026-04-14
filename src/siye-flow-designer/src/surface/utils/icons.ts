@@ -2,7 +2,7 @@
  * SVG Icon utilities for block types
  */
 
-import { BlockType } from '../models/workflow-models';
+import { BlockType } from '../../models/workflow-models';
 
 /**
  * SVG icon definitions (24x24 viewBox)

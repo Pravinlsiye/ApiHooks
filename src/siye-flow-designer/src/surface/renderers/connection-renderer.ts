@@ -3,7 +3,7 @@
  * Renders connections as smooth SVG bezier curves with delete button on hover
  */
 
-import { VisualConnection } from '../models/visual-models';
+import { VisualConnection } from '../../models/visual-models';
 import { connectionPathToSVG, getBezierMidpoint, getConnectionBoundingBox } from '../utils/connection-path';
 import { createSVGElement, setSVGAttributes } from '../utils/dom-helpers';
 

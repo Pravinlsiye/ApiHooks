@@ -328,3 +328,5 @@ src/SiyeFlow.UI/UI/_siyeflow/
 
 # SiyeFlow.CLI - Documentation (if auto-generated)
 cli/SiyeFlow.CLI/docs/
+
+/sample-ui.ignore
