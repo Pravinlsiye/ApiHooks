@@ -15,12 +15,13 @@ export class ApiDefinitionManager {
     /**
      * Load API definition from URL
      */
-    async loadFromUrl(url: string): Promise<ApiDefinition> {
+    async loadFromUrl(url: string, options?: { locked?: boolean }): Promise<ApiDefinition> {
         try {
             const api = await ApiDefinitionLoader.loadFromUrl(url);
+            if (options?.locked) api.locked = true;
             this.apiDefinitions.set(api.id, api);
             this.notifyChange();
-            this.saveToStorage();
+            if (!api.locked) this.saveToStorage();
             return api;
         } catch (error) {
             throw new Error(`Failed to load API from ${url}: ${error}`);

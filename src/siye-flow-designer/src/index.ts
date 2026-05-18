@@ -2,37 +2,38 @@
  * SiyeFlow Designer - Main Entry Point
  */
 
-import './styles/styles.css';
-import { CanvasRenderer } from './canvas/canvas-renderer';
-import { BlockPalette } from './components/block-palette';
-import { Navbar } from './components/navbar';
-import { FloatingToolbar } from './components/floating-toolbar';
-import { Minimap } from './components/minimap';
-import { TerminalPanel } from './components/terminal-panel';
-import { AlertModal } from './components/alert-modal';
+import './surface/styles/styles.css';
+import { CanvasRenderer } from './surface/canvas/canvas-renderer';
+import { BlockPalette } from './surface/components/block-palette';
+import { Navbar } from './surface/components/navbar';
+import { FloatingToolbar } from './surface/components/floating-toolbar';
+import { Minimap } from './surface/components/minimap';
+import { TerminalPanel } from './surface/components/terminal-panel';
+import { AlertModal } from './surface/components/alert-modal';
 import { WorkflowEngine } from './core/workflow-engine';
 import { BrowserWorkflowExecutor } from './core/browser-workflow-executor';
-import { VariableInspector } from './components/variable-inspector';
+import { VariableInspector } from './surface/components/variable-inspector';
 import { VisualBlock, VisualConnection, Position, BlockField, VisualPort } from './models/visual-models';
 import { BlockType, EdgeType } from './models/workflow-models';
-import { generateId } from './utils/dom-helpers';
+import { generateId } from './surface/utils/dom-helpers';
 
 // Export types and classes for library usage
-export { CanvasRenderer } from './canvas/canvas-renderer';
-export { BlockPalette } from './components/block-palette';
-export { Navbar } from './components/navbar';
-export { SettingsDropdown } from './components/settings-dropdown';
-export { FloatingToolbar } from './components/floating-toolbar';
-export { Minimap } from './components/minimap';
-export { TerminalPanel } from './components/terminal-panel';
-export { AlertModal } from './components/alert-modal';
-export { ConfirmModal } from './components/confirm-modal';
+export { CanvasRenderer } from './surface/canvas/canvas-renderer';
+export { BlockPalette } from './surface/components/block-palette';
+export { Navbar } from './surface/components/navbar';
+export { SettingsDropdown } from './surface/components/settings-dropdown';
+export { FloatingToolbar } from './surface/components/floating-toolbar';
+export { Minimap } from './surface/components/minimap';
+export { TerminalPanel } from './surface/components/terminal-panel';
+export { AlertModal } from './surface/components/alert-modal';
+export { ConfirmModal } from './surface/components/confirm-modal';
 export { WorkflowEngine } from './core/workflow-engine';
 export { BrowserWorkflowExecutor } from './core/browser-workflow-executor';
 export * from './models/workflow-models';
 export * from './models/visual-models';
-export { renderBlock, getPortPosition } from './renderers/block-renderer';
-export { renderConnection, updateConnection } from './renderers/connection-renderer';
+export { renderBlock, getPortPosition } from './surface/renderers/block-renderer';
+export { renderConnection, updateConnection } from './surface/renderers/connection-renderer';
+export { apiManager } from './api/api-definition-manager';
 
 export interface DesignerOptions {
     canvasContainerId: string;
@@ -59,7 +60,6 @@ export class WorkflowDesigner {
     private inspector: VariableInspector;
     private blocks: Map<string, VisualBlock> = new Map();
     private connections: Map<string, VisualConnection> = new Map();
-    private selectedBlockId: string | null = null;
     private blockHighlights: Map<string, 'executing' | 'success' | 'fail'> = new Map();
 
     constructor(options: DesignerOptions | string, paletteContainerId?: string) {
@@ -85,6 +85,7 @@ export class WorkflowDesigner {
 
         if (opts.floatingToolbarContainerId) {
             this.floatingToolbar = new FloatingToolbar(opts.floatingToolbarContainerId, {
+                onSelectCanvasTool: (tool) => this.canvas.setTool(tool),
                 onZoomIn: () => this.canvas.zoomIn(),
                 onZoomOut: () => this.canvas.zoomOut(),
                 onFitToScreen: () => this.canvas.fitToScreen(),
@@ -96,6 +97,11 @@ export class WorkflowDesigner {
                 onTerminalToggle: (visible) => this.toggleTerminal(visible),
                 onInspectorToggle: () => this.inspector.toggle()
             });
+
+            this.canvas.on('toolChange', (data: { tool: 'pointer' | 'hand' }) => {
+                this.floatingToolbar?.setCanvasToolIndicator(data.tool);
+            });
+            this.floatingToolbar.setCanvasToolIndicator(this.canvas.getTool());
 
             this.floatingToolbar.on('togglePauseResume', () => {
                 if (!this.executor) return;
@@ -578,6 +584,16 @@ export class WorkflowDesigner {
             targetBlockId: string;
             targetPortName: string;
         }) => {
+            const duplicate = [...this.connections.values()].some(
+                (c) =>
+                    c.sourceBlockId === data.sourceBlockId &&
+                    c.sourcePortName === data.sourcePortName &&
+                    c.targetBlockId === data.targetBlockId &&
+                    c.targetPortName === data.targetPortName
+            );
+            if (duplicate) {
+                return;
+            }
             const connection: VisualConnection = {
                 id: generateId('conn'),
                 type: EdgeType.Execution,
@@ -595,8 +611,8 @@ export class WorkflowDesigner {
             this.canvas.removeConnection(data.connectionId);
         });
 
-        this.canvas.on('blockSelect', (data: { blockId: string }) => {
-            this.selectedBlockId = data.blockId;
+        this.canvas.on('blockSelect', (_data: { blockId: string }) => {
+            void _data;
         });
 
         this.canvas.on('breakpointToggle', (data: { blockId: string }) => {
@@ -617,6 +633,14 @@ export class WorkflowDesigner {
         this.canvas.on('fieldChange', (data: { blockId: string; fieldName: string; value: string }) => {
             const block = this.blocks.get(data.blockId);
             if (block) {
+                // Parse JSON for keyvalue fields
+                try {
+                    const parsed = JSON.parse(data.value);
+                    if (typeof parsed === 'object' && parsed !== null) {
+                        block.fieldValues[data.fieldName] = parsed;
+                        return;
+                    }
+                } catch { /* not JSON, store as string */ }
                 block.fieldValues[data.fieldName] = data.value;
             }
         });
@@ -724,12 +748,44 @@ export class WorkflowDesigner {
             const blockType = e.dataTransfer?.getData('text/plain') as BlockType;
             if (!blockType) return;
 
-            // Calculate drop position relative to canvas
             const rect = canvasWrapper.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            // Add block at drop position
+            // Check for API endpoint data
+            const jsonData = e.dataTransfer?.getData('application/json');
+            if (jsonData && blockType === BlockType.HttpRequest) {
+                try {
+                    const endpoint = JSON.parse(jsonData);
+                    const block = this.addBlock(blockType, { x, y }, endpoint.summary || endpoint.path);
+
+                    const url = (endpoint.baseUrl || '') + endpoint.path;
+                    block.fieldValues['method'] = endpoint.method || 'GET';
+                    block.fieldValues['url'] = url;
+
+                    if (endpoint.parameters) {
+                        const params: Record<string, string> = {};
+                        for (const p of endpoint.parameters) {
+                            params[p.name] = `{{${p.name}}}`;
+                        }
+                        if (Object.keys(params).length > 0) {
+                            block.fieldValues['parameters'] = params;
+                        }
+                    }
+
+                    if (endpoint.requestBody) {
+                        block.fieldValues['body'] = endpoint.requestBody;
+                    }
+
+                    if (endpoint.summary) {
+                        block.fieldValues['description'] = endpoint.summary;
+                    }
+
+                    this.render();
+                    return;
+                } catch { /* fall through to plain block */ }
+            }
+
             this.addBlock(blockType, { x, y });
         });
     }
@@ -820,8 +876,12 @@ function createDefaultBlock(type: BlockType, position: Position, name?: string):
     const id = generateId('block');
 
     const defaultFields: Record<BlockType, BlockField[]> = {
-        [BlockType.Start]: [],
-        [BlockType.End]: [],
+        [BlockType.Start]: [
+            { name: 'values', label: 'Variables', type: 'keyvalue' }
+        ],
+        [BlockType.End]: [
+            { name: 'outputs', label: 'Outputs', type: 'keyvalue' }
+        ],
         [BlockType.HttpRequest]: [
             { name: 'method', label: 'Method', type: 'select', options: ['GET', 'POST', 'PUT', 'DELETE'], value: 'GET' },
             { name: 'url', label: 'URL', type: 'text', placeholder: 'https://api.example.com' }
@@ -961,8 +1021,8 @@ function getBlockTypeName(type: BlockType): string {
     return names[type] || type;
 }
 
-// Auto-initialize if container exists
-if (typeof document !== 'undefined') {
+// Auto-initialize only in standalone dev mode (not when embedded via UMD)
+if (typeof document !== 'undefined' && !(window as any).SiyeFlowConfig) {
     document.addEventListener('DOMContentLoaded', () => {
         const canvasContainer = document.getElementById('canvas-container');
         const paletteContainer = document.getElementById('palette-container');

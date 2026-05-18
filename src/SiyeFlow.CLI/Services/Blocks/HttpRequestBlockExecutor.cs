@@ -97,8 +97,10 @@ namespace SiyeFlow.CLI.Services.Blocks
 
             var outputs = new Dictionary<string, object>
             {
-                ["status"] = statusCode,
+                ["statusCode"] = statusCode,
+                ["status"] = response.StatusCode.ToString(),
                 ["body"] = responseData ?? new { },
+                ["response"] = responseData ?? new { },
                 ["headers"] = response.Headers.ToDictionary(h => h.Key, h => string.Join(", ", h.Value))
             };
 

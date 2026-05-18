@@ -1,10 +1,12 @@
 /**
  * Canvas Renderer
- * Manages the workflow canvas with HTML blocks and SVG connections
+ * Manages the workflow canvas with HTML blocks and SVG connections.
+ * Interaction parity targets common node-editor expectations (Drawflow-style):
+ * hand/pointer tools, middle-mouse pan, Ctrl+wheel zoom, pointer events for touch.
  */
 
 import { BaseComponent } from '../utils/base-component';
-import { VisualBlock, VisualConnection, Position } from '../models/visual-models';
+import { VisualBlock, VisualConnection, Position } from '../../models/visual-models';
 import {
     renderBlock,
     updateBlockPosition,
@@ -172,12 +174,18 @@ export class CanvasRenderer extends BaseComponent {
     }
 
     private setupEventListeners(): void {
-        // Mouse move handler (throttled for performance using DOMDiff)
-        const throttledMouseMove = DOMDiff.throttle((e: MouseEvent) => this.handleMouseMove(e), 16);
+        const throttledPointerMove = DOMDiff.throttle((e: PointerEvent) => this.handlePointerMove(e), 16);
 
-        this.addEventListener(document, 'mousemove', throttledMouseMove as EventListener);
-        this.addEventListener(document, 'mouseup', (e) => this.handleMouseUp(e as MouseEvent));
-        this.addEventListener(this.canvasWrapper, 'mousedown', (e) => this.handleCanvasMouseDown(e as MouseEvent));
+        this.addEventListener(document, 'pointermove', throttledPointerMove as EventListener);
+        this.addEventListener(document, 'pointerup', (e) => this.handlePointerUp(e as PointerEvent));
+        this.addEventListener(document, 'pointercancel', (e) => this.handlePointerUp(e as PointerEvent));
+        this.addEventListener(this.canvasWrapper, 'pointerdown', (e) => this.handleCanvasPointerDown(e as PointerEvent));
+        this.addEventListener(this.canvasWrapper, 'wheel', (e) => this.handleCanvasWheel(e as WheelEvent), { passive: false });
+        this.addEventListener(this.canvasWrapper, 'auxclick', (e) => {
+            if ((e as MouseEvent).button === 1) {
+                e.preventDefault();
+            }
+        });
 
         // Prevent text selection during drag/connection operations
         this.addEventListener(this.canvasWrapper, 'selectstart', (e) => {
@@ -201,6 +209,12 @@ export class CanvasRenderer extends BaseComponent {
             if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
                 return;
             }
+
+            if (keyEvent.key === 'Escape' && this.connectionState.isCreating) {
+                keyEvent.preventDefault();
+                this.cancelConnectionCreation();
+                return;
+            }
             
             // Delete: Delete or Backspace
             if ((keyEvent.key === 'Delete' || keyEvent.key === 'Backspace') && this.selectedBlockId) {
@@ -219,6 +233,8 @@ export class CanvasRenderer extends BaseComponent {
                 this.selectBlock(null);
             }
         });
+
+        this.setTool('hand');
     }
 
     /**
@@ -260,7 +276,7 @@ export class CanvasRenderer extends BaseComponent {
 
     private renderBlockElement(block: VisualBlock): HTMLElement {
         const callbacks: BlockRenderCallbacks = {
-            onBlockMouseDown: (blockId, event) => this.handleBlockMouseDown(blockId, event),
+            onBlockMouseDown: (blockId, event) => this.handleBlockPointerDown(blockId, event),
             onPortMouseDown: (blockId, portName, portType, event) => {
                 if (portType === 'output') {
                     this.startConnectionCreation(blockId, portName, event);
@@ -328,12 +344,18 @@ export class CanvasRenderer extends BaseComponent {
         });
     }
 
-    private handleBlockMouseDown(blockId: string, event: MouseEvent): void {
+    private handleBlockPointerDown(blockId: string, event: PointerEvent): void {
         event.stopPropagation();
 
         const block = this.blocks.get(blockId);
         const blockEl = this.blockElements.get(blockId);
         if (!block || !blockEl) return;
+
+        try {
+            blockEl.setPointerCapture(event.pointerId);
+        } catch {
+            /* ignore if capture unsupported */
+        }
 
         const rect = blockEl.getBoundingClientRect();
 
@@ -355,7 +377,7 @@ export class CanvasRenderer extends BaseComponent {
         });
     }
 
-    private handleMouseMove(event: MouseEvent): void {
+    private handlePointerMove(event: PointerEvent): void {
         if (this.panState.isPanning) {
             this.handlePanning(event);
         } else if (this.dragState.isDragging && this.dragState.blockId) {
@@ -365,7 +387,7 @@ export class CanvasRenderer extends BaseComponent {
         }
     }
 
-    private handleBlockDrag(event: MouseEvent): void {
+    private handleBlockDrag(event: PointerEvent): void {
         const blockId = this.dragState.blockId!;
         const block = this.blocks.get(blockId);
         const blockEl = this.blockElements.get(blockId);
@@ -392,7 +414,7 @@ export class CanvasRenderer extends BaseComponent {
         this.emit('blockMove', { blockId, position: { x: newX, y: newY } });
     }
 
-    private handlePanning(event: MouseEvent): void {
+    private handlePanning(event: PointerEvent): void {
         const deltaX = event.clientX - this.panState.start.x;
         const deltaY = event.clientY - this.panState.start.y;
 
@@ -405,7 +427,7 @@ export class CanvasRenderer extends BaseComponent {
         this.emit('panChange', { offset: { ...this.panState.offset } });
     }
 
-    private handleMouseUp(_event: MouseEvent): void {
+    private handlePointerUp(_event: PointerEvent): void {
         if (this.panState.isPanning) {
             this.panState.isPanning = false;
             this.canvasWrapper.classList.remove('panning');
@@ -421,24 +443,41 @@ export class CanvasRenderer extends BaseComponent {
         }
     }
 
-    private handleCanvasMouseDown(event: MouseEvent): void {
+    private handleCanvasPointerDown(event: PointerEvent): void {
         const target = event.target as HTMLElement;
 
-        // Don't pan or deselect if clicking on interactive elements
-        if (target.closest('.workflow-block') ||
-            target.closest('.port-tab') ||
-            target.closest('.connection-line') ||
-            target.closest('.block-toolbar')) {
+        if (target.closest('.block-toolbar')) {
             return;
         }
 
-        // Deselect any selected block when clicking on empty canvas
+        const onBlockChrome =
+            target.closest('.workflow-block') ||
+            target.closest('.port-tab') ||
+            target.closest('.connection-line');
+
+        if (event.button === 1) {
+            if (!this.canvasWrapper.contains(target)) return;
+            event.preventDefault();
+            this.panState.isPanning = true;
+            this.panState.start.x = event.clientX;
+            this.panState.start.y = event.clientY;
+            this.canvasWrapper.classList.add('panning');
+            return;
+        }
+
+        if (event.button !== 0) {
+            return;
+        }
+
+        if (onBlockChrome) {
+            return;
+        }
+
         if (this.selectedBlockId) {
             this.selectBlock(null);
         }
 
-        // Start panning
-        if (event.button === 0) {
+        if (this.currentTool === 'hand') {
             event.preventDefault();
             this.panState.isPanning = true;
             this.panState.start.x = event.clientX;
@@ -447,7 +486,19 @@ export class CanvasRenderer extends BaseComponent {
         }
     }
 
-    private startConnectionCreation(blockId: string, portName: string, event: MouseEvent): void {
+    private handleCanvasWheel(event: WheelEvent): void {
+        if (!event.ctrlKey && !event.metaKey) {
+            return;
+        }
+        event.preventDefault();
+        const delta = event.deltaY > 0 ? -this.zoomStep : this.zoomStep;
+        this.setZoom(this.currentZoom + delta);
+    }
+
+    private startConnectionCreation(blockId: string, portName: string, event: PointerEvent): void {
+        if (event.button !== 0) {
+            return;
+        }
         event.preventDefault(); // Prevent text selection
 
         const blockEl = this.blockElements.get(blockId);
@@ -477,7 +528,7 @@ export class CanvasRenderer extends BaseComponent {
         this.connectionState.previewElement = preview;
     }
 
-    private handleConnectionPreview(event: MouseEvent): void {
+    private handleConnectionPreview(event: PointerEvent): void {
         if (!this.connectionState.previewElement || !this.connectionState.startPosition) return;
 
         const wrapperRect = this.canvasWrapper.getBoundingClientRect();
@@ -666,7 +717,7 @@ export class CanvasRenderer extends BaseComponent {
     private readonly minZoom: number = 0.25;
     private readonly maxZoom: number = 2;
     private readonly zoomStep: number = 0.1;
-    private currentTool: 'pointer' | 'hand' = 'pointer';
+    private currentTool: 'pointer' | 'hand' = 'hand';
 
     /**
      * Zoom in the canvas

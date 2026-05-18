@@ -1,50 +1,37 @@
 # Demo APIs
 
-This directory contains sample APIs for testing SiyeFlow CLI workflows.
+Sample APIs used to test SiyeFlow end-to-end. Each demo project is a normal ASP.NET Core Web API that also embeds the SiyeFlow designer.
 
-## 📁 Available APIs
+## api1 — SiyeFlow.TestApi
 
-### api1 - SiyeFlow Test API
-A simple ASP.NET Core Web API with:
-- User management (CRUD operations)
-- Post management (CRUD operations)
-- In-memory data storage
-- Swagger UI documentation
+Projects + Jobs CRUD on top of in-memory storage. Includes Swagger and the SiyeFlow designer at `/workflows`.
 
-**Start the API:**
 ```bash
-cd api1
+cd demo/api1
 dotnet run
 ```
 
-**Access:**
-- HTTP: http://localhost:5216
-- Swagger: http://localhost:5216/swagger
+| URL | Purpose |
+| --- | --- |
+| http://localhost:5216 | API root |
+| http://localhost:5216/swagger | Swagger UI |
+| http://localhost:5216/workflows | SiyeFlow designer (auto-loads this API's Swagger) |
 
-## 🧪 Testing with SiyeFlow CLI
+See [api1/README.md](api1/README.md) for endpoints and sample data.
 
-From the `cli` directory:
+## Run a workflow from the CLI
+
+Sample workflows live in [`src/siye-flow-designer/samples/`](../src/siye-flow-designer/samples). From the repo root:
 
 ```bash
-# Using the test script
-./run-local-test.ps1
-
-# Or manually
-cd SiyeFlow.CLI
-dotnet run -- --api ./samples/openapi-local.json --flow ./samples/flow-local-test.json
+dotnet run --project src/SiyeFlow.CLI -- \
+    execute --workflow src/siye-flow-designer/samples/1-cat-fact.json
 ```
 
-## 🚀 Adding New APIs
+## Adding a new demo API
 
-To add new test APIs:
-
-1. Create a new directory: `demo/api2`, `demo/api3`, etc.
-2. Add your API implementation
-3. Create corresponding OpenAPI specification
-4. Add workflow examples in `cli/SiyeFlow.CLI/samples/`
-
-Each API should include:
-- OpenAPI 3.0 specification
-- README documentation
-- Sample data or seed scripts
-- Different port configuration to avoid conflicts
+1. Create `demo/api2/` (or similar) as a fresh `dotnet new webapi` project.
+2. Add `<ProjectReference Include="..\..\src\SiyeFlow.UI\SiyeFlow.UI.csproj" />`.
+3. Wire `builder.Services.AddSiyeFlowDesigner(...)` and `app.UseSiyeFlowDesigner()`.
+4. Pick a port that doesn't clash with `api1` (5216).
+5. Register the new project in [SiyeFlow.sln](../SiyeFlow.sln).

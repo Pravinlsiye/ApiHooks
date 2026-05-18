@@ -1,287 +1,104 @@
-# SiyeFlow CLI
+# SiyeFlow.CLI
 
-A powerful block-based workflow automation tool for APIs. Design workflows visually, execute them via CLI.
+.NET command-line runner for workflow JSON produced by the SiyeFlow designer. Targets `net10.0`.
 
-## Features
+> CLI execution is partial — see [docs/PROGRESS.md](../../docs/PROGRESS.md). The browser executor in `siye-flow-designer` is the most complete runtime today.
 
-✨ **Block-Based Architecture** - Modular, reusable workflow blocks
-🔧 **Multiple Block Types** - HTTP requests, conditions, loops, data processing
-📊 **Data Transformation** - JSONPath extraction and TypeScript evaluation
-🔄 **Flow Control** - Conditional branching, loops, try/catch error handling
-⏱️ **Timing Control** - Delays, retries, timeouts
-📝 **Debugging** - Built-in logging blocks and detailed execution traces
-🎯 **Type Safety** - Start/End blocks define clear input/output contracts
-
-## Installation
+## Build
 
 ```bash
 cd src/SiyeFlow.CLI
 dotnet build
 ```
 
-## Usage
-
-### Execute a Workflow
+## Commands
 
 ```bash
-# Basic execution (API definition is optional!)
-dotnet run -- execute --workflow workflow.json
+# Execute a saved workflow
+dotnet run -- execute --workflow path/to/workflow.json
 
-# With API definition (for validation, operationId lookup, etc.)
+# Optional: pass an OpenAPI definition for richer validation
 dotnet run -- execute --workflow workflow.json --api openapi.json
 
-# With inputs
-dotnet run -- execute -w workflow.json --inputs '{"projectName": "My Project"}'
+# Pass runtime inputs
+dotnet run -- execute -w workflow.json --inputs '{"projectName":"My Project"}'
 
-# Dry run mode
+# Dry run — show what would happen
 dotnet run -- execute -w workflow.json --dry-run
 
-# Save results
+# Save execution output
 dotnet run -- execute -w workflow.json --output results.json
 
-# Verbose logging
-dotnet run -- execute -w workflow.json -a api.json --verbose
-```
-
-### Validate a Workflow
-
-```bash
 # Validate structure
 dotnet run -- validate --workflow workflow.json
 
-# Validate with API
-dotnet run -- validate -w workflow.json -a api.json
+# Generate docs from workflow JSON
+dotnet run -- docs --workflow workflow.json --output ./out
 ```
 
-### Generate Documentation
+Try one of the bundled samples from the designer:
 
 ```bash
-# Single workflow
-dotnet run -- docs --workflow workflow.json
-
-# All workflows in directory
-dotnet run -- docs -w ./workflows --output ./docs
+dotnet run -- execute --workflow ../siye-flow-designer/samples/1-cat-fact.json
 ```
 
-## Workflow Schema
+## Workflow shape
 
-### Basic Structure
+Workflows use the v2.0 node-edge schema — same shape as the designer. Full reference: [docs/WORKFLOW_SCHEMA.md](../../docs/WORKFLOW_SCHEMA.md). Source of truth: [`workflow-models.ts`](../siye-flow-designer/src/models/workflow-models.ts).
 
 ```json
 {
-  "name": "My Workflow",
-  "description": "Description of the workflow",
-  "blocks": [
+  "id": "wf-1",
+  "name": "Cat Fact",
+  "version": "2.0.0",
+  "nodes": [
+    { "id": "start_1", "type": "start", "data": {} },
     {
-      "id": "unique-id",
-      "type": "block-type",
-      "name": "Human readable name",
-      "config": { /* block-specific config */ },
-      "inputs": { /* input mappings */ },
-      "outputs": { /* output mappings */ },
-      "onSuccess": "next-block-id",
-      "onFailure": "error-block-id"
-    }
-  ]
-}
-```
-
-### Block Types
-
-#### Start Block
-```json
-{
-  "id": "start",
-  "type": "start",
-  "config": {
-    "inputs": {
-      "orderId": { "type": "string", "required": true },
-      "options": { "type": "object", "required": false }
-    }
-  }
-}
-```
-
-#### HTTP Request Block
-```json
-{
-  "id": "fetch-data",
-  "type": "http-request",
-  "config": {
-    "method": "GET",
-    "url": "{{baseUrl}}/api/orders/{{orderId}}",
-    "headers": { "Authorization": "Bearer {{token}}" },
-    "retries": 3
-  },
-  "outputs": {
-    "orderId": "$.id",
-    "customerName": "$.customer.name",
-    "items": "$.items[*]",
-    "firstItem": "$.items[0]"
-  }
-}
-```
-
-#### Condition Block
-```json
-{
-  "id": "check-status",
-  "type": "condition",
-  "config": {
-    "expression": "inputs.order.status === 'pending'"
-  },
-  "branches": {
-    "true": "process-order",
-    "false": "skip-order"
-  }
-}
-```
-
-#### Loop Block
-```json
-{
-  "id": "process-items",
-  "type": "loop",
-  "config": {
-    "items": "{{order.items}}",
-    "parallel": true,
-    "maxConcurrency": 5
-  },
-  "loopBody": "process-single-item"
-}
-```
-
-#### Evaluate Block (JSONPath)
-```json
-{
-  "id": "extract-data",
-  "type": "evaluate",
-  "config": {
-    "language": "jsonpath",
-    "expressions": {
-      "total": "$.order.total",
-      "items": "$.order.items[*]"
-    }
-  }
-}
-```
-
-#### Evaluate Block (TypeScript)
-```json
-{
-  "id": "calculate",
-  "type": "evaluate",
-  "config": {
-    "language": "typescript",
-    "code": "return inputs.items.reduce((sum, item) => sum + item.price, 0);"
-  }
-}
-```
-
-## Example Workflow
-
-```json
-{
-  "name": "Order Processing",
-  "description": "Process an order with error handling",
-  "blocks": [
-    {
-      "id": "start",
-      "type": "start",
-      "config": {
-        "inputs": {
-          "orderId": { "type": "string", "required": true }
-        }
-      },
-      "onSuccess": "fetch-order"
-    },
-    {
-      "id": "fetch-order",
+      "id": "http_1",
       "type": "http-request",
-      "config": {
+      "data": {
         "method": "GET",
-        "url": "/api/orders/{{orderId}}"
-      },
-      "outputs": {
-        "order": "$.response"
-      },
-      "onSuccess": "check-status",
-      "onFailure": "handle-error"
-    },
-    {
-      "id": "check-status",
-      "type": "condition",
-      "config": {
-        "expression": "inputs.order.status === 'pending'"
-      },
-      "branches": {
-        "true": "process-order",
-        "false": "end"
+        "url": "https://catfact.ninja/fact",
+        "outputs": { "catFact": "$.fact" }
       }
     },
-    {
-      "id": "process-order",
-      "type": "http-request",
-      "config": {
-        "method": "POST",
-        "url": "/api/orders/{{orderId}}/process",
-        "body": { "action": "approve" }
-      },
-      "onSuccess": "end",
-      "onFailure": "handle-error"
-    },
-    {
-      "id": "handle-error",
-      "type": "log",
-      "config": {
-        "level": "error",
-        "message": "Failed to process order {{orderId}}"
-      },
-      "onSuccess": "end"
-    },
-    {
-      "id": "end",
-      "type": "end",
-      "config": {
-        "outputs": {
-          "success": { "type": "boolean", "value": "{{success}}" },
-          "order": { "type": "object", "value": "{{order}}" }
-        }
-      }
-    }
+    { "id": "end_1", "type": "end", "data": { "outputs": { "fact": "{{catFact}}" } } }
+  ],
+  "edges": [
+    { "id": "e1", "type": "execution", "source": "start_1", "sourceHandle": "default", "target": "http_1", "targetHandle": "trigger" },
+    { "id": "e2", "type": "execution", "source": "http_1", "sourceHandle": "success", "target": "end_1", "targetHandle": "trigger" }
   ]
 }
 ```
 
-## Variable System
+## Variables
 
-### Variable References
-- `{{variableName}}` - Simple variable reference
-- `{{object.property}}` - Nested property access
-- `{{array[0]}}` - Array index access
+- `{{name}}` — string interpolation in URLs, headers, bodies, expressions.
+- `{{a.b.c}}` — nested property access.
+- `$.path.to.value` — JSONPath against an HTTP response, stored under an output key.
 
-### Special Variables
-- `{{$timestamp}}` - Current timestamp
-- `{{$workflowId}}` - Workflow identifier
-- `{{$loopIndex}}` - Current loop iteration (in loops)
-- `{{$loopItem}}` - Current item (in loops)
-- `{{$error}}` - Error object (in catch blocks)
+Loop blocks expose `loopIndex`, `loopItem`, and `loopCount` to their body.
+
+## Dependencies
+
+Listed in [`SiyeFlow.CLI.csproj`](SiyeFlow.CLI.csproj):
+
+- `Microsoft.Extensions.DependencyInjection` 10.0.8
+- `Microsoft.Extensions.Http` 10.0.8
+- `Microsoft.Extensions.Logging.Console` 10.0.8
+- `System.CommandLine` 2.0.0-beta4 (kept on beta until GA migration)
+- `Microsoft.OpenApi.Readers` 1.6.29
+- `Newtonsoft.Json` 13.0.4
 
 ## Architecture
 
-The CLI uses a modular block-based architecture:
+```
+SiyeFlow.CLI/
+├── Program.cs                 # System.CommandLine entry point
+├── Interfaces/                # IBlockExecutor, IWorkflowExecutor, ...
+├── Services/                  # VariableStore, WorkflowExecutor, block executors
+├── Models/                    # CLI-side DTOs
+└── Utils/                     # Logging, JSON helpers
+```
 
-- **Blocks** - Self-contained units of work
-- **Block Executors** - Execute specific block types
-- **Variable Store** - Manages variables and evaluations
-- **Workflow Executor** - Orchestrates block execution
-
-## Contributing
-
-1. Add new block types in `Services/Blocks/`
-2. Register in `BlockRegistry`
-3. Update documentation
-
-## License
-
-Part of the SiyeFlow project
+Part of the SiyeFlow project — see the [root README](../../README.md).

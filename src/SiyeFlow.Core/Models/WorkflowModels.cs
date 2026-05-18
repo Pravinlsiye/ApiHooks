@@ -43,15 +43,8 @@ namespace SiyeFlow.Core.Models
         [EnumMember(Value = "sub-workflow")]
         SubWorkflow,
 
-        // Legacy / Deprecated
         [EnumMember(Value = "condition")]
-        Condition,
-        [EnumMember(Value = "collect")]
-        Collect,
-        [EnumMember(Value = "try-catch")]
-        TryCatch,
-        [EnumMember(Value = "workflow")]
-        Workflow
+        Condition
     }
 
     public enum EdgeType

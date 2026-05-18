@@ -12,6 +12,7 @@ export default defineConfig({
     lib: {
       entry: path.resolve(__dirname, 'src/index.ts'),
       name: 'SiyeFlowDesigner',
+      formats: ['umd', 'es'],
       fileName: (format) => `siye-flow-designer.${format}.js`,
     },
     cssCodeSplit: false,
@@ -19,6 +20,7 @@ export default defineConfig({
       external: [],
       output: {
         globals: {},
+        inlineDynamicImports: true,
         assetFileNames: (assetInfo) => {
           if (assetInfo.name === 'style.css') {
             return 'style.css';

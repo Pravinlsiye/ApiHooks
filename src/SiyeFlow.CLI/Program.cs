@@ -310,8 +310,6 @@ namespace SiyeFlow.CLI
             services.AddScoped<ConditionBlockExecutor>();
             services.AddScoped<LoopBlockExecutor>();
             services.AddScoped<EvaluateBlockExecutor>();
-            services.AddScoped<TryCatchBlockExecutor>();
-            services.AddScoped<CollectBlockExecutor>();
             services.AddScoped<SubWorkflowBlockExecutor>();
 
             // Workflow executor

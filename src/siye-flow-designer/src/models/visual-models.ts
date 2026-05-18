@@ -27,7 +27,7 @@ export interface VisualPort {
 export interface BlockField {
     name: string;
     label?: string;
-    type: 'text' | 'select' | 'number' | 'checkbox';
+    type: 'text' | 'select' | 'number' | 'checkbox' | 'keyvalue';
     placeholder?: string;
     value?: string;
     options?: Array<string | { value: string; label: string }>;

@@ -62,20 +62,20 @@ export interface Edge {
     targetHandle: string;
 }
 
-// Block colors
+/** Neutral header accent per block (monochrome UI). */
 export const BLOCK_COLORS: Record<BlockType, string> = {
-    [BlockType.Start]: '#4CAF50',
-    [BlockType.End]: '#f44336',
-    [BlockType.HttpRequest]: '#2196F3',
-    [BlockType.Variable]: '#FF9800',
-    [BlockType.Switch]: '#9C27B0',
-    [BlockType.Condition]: '#9C27B0',
-    [BlockType.Delay]: '#00BCD4',
-    [BlockType.Log]: '#607D8B',
-    [BlockType.Evaluate]: '#795548',
-    [BlockType.Loop]: '#E91E63',
-    [BlockType.BatchProcess]: '#3F51B5',
-    [BlockType.SubWorkflow]: '#009688',
-    [BlockType.WebhookTrigger]: '#FF5722',
+    [BlockType.Start]: '#262626',
+    [BlockType.End]: '#2e2e2e',
+    [BlockType.HttpRequest]: '#333333',
+    [BlockType.Variable]: '#383838',
+    [BlockType.Switch]: '#2a2a2a',
+    [BlockType.Condition]: '#303030',
+    [BlockType.Delay]: '#353535',
+    [BlockType.Log]: '#2c2c2c',
+    [BlockType.Evaluate]: '#323232',
+    [BlockType.Loop]: '#2e2e2e',
+    [BlockType.BatchProcess]: '#343434',
+    [BlockType.SubWorkflow]: '#2a2a2a',
+    [BlockType.WebhookTrigger]: '#363636',
 };
 

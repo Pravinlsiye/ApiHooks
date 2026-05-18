@@ -4,10 +4,10 @@
  */
 
 import { BaseComponent } from '../utils/base-component';
-import { BlockType } from '../models/workflow-models';
+import { BlockType } from '../../models/workflow-models';
 import { getBlockIcon } from '../utils/icons';
-import { ApiDefinitionManager, apiManager } from '../api/api-definition-manager';
-import { ApiDefinition, ApiEndpoint } from '../api/api-definition-loader';
+import { ApiDefinitionManager, apiManager } from '../../api/api-definition-manager';
+import { ApiDefinition, ApiEndpoint } from '../../api/api-definition-loader';
 import { DOMDiff } from '../utils/dom-diff';
 import { DOMUpdater } from '../utils/dom-updater';
 
@@ -150,12 +150,13 @@ export class BlockPalette extends BaseComponent {
     }
 
     private renderApiDefinition(api: ApiDefinition): string {
+        const removeBtn = api.locked ? '' : '<button class="btn-remove-api" title="Remove API">×</button>';
         return `
             <div class="api-definition" data-api-id="${api.id}" data-api-name="${api.name}">
                 <div class="api-header">
                     <span class="api-name">${api.name}</span>
                     <span class="api-version">${api.version || ''}</span>
-                    <button class="btn-remove-api" title="Remove API">×</button>
+                    ${removeBtn}
                 </div>
                 <div class="api-endpoints">
                     ${api.endpoints.map(endpoint => this.renderApiEndpoint(endpoint, api)).join('')}
@@ -166,13 +167,13 @@ export class BlockPalette extends BaseComponent {
 
     private renderApiEndpoint(endpoint: ApiEndpoint, api: ApiDefinition): string {
         const methodColors: Record<string, string> = {
-            'GET': '#22c55e',
-            'POST': '#3b82f6',
-            'PUT': '#f59e0b',
-            'DELETE': '#ef4444',
-            'PATCH': '#8b5cf6'
+            GET: '#e8e8e8',
+            POST: '#d4d4d4',
+            PUT: '#c9c9c9',
+            DELETE: '#b8b8b8',
+            PATCH: '#dedede'
         };
-        const color = methodColors[endpoint.method.toUpperCase()] || '#666';
+        const color = methodColors[endpoint.method.toUpperCase()] || '#d4d4d4';
         
         // Include API info in the endpoint data for drag
         const endpointData = {

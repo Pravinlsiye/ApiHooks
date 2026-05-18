@@ -3,14 +3,14 @@
  * Renders workflow blocks as HTML elements (divs) for better form handling
  */
 
-import { VisualBlock, VisualPort, BlockField } from '../models/visual-models';
-import { BLOCK_COLORS } from '../models/workflow-models';
+import { VisualBlock, VisualPort, BlockField } from '../../models/visual-models';
+import { BLOCK_COLORS } from '../../models/workflow-models';
 import { DOMUpdater } from '../utils/dom-updater';
 
 export interface BlockRenderCallbacks {
-    onPortMouseDown?: (blockId: string, portName: string, portType: 'input' | 'output', event: MouseEvent) => void;
-    onPortMouseUp?: (blockId: string, portName: string, portType: 'input' | 'output', event: MouseEvent) => void;
-    onBlockMouseDown?: (blockId: string, event: MouseEvent) => void;
+    onPortMouseDown?: (blockId: string, portName: string, portType: 'input' | 'output', event: PointerEvent) => void;
+    onPortMouseUp?: (blockId: string, portName: string, portType: 'input' | 'output', event: PointerEvent) => void;
+    onBlockMouseDown?: (blockId: string, event: PointerEvent) => void;
     onFieldChange?: (blockId: string, fieldName: string, value: string) => void;
     onDelete?: (blockId: string) => void;
     onBreakpointToggle?: (blockId: string) => void;
@@ -70,7 +70,8 @@ export function renderBlock(block: VisualBlock, callbacks?: BlockRenderCallbacks
     header.appendChild(deleteBtn);
     
     if (callbacks?.onBlockMouseDown) {
-        header.addEventListener('mousedown', (e) => {
+        header.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
             if ((e.target as HTMLElement).closest('.block-delete-btn')) return;
             callbacks.onBlockMouseDown!(block.id, e);
         });
@@ -185,6 +186,12 @@ function renderField(
     label.textContent = field.label || field.name;
     fieldDiv.appendChild(label);
 
+    if (field.type === 'keyvalue') {
+        const editor = renderKeyValueEditor(blockId, field.name, value as any, callbacks);
+        fieldDiv.appendChild(editor);
+        return fieldDiv;
+    }
+
     if (field.type === 'select') {
         const select = document.createElement('select');
         select.dataset.fieldName = field.name;
@@ -232,9 +239,86 @@ function renderField(
     return fieldDiv;
 }
 
-/**
- * Render a port (connection point)
- */
+function renderKeyValueEditor(
+    blockId: string,
+    fieldName: string,
+    currentValue: Record<string, any> | undefined,
+    callbacks?: BlockRenderCallbacks
+): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'kv-editor';
+
+    const entries = currentValue && typeof currentValue === 'object'
+        ? Object.entries(currentValue)
+        : [];
+
+    function emitChange(): void {
+        const result: Record<string, string> = {};
+        container.querySelectorAll('.kv-row').forEach(row => {
+            const keyInput = row.querySelector('.kv-key') as HTMLInputElement;
+            const valInput = row.querySelector('.kv-val') as HTMLInputElement;
+            if (keyInput?.value.trim()) {
+                result[keyInput.value.trim()] = valInput?.value || '';
+            }
+        });
+        callbacks?.onFieldChange?.(blockId, fieldName, JSON.stringify(result));
+    }
+
+    function addRow(key: string, val: string): void {
+        const row = document.createElement('div');
+        row.className = 'kv-row';
+
+        const keyInput = document.createElement('input');
+        keyInput.type = 'text';
+        keyInput.className = 'kv-key';
+        keyInput.placeholder = 'name';
+        keyInput.value = key;
+        keyInput.addEventListener('mousedown', e => e.stopPropagation());
+        keyInput.addEventListener('input', emitChange);
+        row.appendChild(keyInput);
+
+        const valInput = document.createElement('input');
+        valInput.type = 'text';
+        valInput.className = 'kv-val';
+        valInput.placeholder = 'value';
+        valInput.value = val;
+        valInput.addEventListener('mousedown', e => e.stopPropagation());
+        valInput.addEventListener('input', emitChange);
+        row.appendChild(valInput);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'kv-del';
+        delBtn.textContent = '×';
+        delBtn.title = 'Remove';
+        delBtn.addEventListener('mousedown', e => e.stopPropagation());
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            row.remove();
+            emitChange();
+        });
+        row.appendChild(delBtn);
+
+        container.insertBefore(row, container.querySelector('.kv-add'));
+    }
+
+    for (const [k, v] of entries) {
+        addRow(k, typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''));
+    }
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'kv-add';
+    addBtn.textContent = '+ Add';
+    addBtn.addEventListener('mousedown', e => e.stopPropagation());
+    addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        addRow('', '');
+        emitChange();
+    });
+    container.appendChild(addBtn);
+
+    return container;
+}
+
 function renderPort(
     blockId: string,
     port: VisualPort,
@@ -251,15 +335,16 @@ function renderPort(
     portTab.dataset.blockId = blockId;
 
     if (portType === 'output' && callbacks?.onPortMouseDown) {
-        portTab.addEventListener('mousedown', (e) => {
+        portTab.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
             e.stopPropagation();
             callbacks.onPortMouseDown!(blockId, port.name, portType, e);
         });
     }
 
     if (portType === 'input' && callbacks?.onPortMouseUp) {
-        portTab.addEventListener('mouseup', (e) => {
-            e.stopPropagation();
+        portTab.addEventListener('pointerup', (e) => {
+            if (e.button !== 0) return;
             callbacks.onPortMouseUp!(blockId, port.name, portType, e);
         });
     }

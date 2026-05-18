@@ -2,7 +2,7 @@
  * Base class for all components with automatic cleanup
  */
 
-import { EventEmitter } from '../models/visual-models';
+import { EventEmitter } from '../../models/visual-models';
 
 export abstract class BaseComponent extends EventEmitter {
     protected container: HTMLElement;

@@ -1,0 +1,174 @@
+/**
+ * SiyeFlow Designer — minimal monochrome theme
+ * White / off-white / grey only; premium editorial feel.
+ */
+
+:root {
+    /* Surfaces */
+    --bg-base: #f5f5f5;
+    --bg-elevated: #ffffff;
+    --bg-surface: #ededed;
+    --bg-tertiary: #e5e5e5;
+    --bg-overlay: rgba(0, 0, 0, 0.035);
+    --bg-hover: #ececec;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f0f0f0;
+
+    /* Typography */
+    --text-primary: #0a0a0a;
+    --text-secondary: #737373;
+    --text-muted: #a3a3a3;
+    --text-inverse: #fafafa;
+    --text-on-accent: #fafafa;
+
+    /* Lines */
+    --border-default: #e5e5e5;
+    --border-subtle: #efefef;
+    --border-strong: #d4d4d4;
+    --border-focus: #0a0a0a;
+
+    /* Primary interaction (charcoal, not hue) */
+    --accent-primary: #171717;
+    --accent-primary-light: #404040;
+    --accent-secondary: #525252;
+    --accent-hover: #0a0a0a;
+
+    /* Toolbar / semantic slots — all neutral */
+    --success-default: #1a1a1a;
+    --success-hover: #0a0a0a;
+    --error-base: #3a3a3a;
+    --error-hover: #262626;
+    --warning-default: #6b6b6b;
+    --warning-hover: #525252;
+
+    /* Focus rings (replace former blue glows) */
+    --focus-ring-soft: rgba(10, 10, 10, 0.06);
+    --focus-ring-medium: rgba(10, 10, 10, 0.1);
+    --focus-ring-strong: rgba(10, 10, 10, 0.14);
+    --focus-ring-glow: rgba(10, 10, 10, 0.18);
+
+    --canvas-grid: rgba(0, 0, 0, 0.04);
+
+    /* Connections */
+    --connection-stroke: #c4c4c4;
+    --connection-stroke-hover: #8a8a8a;
+    --connection-delete-fill: #2a2a2a;
+    --connection-delete-stroke: #0a0a0a;
+
+    /* Block execution highlights */
+    --execution-running: #8a8a8a;
+    --execution-running-pulse: #b5b5b5;
+    --execution-success: #525252;
+    --execution-fail: #141414;
+
+    /* Breakpoint chip */
+    --breakpoint-muted: #d4d4d4;
+    --breakpoint-hover-bg: rgba(0, 0, 0, 0.06);
+    --breakpoint-hover-border: #a3a3a3;
+    --breakpoint-active: #2a2a2a;
+    --breakpoint-active-border: #0a0a0a;
+    --breakpoint-pulse: rgba(0, 0, 0, 0.2);
+
+    /* JSON tree */
+    --json-string: #6b6b6b;
+    --json-number: #4a4a4a;
+    --json-boolean: #3d3d3d;
+
+    /* Ports */
+    --port-glow: rgba(0, 0, 0, 0.12);
+
+    /* Terminal */
+    --terminal-prompt: #525252;
+    --terminal-running-fg: #404040;
+    --terminal-running-bg: rgba(0, 0, 0, 0.06);
+    --log-info: #737373;
+    --log-success: #525252;
+    --log-warning: #6b6b6b;
+    --log-error: #3d3d3d;
+    --log-block: #4a4a4a;
+
+    /* Modal icons (single neutral treatment) */
+    --alert-icon-bg: rgba(0, 0, 0, 0.06);
+    --alert-icon-fg: #404040;
+
+    /* Hover “danger” without red */
+    --state-negative-hover: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] {
+    --bg-base: #0a0a0a;
+    --bg-elevated: #121212;
+    --bg-surface: #1a1a1a;
+    --bg-tertiary: #242424;
+    --bg-overlay: rgba(255, 255, 255, 0.04);
+    --bg-hover: #2a2a2a;
+    --bg-primary: #121212;
+    --bg-secondary: #1a1a1a;
+
+    --text-primary: #f5f5f5;
+    --text-secondary: #a3a3a3;
+    --text-muted: #737373;
+    --text-inverse: #0a0a0a;
+    --text-on-accent: #0a0a0a;
+
+    --border-default: #2a2a2a;
+    --border-subtle: #1f1f1f;
+    --border-strong: #404040;
+    --border-focus: #e5e5e5;
+
+    --accent-primary: #ebebeb;
+    --accent-primary-light: #d4d4d4;
+    --accent-secondary: #a3a3a3;
+    --accent-hover: #ffffff;
+
+    --success-default: #e5e5e5;
+    --success-hover: #ffffff;
+    --error-base: #a3a3a3;
+    --error-hover: #d4d4d4;
+    --warning-default: #737373;
+    --warning-hover: #a3a3a3;
+
+    --focus-ring-soft: rgba(255, 255, 255, 0.06);
+    --focus-ring-medium: rgba(255, 255, 255, 0.1);
+    --focus-ring-strong: rgba(255, 255, 255, 0.14);
+    --focus-ring-glow: rgba(255, 255, 255, 0.2);
+
+    --canvas-grid: rgba(255, 255, 255, 0.04);
+
+    --connection-stroke: #5c5c5c;
+    --connection-stroke-hover: #8c8c8c;
+    --connection-delete-fill: #d4d4d4;
+    --connection-delete-stroke: #fafafa;
+
+    --execution-running: #a3a3a3;
+    --execution-running-pulse: #737373;
+    --execution-success: #d4d4d4;
+    --execution-fail: #fafafa;
+
+    --breakpoint-muted: #404040;
+    --breakpoint-hover-bg: rgba(255, 255, 255, 0.06);
+    --breakpoint-hover-border: #737373;
+    --breakpoint-active: #d4d4d4;
+    --breakpoint-active-border: #fafafa;
+    --breakpoint-pulse: rgba(255, 255, 255, 0.25);
+
+    --json-string: #a3a3a3;
+    --json-number: #d4d4d4;
+    --json-boolean: #e5e5e5;
+
+    --port-glow: rgba(255, 255, 255, 0.15);
+
+    --terminal-prompt: #a3a3a3;
+    --terminal-running-fg: #d4d4d4;
+    --terminal-running-bg: rgba(255, 255, 255, 0.06);
+    --log-info: #a3a3a3;
+    --log-success: #d4d4d4;
+    --log-warning: #a3a3a3;
+    --log-error: #e5e5e5;
+    --log-block: #d4d4d4;
+
+    --alert-icon-bg: rgba(255, 255, 255, 0.06);
+    --alert-icon-fg: #d4d4d4;
+
+    --state-negative-hover: rgba(255, 255, 255, 0.06);
+}

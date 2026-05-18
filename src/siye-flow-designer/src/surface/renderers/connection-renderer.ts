@@ -3,7 +3,7 @@
  * Renders connections as smooth SVG bezier curves with delete button on hover
  */
 
-import { VisualConnection } from '../models/visual-models';
+import { VisualConnection } from '../../models/visual-models';
 import { connectionPathToSVG, getBezierMidpoint, getConnectionBoundingBox } from '../utils/connection-path';
 import { createSVGElement, setSVGAttributes } from '../utils/dom-helpers';
 
@@ -65,7 +65,7 @@ export function renderConnection(
     visiblePath.classList.add('connection-path');
     setSVGAttributes(visiblePath, {
         d: pathData,
-        stroke: 'var(--accent-primary)',
+        stroke: 'var(--connection-stroke)',
         'stroke-width': '3',
         fill: 'none',
         'stroke-linecap': 'round',
@@ -90,8 +90,8 @@ export function renderConnection(
         cx: midpoint.x,
         cy: midpoint.y,
         r: '12',
-        fill: 'var(--error-base)',
-        stroke: 'var(--error-hover)',
+        fill: 'var(--connection-delete-fill)',
+        stroke: 'var(--connection-delete-stroke)',
         'stroke-width': '2',
         style: 'cursor: pointer;'
     });
@@ -120,7 +120,7 @@ export function renderConnection(
             clearTimeout(hideTimeout);
             hideTimeout = null;
         }
-        visiblePath.setAttribute('stroke', 'var(--accent-primary-light)');
+        visiblePath.setAttribute('stroke', 'var(--connection-stroke-hover)');
         visiblePath.setAttribute('stroke-width', '4');
         deleteGroup.style.opacity = '1';
         deleteGroup.style.pointerEvents = 'all';
@@ -128,7 +128,7 @@ export function renderConnection(
 
     const hideDelete = () => {
         hideTimeout = setTimeout(() => {
-            visiblePath.setAttribute('stroke', 'var(--accent-primary)');
+            visiblePath.setAttribute('stroke', 'var(--connection-stroke)');
             visiblePath.setAttribute('stroke-width', '3');
             deleteGroup.style.opacity = '0';
             deleteGroup.style.pointerEvents = 'none';
@@ -235,7 +235,7 @@ export function renderPreviewConnection(
     const path = createSVGElement('path');
     setSVGAttributes(path, {
         d: pathData,
-        stroke: 'var(--accent-primary)',
+        stroke: 'var(--connection-stroke-hover)',
         'stroke-width': '3',
         'stroke-dasharray': '8,4',
         fill: 'none',
