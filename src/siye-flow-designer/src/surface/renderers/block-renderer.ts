@@ -8,9 +8,9 @@ import { BLOCK_COLORS } from '../../models/workflow-models';
 import { DOMUpdater } from '../utils/dom-updater';
 
 export interface BlockRenderCallbacks {
-    onPortMouseDown?: (blockId: string, portName: string, portType: 'input' | 'output', event: MouseEvent) => void;
-    onPortMouseUp?: (blockId: string, portName: string, portType: 'input' | 'output', event: MouseEvent) => void;
-    onBlockMouseDown?: (blockId: string, event: MouseEvent) => void;
+    onPortMouseDown?: (blockId: string, portName: string, portType: 'input' | 'output', event: PointerEvent) => void;
+    onPortMouseUp?: (blockId: string, portName: string, portType: 'input' | 'output', event: PointerEvent) => void;
+    onBlockMouseDown?: (blockId: string, event: PointerEvent) => void;
     onFieldChange?: (blockId: string, fieldName: string, value: string) => void;
     onDelete?: (blockId: string) => void;
     onBreakpointToggle?: (blockId: string) => void;
@@ -70,7 +70,8 @@ export function renderBlock(block: VisualBlock, callbacks?: BlockRenderCallbacks
     header.appendChild(deleteBtn);
     
     if (callbacks?.onBlockMouseDown) {
-        header.addEventListener('mousedown', (e) => {
+        header.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
             if ((e.target as HTMLElement).closest('.block-delete-btn')) return;
             callbacks.onBlockMouseDown!(block.id, e);
         });
@@ -334,15 +335,16 @@ function renderPort(
     portTab.dataset.blockId = blockId;
 
     if (portType === 'output' && callbacks?.onPortMouseDown) {
-        portTab.addEventListener('mousedown', (e) => {
+        portTab.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
             e.stopPropagation();
             callbacks.onPortMouseDown!(blockId, port.name, portType, e);
         });
     }
 
     if (portType === 'input' && callbacks?.onPortMouseUp) {
-        portTab.addEventListener('mouseup', (e) => {
-            e.stopPropagation();
+        portTab.addEventListener('pointerup', (e) => {
+            if (e.button !== 0) return;
             callbacks.onPortMouseUp!(blockId, port.name, portType, e);
         });
     }

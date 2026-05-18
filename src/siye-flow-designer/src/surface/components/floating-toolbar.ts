@@ -7,6 +7,7 @@ import { BaseComponent } from '../utils/base-component';
 import { DOMUpdater } from '../utils/dom-updater';
 
 export interface FloatingToolbarCallbacks {
+    onSelectCanvasTool?: (tool: 'pointer' | 'hand') => void;
     onZoomIn?: () => void;
     onZoomOut?: () => void;
     onFitToScreen?: () => void;
@@ -33,8 +34,21 @@ export class FloatingToolbar extends BaseComponent {
     private render(): void {
         this.container.innerHTML = `
             <div class="floating-toolbar">
+                <div class="toolbar-group toolbar-canvas-tools">
+                    <button type="button" class="toolbar-btn toolbar-btn-tool active" id="tool-hand" title="Hand — pan by dragging empty canvas (H)">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                            <path d="M7.5 1.5a1.5 1.5 0 0 1 3 0V5h1.5a1 1 0 0 1 1 1v2.5a3 3 0 0 1-3 3H9v3.5a1.5 1.5 0 0 1-3 0V8.5H5a3 3 0 0 1-3-3V6a1 1 0 0 1 1-1h1.5V1.5z"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="toolbar-btn toolbar-btn-tool" id="tool-pointer" title="Pointer — select blocks; pan with middle mouse or Hand tool (V)">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                            <path d="M3.5 2.036L13 8.5 8.5 9.5 7 14l-1.5-5.5L3.5 2.036z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="toolbar-separator"></div>
                 <div class="toolbar-group">
-                    <button class="toolbar-btn" id="zoom-out" title="Zoom Out (-)">
+                    <button class="toolbar-btn" id="zoom-out" title="Zoom Out (-) — Ctrl+wheel on canvas">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                             <circle cx="7" cy="7" r="4.5"/>
                             <path d="M10.5 10.5L13.5 13.5"/>
@@ -106,6 +120,21 @@ export class FloatingToolbar extends BaseComponent {
     }
 
     private setupEventHandlers(): void {
+        const handBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#tool-hand');
+        const pointerBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#tool-pointer');
+        if (handBtn) {
+            this.addEventListener(handBtn, 'click', () => {
+                this.callbacks.onSelectCanvasTool?.('hand');
+                this.setCanvasToolIndicator('hand');
+            });
+        }
+        if (pointerBtn) {
+            this.addEventListener(pointerBtn, 'click', () => {
+                this.callbacks.onSelectCanvasTool?.('pointer');
+                this.setCanvasToolIndicator('pointer');
+            });
+        }
+
         const zoomInBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#zoom-in');
         const zoomOutBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#zoom-out');
         const fitScreenBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#fit-screen');
@@ -224,8 +253,39 @@ export class FloatingToolbar extends BaseComponent {
                         this.emit('inspectorToggle', {});
                     }
                     break;
+                case 'h':
+                    if (!event.ctrlKey && !event.metaKey) {
+                        this.callbacks.onSelectCanvasTool?.('hand');
+                        this.setCanvasToolIndicator('hand');
+                    }
+                    break;
+                case 'v':
+                    if (!event.ctrlKey && !event.metaKey) {
+                        this.callbacks.onSelectCanvasTool?.('pointer');
+                        this.setCanvasToolIndicator('pointer');
+                    }
+                    break;
             }
         });
+    }
+
+    setCanvasToolIndicator(tool: 'pointer' | 'hand'): void {
+        const handBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#tool-hand');
+        const pointerBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#tool-pointer');
+        if (handBtn) {
+            if (tool === 'hand') {
+                DOMUpdater.addClasses(handBtn, 'active');
+            } else {
+                DOMUpdater.removeClasses(handBtn, 'active');
+            }
+        }
+        if (pointerBtn) {
+            if (tool === 'pointer') {
+                DOMUpdater.addClasses(pointerBtn, 'active');
+            } else {
+                DOMUpdater.removeClasses(pointerBtn, 'active');
+            }
+        }
     }
 
     updateExecutionState(state: 'idle' | 'running' | 'paused' | 'stepping'): void {

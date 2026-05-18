@@ -167,13 +167,13 @@ export class BlockPalette extends BaseComponent {
 
     private renderApiEndpoint(endpoint: ApiEndpoint, api: ApiDefinition): string {
         const methodColors: Record<string, string> = {
-            'GET': '#22c55e',
-            'POST': '#3b82f6',
-            'PUT': '#f59e0b',
-            'DELETE': '#ef4444',
-            'PATCH': '#8b5cf6'
+            GET: '#e8e8e8',
+            POST: '#d4d4d4',
+            PUT: '#c9c9c9',
+            DELETE: '#b8b8b8',
+            PATCH: '#dedede'
         };
-        const color = methodColors[endpoint.method.toUpperCase()] || '#666';
+        const color = methodColors[endpoint.method.toUpperCase()] || '#d4d4d4';
         
         // Include API info in the endpoint data for drag
         const endpointData = {

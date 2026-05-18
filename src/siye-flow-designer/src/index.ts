@@ -85,6 +85,7 @@ export class WorkflowDesigner {
 
         if (opts.floatingToolbarContainerId) {
             this.floatingToolbar = new FloatingToolbar(opts.floatingToolbarContainerId, {
+                onSelectCanvasTool: (tool) => this.canvas.setTool(tool),
                 onZoomIn: () => this.canvas.zoomIn(),
                 onZoomOut: () => this.canvas.zoomOut(),
                 onFitToScreen: () => this.canvas.fitToScreen(),
@@ -96,6 +97,11 @@ export class WorkflowDesigner {
                 onTerminalToggle: (visible) => this.toggleTerminal(visible),
                 onInspectorToggle: () => this.inspector.toggle()
             });
+
+            this.canvas.on('toolChange', (data: { tool: 'pointer' | 'hand' }) => {
+                this.floatingToolbar?.setCanvasToolIndicator(data.tool);
+            });
+            this.floatingToolbar.setCanvasToolIndicator(this.canvas.getTool());
 
             this.floatingToolbar.on('togglePauseResume', () => {
                 if (!this.executor) return;
@@ -578,6 +584,16 @@ export class WorkflowDesigner {
             targetBlockId: string;
             targetPortName: string;
         }) => {
+            const duplicate = [...this.connections.values()].some(
+                (c) =>
+                    c.sourceBlockId === data.sourceBlockId &&
+                    c.sourcePortName === data.sourcePortName &&
+                    c.targetBlockId === data.targetBlockId &&
+                    c.targetPortName === data.targetPortName
+            );
+            if (duplicate) {
+                return;
+            }
             const connection: VisualConnection = {
                 id: generateId('conn'),
                 type: EdgeType.Execution,
