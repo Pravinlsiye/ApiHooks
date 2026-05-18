@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SiyeFlow — Visual workflow automation for APIs</title>
+    <meta name="description" content="A visual workflow designer with an in-browser execution engine. Build, debug, and run multi-step API workflows from the browser or the command line.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="../">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-name">SiyeFlow</span>
+        </a>
+        <nav class="site-nav">
+            <a href="#features">Features</a>
+            <a href="#docs">Docs</a>
+            <a href="https://github.com/Pravinlsiye/ApiHooks" target="_blank" rel="noopener">GitHub</a>
+            <a class="nav-cta" href="../">Open designer →</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <p class="eyebrow">Visual workflow automation</p>
+            <h1 class="hero-title">
+                Design API workflows<br>
+                <span class="hero-italic">like sentences.</span>
+            </h1>
+            <p class="hero-sub">
+                A node-edge canvas, an in-browser execution engine, and a .NET CLI —
+                in one quiet, monochrome interface.
+            </p>
+            <div class="hero-cta">
+                <a class="btn btn-primary" href="../">Open the designer</a>
+                <a class="btn btn-ghost" href="#docs">Read the docs</a>
+            </div>
+        </section>
+
+        <section class="preview" aria-label="Designer preview">
+            <div class="preview-frame">
+                <img src="/preview.png" alt="SiyeFlow designer showing a loop workflow mid-execution" loading="lazy">
+            </div>
+        </section>
+
+        <section id="features" class="section">
+            <h2 class="section-title">What you get</h2>
+            <p class="section-lede">
+                Six surfaces. One workflow. Everything stays in the browser unless you choose otherwise.
+            </p>
+            <div class="grid">
+                <article class="card">
+                    <h3>Node-edge canvas</h3>
+                    <p>HTML blocks, SVG connections, hand &amp; pointer tools, Ctrl-wheel zoom, monochrome theme.</p>
+                </article>
+                <article class="card">
+                    <h3>Browser executor</h3>
+                    <p>Run real HTTP workflows in-page. Variable interpolation, JSONPath outputs, success / fail branching.</p>
+                </article>
+                <article class="card">
+                    <h3>Step debugger</h3>
+                    <p>Breakpoints on any block. Pause, resume, step. Inspect variables in a pinnable, detachable tree view.</p>
+                </article>
+                <article class="card">
+                    <h3>ASP.NET embed</h3>
+                    <p>Drop <code>app.UseSiyeFlowDesigner()</code> into a .NET 10 API. The designer ships embedded, Swagger-UI style.</p>
+                </article>
+                <article class="card">
+                    <h3>CLI runner</h3>
+                    <p>Save workflow JSON, run it headless from <code>dotnet run -- execute --workflow path</code>.</p>
+                </article>
+                <article class="card">
+                    <h3>Typed schema</h3>
+                    <p>Single source of truth in <code>workflow-models.ts</code>. v2.0 node-edge graph, no legacy nesting.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section quiet">
+            <h2 class="section-title">Twelve blocks. One mental model.</h2>
+            <p class="section-lede">Every block is a node with typed <code>data</code>; every wire is an edge with a <code>type</code>.</p>
+            <ul class="block-list">
+                <li><span>Start</span><em>entry point</em></li>
+                <li><span>End</span><em>exit point</em></li>
+                <li><span>Variable</span><em>read / write store</em></li>
+                <li><span>Log</span><em>terminal output</em></li>
+                <li><span>Evaluate</span><em>expressions</em></li>
+                <li><span>HTTP Request</span><em>REST call</em></li>
+                <li><span>Condition</span><em>if / else</em></li>
+                <li><span>Switch</span><em>multi-branch</em></li>
+                <li><span>Loop</span><em>iterate items</em></li>
+                <li><span>Delay</span><em>pause</em></li>
+                <li><span>Batch</span><em>parallel</em></li>
+                <li><span>Sub-Workflow</span><em>nested</em></li>
+            </ul>
+        </section>
+
+        <section id="docs" class="section">
+            <h2 class="section-title">Docs</h2>
+            <p class="section-lede">Pick a level, drop in.</p>
+            <div class="grid">
+                <a class="card card-link" href="https://github.com/Pravinlsiye/ApiHooks/blob/main/README.md" target="_blank" rel="noopener">
+                    <h3>Repo overview</h3>
+                    <p>How the five projects fit, embed pipeline diagram, quick start.</p>
+                    <span class="card-cta">README →</span>
+                </a>
+                <a class="card card-link" href="https://github.com/Pravinlsiye/ApiHooks/blob/main/docs/WORKFLOW_SCHEMA.md" target="_blank" rel="noopener">
+                    <h3>Workflow schema</h3>
+                    <p>Every block, every port, every <code>data</code> field. JSON examples and runtime behavior.</p>
+                    <span class="card-cta">Schema reference →</span>
+                </a>
+                <a class="card card-link" href="https://github.com/Pravinlsiye/ApiHooks/blob/main/docs/PROGRESS.md" target="_blank" rel="noopener">
+                    <h3>Progress &amp; roadmap</h3>
+                    <p>What's complete, what's in flight, deferred dep migrations.</p>
+                    <span class="card-cta">Status →</span>
+                </a>
+                <a class="card card-link" href="https://github.com/Pravinlsiye/ApiHooks/blob/main/src/SiyeFlow.UI/README.md" target="_blank" rel="noopener">
+                    <h3>Embed in ASP.NET</h3>
+                    <p>Middleware setup, route prefix, theme injection, embed pipeline.</p>
+                    <span class="card-cta">SiyeFlow.UI →</span>
+                </a>
+                <a class="card card-link" href="https://github.com/Pravinlsiye/ApiHooks/blob/main/src/SiyeFlow.CLI/README.md" target="_blank" rel="noopener">
+                    <h3>Run from the CLI</h3>
+                    <p>Commands, sample workflow, variable system.</p>
+                    <span class="card-cta">SiyeFlow.CLI →</span>
+                </a>
+                <a class="card card-link" href="https://github.com/Pravinlsiye/ApiHooks/blob/main/demo/api1/README.md" target="_blank" rel="noopener">
+                    <h3>Demo API</h3>
+                    <p>Projects + Jobs CRUD that hosts the embedded designer at <code>/workflows</code>.</p>
+                    <span class="card-cta">SiyeFlow.TestApi →</span>
+                </a>
+            </div>
+        </section>
+
+        <section class="cta">
+            <h2>Open the canvas.</h2>
+            <p>No install. No sign-in. The whole thing runs in your browser.</p>
+            <a class="btn btn-primary" href="../">Launch designer</a>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-row">
+            <span>SiyeFlow · MIT</span>
+            <span>
+                <a href="https://github.com/Pravinlsiye/ApiHooks" target="_blank" rel="noopener">github.com/Pravinlsiye/ApiHooks</a>
+            </span>
+        </div>
+    </footer>
+</body>
+</html>
