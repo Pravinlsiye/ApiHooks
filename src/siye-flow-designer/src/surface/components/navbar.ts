@@ -6,20 +6,31 @@ import { BaseComponent } from '../utils/base-component';
 import { SettingsDropdown } from './settings-dropdown';
 import { DOMUpdater } from '../utils/dom-updater';
 
+export interface NavbarOptions {
+    homeUrl?: string;
+}
+
 export class Navbar extends BaseComponent {
     private settingsDropdown: SettingsDropdown | null = null;
+    private homeUrl?: string;
 
-    constructor(containerId: string) {
+    constructor(containerId: string, options: NavbarOptions = {}) {
         super(containerId);
+        this.homeUrl = options.homeUrl;
         this.render();
         this.initSettingsDropdown();
         this.setupEventHandlers();
     }
 
     private render(): void {
+        const brandTag = this.homeUrl ? 'a' : 'div';
+        const brandAttrs = this.homeUrl
+            ? `class="navbar-brand navbar-brand-link" href="${this.homeUrl}" title="Back to Home"`
+            : `class="navbar-brand"`;
+
         DOMUpdater.updateElement(this.container, { html: `
             <div class="navbar">
-                <div class="navbar-brand">
+                <${brandTag} ${brandAttrs}>
                     <span class="navbar-logo">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                             <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="var(--accent-primary)" opacity="0.2"/>
@@ -28,7 +39,7 @@ export class Navbar extends BaseComponent {
                         </svg>
                     </span>
                     <span class="navbar-title">SiyeFlow Designer</span>
-                </div>
+                </${brandTag}>
                 <div class="navbar-actions">
                     <button class="navbar-btn" id="import-btn" title="Import Workflow">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -85,6 +85,25 @@ body {
     color: var(--accent-primary);
 }
 
+a.navbar-brand-link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 4px 6px;
+    margin: -4px -6px;
+    transition: background 0.15s, color 0.15s;
+}
+
+a.navbar-brand-link:hover {
+    background: var(--bg-surface);
+    color: var(--accent-primary);
+}
+
+a.navbar-brand-link:hover .navbar-title {
+    color: var(--accent-primary);
+}
+
 .navbar-btn svg {
     display: block;
 }

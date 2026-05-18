@@ -42,6 +42,8 @@ export interface DesignerOptions {
     floatingToolbarContainerId?: string;
     minimapContainerId?: string;
     terminalContainerId?: string;
+    /** When set, the navbar renders a Home link pointing to this URL. */
+    homeUrl?: string;
 }
 
 /**
@@ -79,7 +81,7 @@ export class WorkflowDesigner {
         }
 
         if (opts.navbarContainerId) {
-            this.navbar = new Navbar(opts.navbarContainerId);
+            this.navbar = new Navbar(opts.navbarContainerId, { homeUrl: opts.homeUrl });
             this.setupNavbarHandlers();
         }
 
@@ -1038,7 +1040,8 @@ if (typeof document !== 'undefined' && !(window as any).SiyeFlowConfig) {
                 navbarContainerId: navbarContainer ? 'navbar-container' : undefined,
                 floatingToolbarContainerId: floatingToolbarContainer ? 'floating-toolbar-container' : undefined,
                 minimapContainerId: minimapContainer ? 'minimap-container' : undefined,
-                terminalContainerId: terminalContainer ? 'terminal-container' : undefined
+                terminalContainerId: terminalContainer ? 'terminal-container' : undefined,
+                homeUrl: './Home/'
             });
 
             // Center of 8000x8000 canvas
