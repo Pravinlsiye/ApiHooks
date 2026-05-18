@@ -326,7 +326,4 @@ src/SiyeFlow.UI/UI/index.html.tmp
 # Legacy: Old UI folder structure (no longer used)
 src/SiyeFlow.UI/UI/_siyeflow/
 
-# SiyeFlow.CLI - Documentation (if auto-generated)
-cli/SiyeFlow.CLI/docs/
-
 /sample-ui.ignore

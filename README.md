@@ -1,50 +1,63 @@
-# SiyeFlow - API Workflow Automation
+# SiyeFlow
 
-A visual workflow designer and execution engine for orchestrating API calls. Build, debug, and run multi-step API workflows in the browser or from the command line.
+Visual workflow designer plus an in-browser execution engine for orchestrating API calls. Design workflows in a node-edge canvas, run them in the browser, embed the designer in an ASP.NET Core API, or execute saved workflows from the .NET CLI.
 
-## What's Included
+The repo contains five projects in one solution ([SiyeFlow.sln](SiyeFlow.sln)):
 
-### SiyeFlow Designer (TypeScript)
-A standalone browser-based workflow designer with a built-in execution engine.
+| Project | Path | What it does |
+| --- | --- | --- |
+| Designer (TS) | [src/siye-flow-designer/](src/siye-flow-designer) | Standalone Vite/TypeScript app — canvas, palette, terminal, breakpoints, browser executor |
+| SiyeFlow.UI | [src/SiyeFlow.UI/](src/SiyeFlow.UI) | ASP.NET Core middleware that embeds the designer (Swagger-UI style) |
+| SiyeFlow.Core | [src/SiyeFlow.Core/](src/SiyeFlow.Core) | Shared C# models + interfaces |
+| SiyeFlow.CLI | [src/SiyeFlow.CLI/](src/SiyeFlow.CLI) | Command-line workflow runner |
+| SiyeFlow.TestApi | [demo/api1/](demo/api1) | Demo .NET 10 web API that hosts both Swagger and the embedded designer at `/workflows` |
+| SiyeFlow.Core.TypeGen | [src/SiyeFlow.Core.TypeGen/](src/SiyeFlow.Core.TypeGen) | Codegen tool (idle — emits TS enums from C# models on demand) |
+
+## Quick start
+
+### Standalone designer
 
 ```bash
 cd src/siye-flow-designer
 npm install
 npm run dev
-# Open http://localhost:3001
+# http://localhost:3001
 ```
 
-Features:
-- Drag-and-drop block canvas with SVG connections
-- 10 block types: Start, End, HTTP Request, Variable, Condition, Log, Delay, Evaluate, Loop, Sub-Workflow
-- Import/Export workflow JSON files
-- In-browser workflow execution with real HTTP calls
-- Breakpoints and step-through debugging
-- Variable Inspector with tabbed JSON tree view (pin, detach, minimize)
-- Block detail view with runtime variable resolution
-- Dark/Light/System theme support
-- 6 sample workflows using public APIs
+### Demo API with embedded designer
 
-### SiyeFlow.CLI (.NET)
-Execute workflows from the command line.
+```bash
+cd demo/api1
+dotnet run
+# Swagger:   http://localhost:5216/swagger
+# Designer:  http://localhost:5216/workflows
+```
+
+### CLI
 
 ```bash
 cd src/SiyeFlow.CLI
-dotnet run -- execute --workflow ../../demo/api1/Workflows/test-catfact.json
+dotnet run -- execute --workflow ../siye-flow-designer/samples/1-cat-fact.json
 ```
 
-### SiyeFlow.UI (ASP.NET Middleware)
-Embed the workflow designer in any ASP.NET Core API.
+## How the pieces fit
 
-```csharp
-builder.Services.AddSiyeFlow();
-app.UseSiyeFlow();
-// Navigate to /siyeflow
+```mermaid
+flowchart LR
+    designer[siye-flow-designer<br/>TS + Vite] -->|dist/*| ui[SiyeFlow.UI<br/>EmbeddedResource]
+    ui -->|middleware| demo[SiyeFlow.TestApi<br/>/workflows]
+    designer -->|workflow JSON| cli[SiyeFlow.CLI]
+    core[SiyeFlow.Core] --> ui
+    core --> cli
 ```
 
-## Workflow Schema (v2.0)
+- `npm run build` in the designer outputs `dist/*` (`siye-flow-designer.{es,umd}.js`, `style.css`).
+- [`src/SiyeFlow.UI/build-designer.ps1`](src/SiyeFlow.UI/build-designer.ps1) runs as a `BeforeTargets="PrepareForBuild"` step and copies `dist/*` into [`src/SiyeFlow.UI/UI/`](src/SiyeFlow.UI/UI), where the files become `EmbeddedResource` entries inside `SiyeFlow.UI.dll`.
+- `SiyeFlowMiddleware` then serves them under the configured route prefix.
 
-Workflows use a node-edge graph with typed blocks and execution/data edges:
+## Workflow schema (v2.0)
+
+Schema source of truth: [`src/siye-flow-designer/src/models/workflow-models.ts`](src/siye-flow-designer/src/models/workflow-models.ts). Full reference in [docs/WORKFLOW_SCHEMA.md](docs/WORKFLOW_SCHEMA.md).
 
 ```json
 {
@@ -52,12 +65,7 @@ Workflows use a node-edge graph with typed blocks and execution/data edges:
   "name": "Cat Fact API",
   "version": "2.0.0",
   "nodes": [
-    {
-      "id": "start_1",
-      "type": "start",
-      "label": "Start",
-      "data": {}
-    },
+    { "id": "start_1", "type": "start", "label": "Start", "data": {} },
     {
       "id": "http_1",
       "type": "http-request",
@@ -68,12 +76,7 @@ Workflows use a node-edge graph with typed blocks and execution/data edges:
         "outputs": { "catFact": "$.fact" }
       }
     },
-    {
-      "id": "end_1",
-      "type": "end",
-      "label": "End",
-      "data": { "outputs": { "fact": "{{catFact}}" } }
-    }
+    { "id": "end_1", "type": "end", "label": "End", "data": { "outputs": { "fact": "{{catFact}}" } } }
   ],
   "edges": [
     { "id": "e1", "type": "execution", "source": "start_1", "sourceHandle": "default", "target": "http_1", "targetHandle": "trigger" },
@@ -82,91 +85,100 @@ Workflows use a node-edge graph with typed blocks and execution/data edges:
 }
 ```
 
-Key concepts:
-- **Nodes**: Workflow blocks with type-specific `data` configuration
-- **Edges**: Execution flow (`success`/`fail` branching) and data connections
-- **JSONPath extraction**: `$.field` syntax to extract values from HTTP responses
-- **Variable interpolation**: `{{variableName}}` in URLs, headers, bodies, expressions
+- **Nodes** carry type-specific `data`.
+- **Edges** are either `execution` (flow) or `data` (variable wires).
+- **`{{var}}`** interpolation in strings, **`$.path`** JSONPath in `outputs`.
 
-## Debugging
+## Block palette
 
-The designer includes a full debugging toolkit:
+| Block | Category | Purpose |
+| --- | --- | --- |
+| Start | Core | Entry point; defines inputs and profiles |
+| End | Core | Exit point; returns outputs |
+| Variable | Core | Read/write the variable store |
+| Log | Core | Write to the terminal panel |
+| Evaluate | Core | Run a sandboxed expression |
+| HTTP Request | Connectivity | REST call with `success`/`fail` branches |
+| Condition | Logic | If/else on an expression |
+| Switch | Logic | Multi-branch on a value |
+| Loop | Logic | Iterate an array; exposes `loopIndex` / `loopItem` |
+| Delay | Logic | Pause execution |
+| Batch | Logic | Parallel processing over items |
+| Sub Workflow | Logic | Nested workflow (executor still a stub — see [docs/PROGRESS.md](docs/PROGRESS.md)) |
 
-- **Breakpoints**: Click the red dot on any block's left edge to set a breakpoint
-- **Pause/Resume/Step**: Space to pause/resume, S to step one block at a time
-- **Block Highlighting**: Blue = executing, Green = success, Red = failed
-- **Variable Inspector**: Tabbed panel showing all variables and block outputs as a JSON tree
-  - Pin tabs to persist across executions
-  - Detach tabs into floating windows
-  - Minimize to title bar
-- **Runtime Resolution**: Block detail rows show resolved `{{variable}}` values at breakpoints
-- **Copy JSON**: Click the copy button on any detail row to copy resolved data
+`webhook-trigger` exists in the enum but is not currently exposed in the palette.
 
-## Project Structure
+## Designer UX
+
+- **Hand tool** (default, H) — drag empty canvas to pan; middle-mouse pans anywhere.
+- **Pointer tool** (V) — select-first behavior.
+- **Ctrl/Cmd + wheel** zooms; toolbar has zoom/fit/run controls.
+- **Pointer events** throughout — works with touch and stylus.
+- **Monochrome theme** (white / off-white / grey) with light/dark variants in [`theme.css`](src/siye-flow-designer/src/surface/styles/theme.css).
+- **Breakpoints** — click the chip on the left edge of any block.
+- **Pause / Resume / Step** — Space and `S`. Block outlines turn grey while running, success/fail use darker tones.
+- **Variable Inspector** — tabbed JSON tree; pin, detach, minimize.
+- **Block detail rows** show resolved `{{variable}}` values at breakpoints; copy button per row.
+- **Escape** cancels an in-progress wire; duplicate edges are ignored.
+
+## Samples
+
+Six workflows live in [`src/siye-flow-designer/samples/`](src/siye-flow-designer/samples) and exercise the public APIs catfact.ninja, jsonplaceholder, dog.ceo, restcountries, and friends.
+
+1. [1-cat-fact.json](src/siye-flow-designer/samples/1-cat-fact.json) — simplest GET + JSONPath extraction
+2. [2-users-and-posts.json](src/siye-flow-designer/samples/2-users-and-posts.json) — chained calls with variable passing
+3. [3-status-check.json](src/siye-flow-designer/samples/3-status-check.json) — branch on HTTP status
+4. [4-chained-apis.json](src/siye-flow-designer/samples/4-chained-apis.json) — combine multiple public APIs
+5. [5-loop-users.json](src/siye-flow-designer/samples/5-loop-users.json) — loop over a collection
+6. [6-evaluate-delay-switch.json](src/siye-flow-designer/samples/6-evaluate-delay-switch.json) — expression evaluation, delay, switch
+
+## Repo layout
 
 ```
 SiyeFlow/
+├── SiyeFlow.sln
+├── README.md
+├── docs/
+│   ├── WORKFLOW_SCHEMA.md
+│   └── PROGRESS.md
+├── demo/
+│   ├── README.md
+│   └── api1/                  # SiyeFlow.TestApi (net10.0) — embeds designer at /workflows
 ├── src/
-│   ├── siye-flow-designer/    # TypeScript workflow designer + execution engine
+│   ├── siye-flow-designer/    # TS + Vite: source of truth for the UI
 │   │   ├── src/
-│   │   │   ├── canvas/        # Canvas rendering (HTML blocks + SVG connections)
-│   │   │   ├── components/    # UI components (palette, toolbar, inspector, terminal)
-│   │   │   ├── core/          # Workflow engine + browser executor
-│   │   │   ├── models/        # TypeScript type definitions
-│   │   │   ├── renderers/     # Block and connection renderers
-│   │   │   ├── styles/        # CSS with theme variables
-│   │   │   └── utils/         # DOM helpers, animation, state management
-│   │   └── samples/           # 6 sample workflow JSON files
-│   ├── SiyeFlow.CLI/          # .NET command-line executor
-│   ├── SiyeFlow.Core/         # Shared models and interfaces
-│   └── SiyeFlow.UI/           # ASP.NET Core middleware
-├── demo/api1/Workflows/       # Test workflow files for CLI
-└── docs/
-    ├── WORKFLOW_SCHEMA.md      # Schema reference
-    └── PROGRESS.md             # Implementation status and roadmap
+│   │   │   ├── api/           # OpenAPI / Swagger loader
+│   │   │   ├── core/          # WorkflowEngine + BrowserWorkflowExecutor
+│   │   │   ├── models/        # Schema types
+│   │   │   └── surface/       # canvas, components, renderers, styles, utils
+│   │   └── samples/           # public-API sample workflows
+│   ├── SiyeFlow.Core/         # shared C# models
+│   ├── SiyeFlow.Core.TypeGen/ # codegen tool (idle)
+│   ├── SiyeFlow.CLI/          # dotnet CLI runner
+│   └── SiyeFlow.UI/           # ASP.NET middleware + embedded designer assets
+│       ├── UI/                # index.html template + designer dist (build output)
+│       └── build-designer.ps1 # runs `npm run build` and copies dist → UI
 ```
 
-## Block Types
+## Targets and dependencies
 
-| Block | Description | Ports |
-|-------|-------------|-------|
-| **Start** | Entry point, defines input variables | out |
-| **End** | Exit point, returns outputs | trigger |
-| **HTTP Request** | Makes REST API calls (GET/POST/PUT/DELETE) | trigger, success, fail |
-| **Variable** | Sets variables for downstream blocks | trigger, out |
-| **Condition** | Branches on expression (true/false) | trigger, success, fail |
-| **Log** | Logs messages to terminal | trigger, out |
-| **Delay** | Pauses execution (ms/seconds/minutes) | trigger, out |
-| **Evaluate** | Evaluates expressions, stores result | trigger, out |
-| **Loop** | Iterates over arrays, executes body per item | trigger, each, done |
-| **Sub-Workflow** | Nested workflow execution (stub) | trigger, success, fail |
+- `.NET 10` (net10.0) across every C# project.
+- `Newtonsoft.Json` 13.0.4 everywhere; OpenAPI handling via `Swashbuckle.AspNetCore` 6.6.2.
+- CLI uses `System.CommandLine` 2.0 beta4 + `Microsoft.Extensions.*` 10.0.8.
+- Designer is `vite` 5.4 / `typescript` 5.9 / `vitest` 4.1, no runtime dependencies (pure DOM + SVG).
 
-## Sample Workflows
-
-Import these from `src/siye-flow-designer/samples/`:
-
-1. **Cat Fact** - Simple GET request with JSONPath extraction
-2. **Users & Posts** - Chained API calls with variable passing
-3. **Status Check** - Condition branching on HTTP status
-4. **Chained APIs** - Multiple public APIs (Dog, Joke, Countries) combined
-5. **Loop Users** - Fetch users and iterate with Loop block
-6. **Evaluate + Delay** - Expression evaluation, delay, and branching
-
-## Development
+## Development cheatsheet
 
 ```bash
-# Designer (TypeScript + Vite)
+# Designer
 cd src/siye-flow-designer
 npm install
-npm run dev          # Dev server on port 3001
-npm run build        # Production build
-npm test             # Run tests
+npm run dev          # http://localhost:3001
+npm run build        # emits dist/, then copy to ../SiyeFlow.UI/UI manually if not building the sln
+npm test             # vitest
 
-# CLI (.NET)
-cd src/SiyeFlow.CLI
-dotnet run -- execute --workflow path/to/workflow.json
+# Solution
+dotnet build SiyeFlow.sln
+dotnet run --project demo/api1
+dotnet run --project src/SiyeFlow.CLI -- execute --workflow path/to/workflow.json
 ```
-
----
-
-Built with ❤️ for API automation enthusiasts
