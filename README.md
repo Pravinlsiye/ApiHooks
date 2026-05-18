@@ -2,6 +2,10 @@
 
 Visual workflow designer plus an in-browser execution engine for orchestrating API calls. Design workflows in a node-edge canvas, run them in the browser, embed the designer in an ASP.NET Core API, or execute saved workflows from the .NET CLI.
 
+## Preview
+
+![SiyeFlow Designer — monochrome theme, loop sample mid-run](docs/assets/preview.png)
+
 The repo contains five projects in one solution ([SiyeFlow.sln](SiyeFlow.sln)):
 
 | Project | Path | What it does |

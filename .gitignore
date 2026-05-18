@@ -307,6 +307,7 @@ $RECYCLE.BIN/
 
 # TypeScript Designer - Build outputs (source of truth is TypeScript source)
 src/siye-flow-designer/dist/
+src/siye-flow-designer/dist-site/
 src/siye-flow-designer/node_modules/
 src/siye-flow-designer/*.js.map
 src/siye-flow-designer/*.css.map
