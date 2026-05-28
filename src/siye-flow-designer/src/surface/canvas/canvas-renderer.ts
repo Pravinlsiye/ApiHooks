@@ -612,6 +612,32 @@ export class CanvasRenderer extends BaseComponent {
     }
 
     /**
+     * Replace a block in-place — preserves DOM position/z-order and selection state.
+     * Connections are unaffected because they reference block IDs, not DOM elements.
+     */
+    replaceBlock(block: VisualBlock): void {
+        const oldEl = this.blockElements.get(block.id);
+        if (!oldEl) { this.addBlock(block); return; }
+
+        const wasSelected = oldEl.classList.contains('selected');
+        const hadBreakpoint = oldEl.classList.contains('has-breakpoint');
+
+        this.blocks.set(block.id, block);
+        const newEl = this.renderBlockElement(block);
+
+        if (wasSelected) newEl.classList.add('selected');
+        if (hadBreakpoint) newEl.classList.add('has-breakpoint');
+
+        oldEl.replaceWith(newEl);
+        this.blockElements.set(block.id, newEl);
+
+        // Toolbar repositioning after layout
+        if (this.selectedBlockId === block.id) {
+            this.updateBlockToolbarPosition();
+        }
+    }
+
+    /**
      * Remove a block from the canvas
      */
     removeBlock(blockId: string): void {

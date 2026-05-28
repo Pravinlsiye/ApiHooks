@@ -10,6 +10,7 @@ import { FloatingToolbar } from './surface/components/floating-toolbar';
 import { Minimap } from './surface/components/minimap';
 import { TerminalPanel } from './surface/components/terminal-panel';
 import { AlertModal } from './surface/components/alert-modal';
+import { BlockSettingsPanel } from './surface/components/block-settings-panel';
 import { WorkflowEngine } from './core/workflow-engine';
 import { BrowserWorkflowExecutor } from './core/browser-workflow-executor';
 import { VariableInspector } from './surface/components/variable-inspector';
@@ -27,6 +28,7 @@ export { Minimap } from './surface/components/minimap';
 export { TerminalPanel } from './surface/components/terminal-panel';
 export { AlertModal } from './surface/components/alert-modal';
 export { ConfirmModal } from './surface/components/confirm-modal';
+export { BlockSettingsPanel } from './surface/components/block-settings-panel';
 export { WorkflowEngine } from './core/workflow-engine';
 export { BrowserWorkflowExecutor } from './core/browser-workflow-executor';
 export * from './models/workflow-models';
@@ -42,6 +44,7 @@ export interface DesignerOptions {
     floatingToolbarContainerId?: string;
     minimapContainerId?: string;
     terminalContainerId?: string;
+    settingsPanelContainerId?: string;
     /** When set, the navbar renders a Home link pointing to this URL. */
     homeUrl?: string;
 }
@@ -56,6 +59,7 @@ export class WorkflowDesigner {
     private floatingToolbar: FloatingToolbar | null = null;
     private minimap: Minimap | null = null;
     private terminal: TerminalPanel | null = null;
+    private settingsPanel: BlockSettingsPanel | null = null;
     private alertModal: AlertModal;
     private engine: WorkflowEngine;
     private executor: BrowserWorkflowExecutor | null = null;
@@ -63,6 +67,7 @@ export class WorkflowDesigner {
     private blocks: Map<string, VisualBlock> = new Map();
     private connections: Map<string, VisualConnection> = new Map();
     private blockHighlights: Map<string, 'executing' | 'success' | 'fail'> = new Map();
+    private currentRuntimeVars: Record<string, any> | null = null;
 
     constructor(options: DesignerOptions | string, paletteContainerId?: string) {
         // Support both old and new constructor signatures
@@ -158,6 +163,8 @@ export class WorkflowDesigner {
                 if (state === 'idle') {
                     this.blockHighlights.clear();
                     this.canvas.setRuntimeVariables(null);
+                    this.currentRuntimeVars = null;
+                    this.settingsPanel?.setRuntimeVariables(null);
                     this.render();
                 }
             });
@@ -176,6 +183,8 @@ export class WorkflowDesigner {
                 this.inspector.show();
 
                 this.canvas.setRuntimeVariables(variables);
+                this.currentRuntimeVars = variables;
+                this.settingsPanel?.setRuntimeVariables(variables);
                 this.render();
             });
             
@@ -195,9 +204,39 @@ export class WorkflowDesigner {
                 localStorage.setItem('siyeflow-terminal', String(data.expanded));
             });
         }
+
+        if (opts.settingsPanelContainerId) {
+            this.settingsPanel = new BlockSettingsPanel(opts.settingsPanelContainerId);
+            this.setupSettingsPanelHandlers();
+        }
         
         this.setupCanvasHandlers();
         this.setupDropHandler();
+    }
+
+    private setupSettingsPanelHandlers(): void {
+        if (!this.settingsPanel) return;
+
+        this.settingsPanel.on('fieldChange', (data: { blockId: string; fieldName: string; value: any }) => {
+            const block = this.blocks.get(data.blockId);
+            if (!block) return;
+            block.fieldValues[data.fieldName] = data.value;
+            this.canvas.replaceBlock(block);
+        });
+
+        this.settingsPanel.on('nameChange', (data: { blockId: string; name: string }) => {
+            const block = this.blocks.get(data.blockId);
+            if (!block) return;
+            block.name = data.name;
+            this.canvas.replaceBlock(block);
+        });
+
+        this.settingsPanel.on('dataChange', (data: { blockId: string; fieldValues: Record<string, any> }) => {
+            const block = this.blocks.get(data.blockId);
+            if (!block) return;
+            block.fieldValues = data.fieldValues;
+            this.canvas.replaceBlock(block);
+        });
     }
 
     private setupNavbarHandlers(): void {
@@ -613,8 +652,15 @@ export class WorkflowDesigner {
             this.canvas.removeConnection(data.connectionId);
         });
 
-        this.canvas.on('blockSelect', (_data: { blockId: string }) => {
-            void _data;
+        this.canvas.on('blockSelect', (data: { blockId: string | null }) => {
+            if (!data.blockId) {
+                this.settingsPanel?.close();
+                return;
+            }
+            const block = this.blocks.get(data.blockId);
+            if (block && this.settingsPanel) {
+                this.settingsPanel.open(block, this.currentRuntimeVars ?? undefined);
+            }
         });
 
         this.canvas.on('breakpointToggle', (data: { blockId: string }) => {
@@ -629,6 +675,9 @@ export class WorkflowDesigner {
             if (block) {
                 block.position = data.position;
                 this.updateMinimap();
+                if (this.settingsPanel) {
+                    this.settingsPanel.update(block, this.currentRuntimeVars ?? undefined);
+                }
             }
         });
 
@@ -651,6 +700,9 @@ export class WorkflowDesigner {
             // Remove from internal state
             this.blocks.delete(data.blockId);
             
+            // Close settings panel if this block was open
+            this.settingsPanel?.close();
+            
             // Remove all connections involving this block
             const connectionsToRemove: string[] = [];
             this.connections.forEach((conn, connId) => {
@@ -669,12 +721,10 @@ export class WorkflowDesigner {
         });
 
         this.canvas.on('blockSettings', (data: { blockId: string }) => {
-            // TODO: Open property panel when implemented
-            this.alertModal.show(
-                `Settings panel for block "${data.blockId}" coming soon!`,
-                'Block Settings',
-                'info'
-            );
+            const block = this.blocks.get(data.blockId);
+            if (block && this.settingsPanel) {
+                this.settingsPanel.open(block, this.currentRuntimeVars ?? undefined);
+            }
         });
     }
 
@@ -1032,6 +1082,7 @@ if (typeof document !== 'undefined' && !(window as any).SiyeFlowConfig) {
         const floatingToolbarContainer = document.getElementById('floating-toolbar-container');
         const minimapContainer = document.getElementById('minimap-container');
         const terminalContainer = document.getElementById('terminal-container');
+        const settingsPanelContainer = document.getElementById('settings-panel-container');
         
         if (canvasContainer) {
             const designer = new WorkflowDesigner({
@@ -1041,6 +1092,7 @@ if (typeof document !== 'undefined' && !(window as any).SiyeFlowConfig) {
                 floatingToolbarContainerId: floatingToolbarContainer ? 'floating-toolbar-container' : undefined,
                 minimapContainerId: minimapContainer ? 'minimap-container' : undefined,
                 terminalContainerId: terminalContainer ? 'terminal-container' : undefined,
+                settingsPanelContainerId: settingsPanelContainer ? 'settings-panel-container' : undefined,
                 homeUrl: './Home/'
             });
 

@@ -320,6 +320,10 @@ src/siye-flow-designer/.vite-cache/
 # The build script ensures they're always up-to-date before embedding
 src/SiyeFlow.UI/UI/*.js
 src/SiyeFlow.UI/UI/*.css
+src/SiyeFlow.UI/UI/*.png
+
+# CLI sample output / scratch runs
+/.out/
 # Exception: Keep index.html as it's a template file that gets processed by middleware
 !src/SiyeFlow.UI/UI/index.html
 # Temporary file used during build to preserve index.html
