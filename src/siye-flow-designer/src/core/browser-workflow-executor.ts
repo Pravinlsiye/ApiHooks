@@ -811,8 +811,9 @@ export class BrowserWorkflowExecutor {
             }
         }
 
-        const totalLines = mode === 'lines' ? source.split('\n').length - skip : source.length;
         const chunkCount = chunks.length;
+        // totalLines = actual lines being processed (respects skip and limit).
+        const totalLines = chunks.length * chunkSize;
 
         this.terminal.log('debug', `   Stream Reader: ${chunkCount} chunks (mode=${mode}, chunkSize=${chunkSize}${skip > 0 ? `, skip=${skip}` : ''}${limit > 0 ? `, limit=${limit}` : ''})`);
 
