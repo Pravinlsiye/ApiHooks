@@ -700,8 +700,8 @@ export class WorkflowDesigner {
             // Remove from internal state
             this.blocks.delete(data.blockId);
             
-            // Close settings panel if this block was open
-            this.settingsPanel?.close();
+            // Close settings panel only if the deleted block is currently open
+            this.settingsPanel?.closeIfBlock(data.blockId);
             
             // Remove all connections involving this block
             const connectionsToRemove: string[] = [];

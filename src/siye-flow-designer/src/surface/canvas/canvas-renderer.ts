@@ -155,20 +155,29 @@ export class CanvasRenderer extends BaseComponent {
             return;
         }
 
-        // Position toolbar above the block
+        // The toolbar lives in canvas-wrapper (sibling of canvas-layer).
+        // canvas-layer is scaled from its center (4000, 4000) with scale(currentZoom).
+        // To place the toolbar over the correct visual position, convert from
+        // canvas-layer space to canvas-wrapper space:
+        //   wrapperX = 4000 + (layerX - 4000) * zoom
         const toolbarHeight = 36;
         const gap = 8;
-        
-        // Calculate position in canvas coordinates
-        const x = block.position.x + (block.width || 200) / 2;
-        const y = block.position.y - toolbarHeight - gap;
+        const canvasCenter = 4000;
 
+        const blockCenterX = block.position.x + (block.width || 200) / 2;
+        const blockTopY    = block.position.y;
+
+        const x = canvasCenter + (blockCenterX - canvasCenter) * this.currentZoom;
+        const y = canvasCenter + (blockTopY    - canvasCenter) * this.currentZoom - toolbarHeight - gap;
+
+        // No scale() needed: the toolbar is not inside canvas-layer so zoom doesn't affect it.
         DOMUpdater.updateElement(this.blockToolbar, {
             styles: {
                 display: 'flex',
                 left: `${x}px`,
                 top: `${y}px`,
-                transform: `translateX(-50%) scale(${1 / this.currentZoom})`
+                transformOrigin: 'top center',
+                transform: 'translateX(-50%)'
             }
         });
     }
@@ -363,8 +372,8 @@ export class CanvasRenderer extends BaseComponent {
             isDragging: true,
             blockId: blockId,
             offset: {
-                x: event.clientX - rect.left,
-                y: event.clientY - rect.top
+                x: (event.clientX - rect.left) / this.currentZoom,
+                y: (event.clientY - rect.top)  / this.currentZoom
             }
         };
 
@@ -394,8 +403,8 @@ export class CanvasRenderer extends BaseComponent {
         if (!block || !blockEl) return;
 
         const wrapperRect = this.canvasWrapper.getBoundingClientRect();
-        const newX = event.clientX - wrapperRect.left - this.dragState.offset.x;
-        const newY = event.clientY - wrapperRect.top - this.dragState.offset.y;
+        const newX = (event.clientX - wrapperRect.left - this.dragState.offset.x) / this.currentZoom;
+        const newY = (event.clientY - wrapperRect.top  - this.dragState.offset.y) / this.currentZoom;
 
         // Update block position
         block.position.x = newX;

@@ -50,6 +50,13 @@ export class BlockSettingsPanel extends BaseComponent {
         this.currentBlock = null;
     }
 
+    /** Close only if the given block ID is the one currently open. */
+    closeIfBlock(blockId: string): void {
+        if (this.currentBlock?.id === blockId) {
+            this.close();
+        }
+    }
+
     update(block: VisualBlock, runtimeVars?: Record<string, any>): void {
         if (!this.panelEl.classList.contains('open')) return;
         if (this.currentBlock?.id !== block.id) return;
