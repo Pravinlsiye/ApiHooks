@@ -44,7 +44,17 @@ namespace SiyeFlow.Core.Models
         SubWorkflow,
 
         [EnumMember(Value = "condition")]
-        Condition
+        Condition,
+
+        // Files
+        [EnumMember(Value = "file-download")]
+        FileDownload,
+        [EnumMember(Value = "file-upload")]
+        FileUpload,
+        [EnumMember(Value = "file-stream-writer")]
+        FileStreamWriter,
+        [EnumMember(Value = "file-stream-reader")]
+        FileStreamReader
     }
 
     public enum EdgeType

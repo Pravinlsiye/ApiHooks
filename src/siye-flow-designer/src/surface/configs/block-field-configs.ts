@@ -91,4 +91,33 @@ export const BLOCK_PANEL_FIELDS: Partial<Record<BlockType, PanelField[]>> = {
         { name: 'path', label: 'Path', type: 'text', placeholder: '/webhook/my-event' },
         { name: 'method', label: 'Method', type: 'pill-select', options: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], defaultValue: 'POST' },
     ],
+
+    [BlockType.FileDownload]: [
+        { name: 'url', label: 'URL', type: 'text', placeholder: 'https://example.com/file.csv' },
+        { name: 'outputVar', label: 'Output Variable', type: 'text', placeholder: 'fileData', hint: 'Variable to store file contents (base64 for binary, text for text/*)' },
+        { name: 'encoding', label: 'Encoding', type: 'pill-select', options: ['auto', 'base64', 'text'], defaultValue: 'auto' },
+        { name: 'saveAs', label: 'Save to Disk (browser only)', type: 'checkbox' },
+        { name: 'fileName', label: 'File Name', type: 'text', placeholder: 'output.csv', hint: 'Used when Save to Disk is enabled' },
+    ],
+
+    [BlockType.FileUpload]: [
+        { name: 'outputVar', label: 'Output Variable', type: 'text', placeholder: 'uploadedFile', hint: 'Variable to store file contents' },
+        { name: 'accept', label: 'Accept', type: 'text', placeholder: '.csv,.json,*/*', hint: 'File types accepted (MIME type or extension)' },
+        { name: 'encoding', label: 'Encoding', type: 'pill-select', options: ['auto', 'base64', 'text'], defaultValue: 'auto' },
+    ],
+
+    [BlockType.FileStreamWriter]: [
+        { name: 'streamVar', label: 'Stream Variable', type: 'text', placeholder: 'myStream', hint: 'Variable that accumulates the written data' },
+        { name: 'value', label: 'Value', type: 'text', placeholder: '{{line}}', hint: 'Value to append on each call' },
+        { name: 'separator', label: 'Separator', type: 'text', placeholder: '\\n', hint: 'Appended between writes (default: newline)' },
+    ],
+
+    [BlockType.FileStreamReader]: [
+        { name: 'source', label: 'Source Variable', type: 'text', placeholder: '{{fileData}}', hint: 'Variable holding the file contents to iterate' },
+        { name: 'mode', label: 'Mode', type: 'pill-select', options: ['lines', 'chars', 'bytes'], defaultValue: 'lines' },
+        { name: 'chunkSize', label: 'Chunk Size', type: 'number', placeholder: '1', hint: 'Lines / chars per iteration. Increase (e.g. 100) for large files.' },
+        { name: 'skip', label: 'Skip Lines', type: 'number', placeholder: '0', hint: 'Skip the first N lines (e.g. 1 to skip a CSV header)' },
+        { name: 'limit', label: 'Max Chunks', type: 'number', placeholder: '0', hint: '0 = process all. Set a number to cap iterations (useful for large files).' },
+        { name: 'outputVar', label: 'Chunk Variable', type: 'text', placeholder: 'chunk', hint: 'Variable set to the current chunk each iteration' },
+    ],
 };

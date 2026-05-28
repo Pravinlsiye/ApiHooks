@@ -16,6 +16,10 @@ export enum BlockType {
     BatchProcess = 'batch-process',
     SubWorkflow = 'sub-workflow',
     Condition = 'condition',
+    FileDownload = 'file-download',
+    FileUpload = 'file-upload',
+    FileStreamWriter = 'file-stream-writer',
+    FileStreamReader = 'file-stream-reader',
 }
 
 export enum EdgeType {
@@ -77,5 +81,9 @@ export const BLOCK_COLORS: Record<BlockType, string> = {
     [BlockType.BatchProcess]: '#343434',
     [BlockType.SubWorkflow]: '#2a2a2a',
     [BlockType.WebhookTrigger]: '#363636',
+    [BlockType.FileDownload]: '#2f2f2f',
+    [BlockType.FileUpload]: '#353030',
+    [BlockType.FileStreamWriter]: '#303535',
+    [BlockType.FileStreamReader]: '#2a3030',
 };
 

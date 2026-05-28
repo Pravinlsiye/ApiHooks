@@ -1,0 +1,142 @@
+{
+  "id": "sample-file-stream",
+  "name": "File Download & Stream Processing",
+  "description": "Downloads a small public CSV (continent codes, 7 rows), reads it line by line with FileStreamReader, accumulates the lines with FileStreamWriter, and logs the result. Demonstrates all four file blocks.",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "label": "Start",
+      "data": {}
+    },
+    {
+      "id": "download_1",
+      "type": "file-download",
+      "label": "Download CSV",
+      "data": {
+        "url": "https://raw.githubusercontent.com/datasets/continent-codes/master/data/continent-codes.csv",
+        "outputVar": "csvData",
+        "encoding": "text",
+        "saveAs": false
+      }
+    },
+    {
+      "id": "log_downloaded",
+      "type": "log",
+      "label": "Log Download",
+      "data": {
+        "message": "Downloaded {{fileName}} ({{fileSize}} bytes)",
+        "level": "info"
+      }
+    },
+    {
+      "id": "reader_1",
+      "type": "file-stream-reader",
+      "label": "Read Lines",
+      "data": {
+        "source": "csvData",
+        "mode": "lines",
+        "chunkSize": 1,
+        "outputVar": "line"
+      }
+    },
+    {
+      "id": "log_line",
+      "type": "log",
+      "label": "Log Line",
+      "data": {
+        "message": "[{{chunkIndex}}] {{line}}",
+        "level": "debug"
+      }
+    },
+    {
+      "id": "writer_1",
+      "type": "file-stream-writer",
+      "label": "Collect Lines",
+      "data": {
+        "streamVar": "processedLines",
+        "value": "{{line}}",
+        "separator": "\\n"
+      }
+    },
+    {
+      "id": "log_done",
+      "type": "log",
+      "label": "Stream Done",
+      "data": {
+        "message": "Processed {{chunkCount}} lines. Result stored in processedLines.",
+        "level": "success"
+      }
+    },
+    {
+      "id": "end_1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "lineCount": "{{chunkCount}}",
+          "result": "{{processedLines}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "execution",
+      "source": "start_1",
+      "sourceHandle": "default",
+      "target": "download_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e2",
+      "type": "execution",
+      "source": "download_1",
+      "sourceHandle": "success",
+      "target": "log_downloaded",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e3",
+      "type": "execution",
+      "source": "log_downloaded",
+      "sourceHandle": "success",
+      "target": "reader_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e4",
+      "type": "execution",
+      "source": "reader_1",
+      "sourceHandle": "each",
+      "target": "log_line",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e5",
+      "type": "execution",
+      "source": "log_line",
+      "sourceHandle": "success",
+      "target": "writer_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e6",
+      "type": "execution",
+      "source": "reader_1",
+      "sourceHandle": "done",
+      "target": "log_done",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e7",
+      "type": "execution",
+      "source": "log_done",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    }
+  ]
+}

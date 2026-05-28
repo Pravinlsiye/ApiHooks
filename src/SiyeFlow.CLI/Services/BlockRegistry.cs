@@ -107,6 +107,10 @@ namespace SiyeFlow.CLI.Services
             Register<LoopBlockExecutor>(BlockType.Loop);
             Register<EvaluateBlockExecutor>(BlockType.Evaluate);
             Register<SubWorkflowBlockExecutor>(BlockType.SubWorkflow);
+            Register<FileDownloadBlockExecutor>(BlockType.FileDownload);
+            Register<FileUploadBlockExecutor>(BlockType.FileUpload);
+            Register<FileStreamWriterBlockExecutor>(BlockType.FileStreamWriter);
+            Register<FileStreamReaderBlockExecutor>(BlockType.FileStreamReader);
         }
 
         public static IBlockRegistry CreateDefault(IServiceProvider serviceProvider)

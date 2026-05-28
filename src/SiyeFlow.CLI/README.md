@@ -79,6 +79,29 @@ Workflows use the v2.0 node-edge schema — same shape as the designer. Full ref
 
 Loop blocks expose `loopIndex`, `loopItem`, and `loopCount` to their body.
 
+Stream Reader blocks expose `chunk`, `chunkIndex`, `chunkCount`, and `totalLines` to their body.
+
+## Block palette
+
+| Block | Category | Browser executor | CLI executor |
+| --- | --- | --- | --- |
+| Start | Core | Complete | Complete |
+| End | Core | Complete | Complete |
+| Variable | Core | Complete | Complete |
+| Log | Core | Complete | Complete |
+| Evaluate | Core | Complete | Complete |
+| HTTP Request | Connectivity | Complete | Complete |
+| Condition | Logic | Complete | Complete |
+| Switch | Logic | Complete | Complete (as Condition) |
+| Loop | Logic | Complete | Complete |
+| Delay | Logic | Complete | Complete |
+| Batch | Logic | Complete | Same as Loop |
+| Sub-Workflow | Logic | Stub | Stub |
+| File Download | Files | Complete (browser only) | Path-based (not yet) |
+| File Upload | Files | Complete (file picker) | Path-based (not yet) |
+| Stream Writer | Files | Complete | Not yet |
+| Stream Reader | Files | Complete | Not yet |
+
 ## Dependencies
 
 Listed in [`SiyeFlow.CLI.csproj`](SiyeFlow.CLI.csproj):

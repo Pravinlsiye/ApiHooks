@@ -369,6 +369,14 @@ export class BrowserWorkflowExecutor {
             case 'subworkflow':
                 this.terminal.log('warning', `   Sub-workflow execution not yet implemented`);
                 return { success: true, outputs: {}, nextHandle: 'success' };
+            case 'filedownload':
+                return this.executeFileDownloadBlock(node, context);
+            case 'fileupload':
+                return this.executeFileUploadBlock(node, context);
+            case 'filestreamwriter':
+                return this.executeFileStreamWriterBlock(node, context);
+            case 'filestreamreader':
+                return this.executeFileStreamReaderBlock(node, context);
             default:
                 this.terminal.log('debug', `   Block type '${node.type}' - passing through`);
                 return { success: true, outputs: {}, nextHandle: 'success' };
@@ -617,6 +625,233 @@ export class BrowserWorkflowExecutor {
         }
     }
     
+    private async executeFileDownloadBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
+        const data = node.data || {};
+        const url = this.resolveValue(String(data.url || ''), context);
+        if (!url) {
+            return { success: false, outputs: {}, error: 'No URL specified', nextHandle: 'fail' };
+        }
+
+        const encoding = String(data.encoding || 'auto');
+        const saveAs   = Boolean(data.saveAs);
+        const fileName = this.resolveValue(String(data.fileName || url.split('/').pop() || 'download'), context);
+        const outputVar = String(data.outputVar || 'fileData');
+
+        this.terminal.log('info', `   Downloading ${url}`);
+
+        try {
+            const response = await fetch(url, { signal: this.abortController?.signal });
+            if (!response.ok) {
+                return { success: false, outputs: { statusCode: response.status }, error: `HTTP ${response.status}`, nextHandle: 'fail' };
+            }
+
+            const mimeType = response.headers.get('content-type')?.split(';')[0] || 'application/octet-stream';
+            const blob = await response.blob();
+            const size = blob.size;
+
+            let fileData: string;
+            const useText = encoding === 'text' || (encoding === 'auto' && mimeType.startsWith('text/'));
+
+            if (useText) {
+                fileData = await blob.text();
+            } else {
+                const ab = await blob.arrayBuffer();
+                const bytes = new Uint8Array(ab);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                fileData = `data:${mimeType};base64,${btoa(binary)}`;
+            }
+
+            if (saveAs) {
+                const anchor = document.createElement('a');
+                anchor.href = URL.createObjectURL(blob);
+                anchor.download = fileName;
+                document.body.appendChild(anchor);
+                anchor.click();
+                document.body.removeChild(anchor);
+                setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
+            }
+
+            const outputs = { fileData, fileName, mimeType, size };
+            context.variables.set(outputVar, fileData);
+            context.variables.set('fileName', fileName);
+            context.variables.set('mimeType', mimeType);
+            context.variables.set('fileSize', size);
+
+            this.terminal.log('info', `   Downloaded ${fileName} (${(size / 1024).toFixed(1)} KB, ${mimeType})`);
+            return { success: true, outputs, nextHandle: 'success' };
+
+        } catch (error) {
+            this.terminal.log('error', `   File download error: ${error}`);
+            return { success: false, outputs: { error: String(error) }, error: String(error), nextHandle: 'fail' };
+        }
+    }
+
+    private async executeFileUploadBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
+        const data = node.data || {};
+        const accept    = String(data.accept || '*/*');
+        const encoding  = String(data.encoding || 'auto');
+        const outputVar = String(data.outputVar || 'uploadedFile');
+
+        this.terminal.log('info', `   Waiting for file selection...`);
+
+        try {
+            const file = await new Promise<File>((resolve, reject) => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = accept;
+                input.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+                document.body.appendChild(input);
+
+                const cleanup = () => document.body.removeChild(input);
+
+                input.addEventListener('change', () => {
+                    const f = input.files?.[0];
+                    cleanup();
+                    f ? resolve(f) : reject(new Error('No file selected'));
+                });
+                input.addEventListener('cancel', () => { cleanup(); reject(new Error('File selection cancelled')); });
+
+                // Abort support
+                this.abortController?.signal.addEventListener('abort', () => { cleanup(); reject(new Error('Execution aborted')); });
+
+                input.click();
+            });
+
+            const mimeType = file.type || 'application/octet-stream';
+            const size = file.size;
+            const fileName = file.name;
+            const useText = encoding === 'text' || (encoding === 'auto' && (file.type.startsWith('text/') || /\.(csv|txt|md|json|xml|html|yaml|yml)$/i.test(file.name)));
+
+            const fileData = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload  = () => resolve(reader.result as string);
+                reader.onerror = () => reject(reader.error);
+                useText ? reader.readAsText(file) : reader.readAsDataURL(file);
+            });
+
+            const outputs = { fileData, fileName, mimeType, size };
+            context.variables.set(outputVar, fileData);
+            context.variables.set('fileName', fileName);
+            context.variables.set('mimeType', mimeType);
+            context.variables.set('fileSize', size);
+
+            this.terminal.log('info', `   Uploaded ${fileName} (${(size / 1024).toFixed(1)} KB, ${mimeType})`);
+            return { success: true, outputs, nextHandle: 'success' };
+
+        } catch (error) {
+            this.terminal.log('error', `   File upload error: ${error}`);
+            return { success: false, outputs: { error: String(error) }, error: String(error), nextHandle: 'fail' };
+        }
+    }
+
+    private async executeFileStreamWriterBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
+        const data = node.data || {};
+        const streamVar = String(data.streamVar || 'stream');
+        const value     = this.resolveValue(String(data.value || ''), context);
+        const sepRaw    = data.separator !== undefined ? String(data.separator) : '\\n';
+        const sep       = sepRaw.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+
+        const existing = context.variables.get(streamVar);
+        const accumulated = (typeof existing === 'string' && existing.length > 0)
+            ? existing + sep + value
+            : value;
+
+        context.variables.set(streamVar, accumulated);
+
+        this.terminal.log('debug', `   Stream "${streamVar}" += ${JSON.stringify(value).substring(0, 60)}`);
+        return { success: true, outputs: { [streamVar]: accumulated }, nextHandle: 'out' };
+    }
+
+    private async executeFileStreamReaderBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
+        const data = node.data || {};
+        const sourceName = String(data.source || '');
+        const mode      = String(data.mode || 'lines');
+        const chunkSize = Math.max(1, Number(data.chunkSize) || 1);
+        const skip      = Math.max(0, Number(data.skip)  || 0);
+        const limit     = Math.max(0, Number(data.limit) || 0);
+        const outputVar = String(data.outputVar || 'chunk');
+
+        const rawSource = sourceName
+            ? (context.variables.get(sourceName) ?? this.resolveValue(sourceName, context))
+            : '';
+
+        const source = String(rawSource);
+
+        // Build chunks lazily — only materialize the slice we'll actually process.
+        let chunks: string[];
+        if (mode === 'lines') {
+            let lines = source.split('\n');
+            if (skip > 0)  lines = lines.slice(skip);
+            if (limit > 0) lines = lines.slice(0, limit * chunkSize);
+            if (chunkSize === 1) {
+                chunks = lines;
+            } else {
+                chunks = [];
+                for (let i = 0; i < lines.length; i += chunkSize) {
+                    chunks.push(lines.slice(i, i + chunkSize).join('\n'));
+                }
+            }
+        } else if (mode === 'chars') {
+            const start = skip * chunkSize;
+            const end   = limit > 0 ? start + limit * chunkSize : source.length;
+            chunks = [];
+            for (let i = start; i < Math.min(end, source.length); i += chunkSize) {
+                chunks.push(source.slice(i, i + chunkSize));
+            }
+        } else {
+            // bytes: base64 data URI or raw base64
+            const b64 = source.includes(',') ? source.split(',')[1] : source;
+            const stride = Math.ceil(chunkSize * 4 / 3);
+            const start  = skip * stride;
+            const end    = limit > 0 ? start + limit * stride : b64.length;
+            chunks = [];
+            for (let i = start; i < Math.min(end, b64.length); i += stride) {
+                chunks.push(b64.slice(i, i + stride));
+            }
+        }
+
+        const totalLines = mode === 'lines' ? source.split('\n').length - skip : source.length;
+        const chunkCount = chunks.length;
+
+        this.terminal.log('debug', `   Stream Reader: ${chunkCount} chunks (mode=${mode}, chunkSize=${chunkSize}${skip > 0 ? `, skip=${skip}` : ''}${limit > 0 ? `, limit=${limit}` : ''})`);
+
+        context.variables.set('chunkCount', chunkCount);
+        context.variables.set('totalLines', totalLines);
+
+        const eachEdges = this.edges.filter(e =>
+            e.source === node.id &&
+            e.type === EdgeType.Execution &&
+            e.sourceHandle === 'each'
+        );
+
+        for (let i = 0; i < chunks.length; i++) {
+            if (this.abortController?.signal.aborted) throw new Error('Execution aborted');
+
+            // Yield to the event loop every 50 iterations so the browser stays responsive.
+            if (i > 0 && i % 50 === 0) {
+                this.terminal.log('debug', `   ... ${i}/${chunkCount} chunks processed`);
+                await new Promise<void>(resolve => setTimeout(resolve, 0));
+            }
+
+            context.variables.set('chunkIndex', i);
+            context.variables.set('chunkCount', chunkCount);
+            context.variables.set(outputVar, chunks[i]);
+            context.variables.set('chunk', chunks[i]);
+
+            for (const edge of eachEdges) {
+                const targetNode = this.nodes.get(edge.target);
+                if (targetNode) await this.executeNode(targetNode, context);
+            }
+        }
+
+        return {
+            success: true,
+            outputs: { chunkCount, totalLines, lastChunk: chunks[chunks.length - 1] ?? '' },
+            nextHandle: 'done'
+        };
+    }
+
     private async executeLoopBlock(node: Node, context: ExecutionContext): Promise<BlockResult> {
         const data = node.data || {};
         let items: any[] = [];
@@ -647,6 +882,11 @@ export class BrowserWorkflowExecutor {
         for (let i = 0; i < items.length; i++) {
             if (this.abortController?.signal.aborted) {
                 throw new Error('Execution aborted');
+            }
+
+            // Yield every 50 iterations to keep the browser responsive on large arrays.
+            if (i > 0 && i % 50 === 0) {
+                await new Promise<void>(resolve => setTimeout(resolve, 0));
             }
 
             context.variables.set('loopIndex', i);

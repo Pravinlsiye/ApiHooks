@@ -969,6 +969,21 @@ function createDefaultBlock(type: BlockType, position: Position, name?: string):
         ],
         [BlockType.WebhookTrigger]: [
             { name: 'path', label: 'Path', type: 'text', placeholder: '/webhook' }
+        ],
+        [BlockType.FileDownload]: [
+            { name: 'url', label: 'URL', type: 'text', placeholder: 'https://example.com/file.csv' },
+            { name: 'outputVar', label: 'Output Variable', type: 'text', placeholder: 'fileData' }
+        ],
+        [BlockType.FileUpload]: [
+            { name: 'outputVar', label: 'Output Variable', type: 'text', placeholder: 'uploadedFile' }
+        ],
+        [BlockType.FileStreamWriter]: [
+            { name: 'streamVar', label: 'Stream Variable', type: 'text', placeholder: 'myStream' },
+            { name: 'value', label: 'Value', type: 'text', placeholder: '{{line}}' }
+        ],
+        [BlockType.FileStreamReader]: [
+            { name: 'source', label: 'Source Variable', type: 'text', placeholder: '{{fileData}}' },
+            { name: 'outputVar', label: 'Chunk Variable', type: 'text', placeholder: 'chunk' }
         ]
     };
 
@@ -1024,6 +1039,22 @@ function createDefaultBlock(type: BlockType, position: Position, name?: string):
         [BlockType.WebhookTrigger]: {
             inputs: [],
             outputs: [{ name: 'default', type: 'execution', label: 'out' }]
+        },
+        [BlockType.FileDownload]: {
+            inputs: [{ name: 'trigger', type: 'execution' }],
+            outputs: [{ name: 'success', type: 'execution' }, { name: 'fail', type: 'execution' }]
+        },
+        [BlockType.FileUpload]: {
+            inputs: [{ name: 'trigger', type: 'execution' }],
+            outputs: [{ name: 'success', type: 'execution' }, { name: 'fail', type: 'execution' }]
+        },
+        [BlockType.FileStreamWriter]: {
+            inputs: [{ name: 'trigger', type: 'execution' }],
+            outputs: [{ name: 'out', type: 'execution', label: 'out' }]
+        },
+        [BlockType.FileStreamReader]: {
+            inputs: [{ name: 'trigger', type: 'execution' }],
+            outputs: [{ name: 'each', type: 'execution' }, { name: 'done', type: 'execution' }]
         }
     };
 
@@ -1068,7 +1099,11 @@ function getBlockTypeName(type: BlockType): string {
         [BlockType.Evaluate]: 'Evaluate',
         [BlockType.BatchProcess]: 'Batch Process',
         [BlockType.SubWorkflow]: 'Sub Workflow',
-        [BlockType.WebhookTrigger]: 'Webhook Trigger'
+        [BlockType.WebhookTrigger]: 'Webhook Trigger',
+        [BlockType.FileDownload]: 'File Download',
+        [BlockType.FileUpload]: 'File Upload',
+        [BlockType.FileStreamWriter]: 'Stream Writer',
+        [BlockType.FileStreamReader]: 'Stream Reader'
     };
     return names[type] || type;
 }

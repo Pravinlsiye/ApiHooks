@@ -197,7 +197,8 @@ namespace SiyeFlow.CLI.Services
             }
 
             // Loop: iterate body nodes via "each" edges, then follow "done"
-            if (node.Type == BlockType.Loop || node.Type == BlockType.BatchProcess)
+            if (node.Type == BlockType.Loop || node.Type == BlockType.BatchProcess ||
+                node.Type == BlockType.FileStreamReader)
             {
                 await ExecuteLoopBodyAsync(node, blockResult, context, result, cancellationToken);
                 return;
@@ -226,30 +227,58 @@ namespace SiyeFlow.CLI.Services
             var eachEdges = GetOutgoingEdges(loopNode.Id, "each");
             var doneEdges = GetOutgoingEdges(loopNode.Id, "done");
 
-            var items = new List<object>();
-            if (loopResult.Outputs.TryGetValue("items", out var itemsObj))
+            // FileStreamReader: chunks are strings; Loop: items are objects
+            var isStreamReader = loopNode.Type == BlockType.FileStreamReader;
+
+            List<object> items = new();
+            List<string> chunks = new();
+
+            if (isStreamReader)
             {
-                if (itemsObj is IEnumerable<object> enumerable)
-                    items = enumerable.ToList();
-                else if (itemsObj is JArray jArray)
-                    items = jArray.Select(t => (object)t).ToList();
+                if (loopResult.Outputs.TryGetValue("chunks", out var chunksObj) && chunksObj is List<string> cl)
+                    chunks = cl;
+                items = chunks.Cast<object>().ToList();
+            }
+            else
+            {
+                if (loopResult.Outputs.TryGetValue("items", out var itemsObj))
+                {
+                    if (itemsObj is IEnumerable<object> enumerable)
+                        items = enumerable.ToList();
+                    else if (itemsObj is JArray jArray)
+                        items = jArray.Select(t => (object)t).ToList();
+                }
             }
 
-            _console.Info($"Loop: iterating {items.Count} items over {eachEdges.Count} body node(s)");
+            _console.Info($"{(isStreamReader ? "Stream Reader" : "Loop")}: iterating {items.Count} {(isStreamReader ? "chunks" : "items")} over {eachEdges.Count} body node(s)");
+
+            var outputVar = isStreamReader
+                ? (loopResult.Outputs.TryGetValue("outputVar", out var ov) ? ov as string : null) ?? "chunk"
+                : null;
 
             for (int i = 0; i < items.Count; i++)
             {
                 if (cancellationToken.IsCancellationRequested)
                     throw new OperationCanceledException();
 
-                context.LoopIndex = i;
-                context.LoopItem = items[i];
-                context.LoopTotal = items.Count;
-                _variableStore.SetVariable("loopIndex", i);
-                _variableStore.SetVariable("loopItem", items[i]);
-                _variableStore.SetVariable("loopCount", items.Count);
-
-                _console.Info($"  Iteration {i + 1}/{items.Count}");
+                if (isStreamReader)
+                {
+                    var chunkStr = chunks[i];
+                    _variableStore.SetVariable("chunkIndex", i);
+                    _variableStore.SetVariable("chunkCount", items.Count);
+                    _variableStore.SetVariable("chunk", chunkStr);
+                    _variableStore.SetVariable(outputVar!, chunkStr);
+                }
+                else
+                {
+                    context.LoopIndex = i;
+                    context.LoopItem = items[i];
+                    context.LoopTotal = items.Count;
+                    _variableStore.SetVariable("loopIndex", i);
+                    _variableStore.SetVariable("loopItem", items[i]);
+                    _variableStore.SetVariable("loopCount", items.Count);
+                    _console.Info($"  Iteration {i + 1}/{items.Count}");
+                }
 
                 foreach (var edge in eachEdges)
                 {

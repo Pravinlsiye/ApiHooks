@@ -36,6 +36,12 @@ const BLOCK_TEMPLATES: BlockTemplate[] = [
     { type: BlockType.Delay, name: 'Delay', category: 'Logic', description: 'Wait duration' },
     { type: BlockType.BatchProcess, name: 'Batch', category: 'Logic', description: 'Parallel processing' },
     { type: BlockType.SubWorkflow, name: 'Sub Workflow', category: 'Logic', description: 'Call workflow' },
+
+    // Files
+    { type: BlockType.FileDownload, name: 'File Download', category: 'Files', description: 'Download file from URL' },
+    { type: BlockType.FileUpload, name: 'File Upload', category: 'Files', description: 'Pick file from disk' },
+    { type: BlockType.FileStreamWriter, name: 'Stream Writer', category: 'Files', description: 'Append to file stream' },
+    { type: BlockType.FileStreamReader, name: 'Stream Reader', category: 'Files', description: 'Iterate file as chunks' },
 ];
 
 export class BlockPalette extends BaseComponent {

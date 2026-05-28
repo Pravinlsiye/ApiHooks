@@ -311,6 +311,10 @@ namespace SiyeFlow.CLI
             services.AddScoped<LoopBlockExecutor>();
             services.AddScoped<EvaluateBlockExecutor>();
             services.AddScoped<SubWorkflowBlockExecutor>();
+            services.AddScoped<FileDownloadBlockExecutor>();
+            services.AddScoped<FileUploadBlockExecutor>();
+            services.AddScoped<FileStreamWriterBlockExecutor>();
+            services.AddScoped<FileStreamReaderBlockExecutor>();
 
             // Workflow executor
             services.AddScoped<IWorkflowExecutor, WorkflowExecutor>();
