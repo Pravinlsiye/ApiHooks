@@ -267,6 +267,18 @@ export class WorkflowDesigner {
             this.importWorkflow();
         });
 
+        this.navbar.on('loadSample', (data: { data: Record<string, unknown> }) => {
+            try {
+                this.loadWorkflowFromSchema(data.data as Parameters<typeof this.loadWorkflowFromSchema>[0]);
+            } catch (err) {
+                this.alertModal.show(
+                    `Failed to load sample: ${err}`,
+                    'Sample Load Error',
+                    'error'
+                );
+            }
+        });
+
         this.navbar.on('export', () => {
             this.exportWorkflow();
         });

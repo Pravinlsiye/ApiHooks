@@ -5,6 +5,7 @@
 import { BaseComponent } from '../utils/base-component';
 import { SettingsDropdown } from './settings-dropdown';
 import { DOMUpdater } from '../utils/dom-updater';
+import { SAMPLES } from '../../../samples/index';
 
 export interface NavbarOptions {
     homeUrl?: string;
@@ -13,6 +14,7 @@ export interface NavbarOptions {
 export class Navbar extends BaseComponent {
     private settingsDropdown: SettingsDropdown | null = null;
     private homeUrl?: string;
+    private samplesOpen = false;
 
     constructor(containerId: string, options: NavbarOptions = {}) {
         super(containerId);
@@ -40,6 +42,7 @@ export class Navbar extends BaseComponent {
                     </span>
                     <span class="navbar-title">SiyeFlow Designer</span>
                 </${brandTag}>
+
                 <div class="navbar-actions">
                     <button class="navbar-btn" id="import-btn" title="Import Workflow">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -55,6 +58,26 @@ export class Navbar extends BaseComponent {
                             <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
                     </button>
+                    <div class="navbar-separator"></div>
+                    <div class="samples-dropdown-wrapper" id="samples-dropdown-wrapper">
+                        <button class="samples-trigger" id="samples-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                            Try a sample
+                            <svg class="samples-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </button>
+                        <div class="samples-menu" id="samples-menu" role="listbox" aria-label="Sample workflows">
+                            ${SAMPLES.map(s => `
+                                <button class="samples-item" role="option" data-sample-id="${s.id}" title="${s.description}">
+                                    <span class="samples-item-label">${s.label}</span>
+                                    <span class="samples-item-desc">${s.description}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
                     <div class="navbar-separator"></div>
                     <div class="settings-dropdown-wrapper">
                         <button class="navbar-btn" id="settings-btn" title="Settings">
@@ -99,6 +122,56 @@ export class Navbar extends BaseComponent {
     }
 
     private setupEventHandlers(): void {
+        // ── Samples dropdown ──────────────────────────────────────────────
+        const trigger = DOMUpdater.query<HTMLButtonElement>(this.container, '#samples-trigger');
+        const menu    = DOMUpdater.query<HTMLElement>(this.container, '#samples-menu');
+        const wrapper = DOMUpdater.query<HTMLElement>(this.container, '#samples-dropdown-wrapper');
+
+        const openMenu  = () => {
+            this.samplesOpen = true;
+            menu?.classList.add('open');
+            trigger?.setAttribute('aria-expanded', 'true');
+        };
+        const closeMenu = () => {
+            this.samplesOpen = false;
+            menu?.classList.remove('open');
+            trigger?.setAttribute('aria-expanded', 'false');
+        };
+
+        if (trigger) {
+            this.addEventListener(trigger, 'click', (e) => {
+                e.stopPropagation();
+                this.settingsDropdown?.close?.();
+                this.samplesOpen ? closeMenu() : openMenu();
+            });
+        }
+
+        // Close when clicking outside
+        this.addEventListener(document, 'click', (e) => {
+            if (this.samplesOpen && wrapper && !wrapper.contains(e.target as Node)) {
+                closeMenu();
+            }
+        });
+
+        // Close on Escape
+        this.addEventListener(document, 'keydown', (e) => {
+            if ((e as KeyboardEvent).key === 'Escape' && this.samplesOpen) closeMenu();
+        });
+
+        // Item clicks
+        if (menu) {
+            this.addEventListener(menu, 'click', (e) => {
+                const item = (e.target as HTMLElement).closest<HTMLElement>('.samples-item');
+                if (!item) return;
+                const id = item.dataset.sampleId;
+                const sample = SAMPLES.find(s => s.id === id);
+                if (sample) {
+                    this.emit('loadSample', { data: sample.data });
+                    closeMenu();
+                }
+            });
+        }
+
         const settingsBtn = DOMUpdater.query<HTMLButtonElement>(this.container, '#settings-btn');
         if (settingsBtn) {
             this.addEventListener(settingsBtn, 'click', (e) => {
