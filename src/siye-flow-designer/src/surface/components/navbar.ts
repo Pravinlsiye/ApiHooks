@@ -61,21 +61,37 @@ export class Navbar extends BaseComponent {
                     <div class="navbar-separator"></div>
                     <div class="samples-dropdown-wrapper" id="samples-dropdown-wrapper">
                         <button class="samples-trigger" id="samples-trigger" aria-haspopup="listbox" aria-expanded="false">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                             </svg>
                             Try a sample
-                            <svg class="samples-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="samples-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <polyline points="6 9 12 15 18 9"/>
                             </svg>
                         </button>
                         <div class="samples-menu" id="samples-menu" role="listbox" aria-label="Sample workflows">
-                            ${SAMPLES.map(s => `
-                                <button class="samples-item" role="option" data-sample-id="${s.id}" title="${s.description}">
-                                    <span class="samples-item-label">${s.label}</span>
-                                    <span class="samples-item-desc">${s.description}</span>
-                                </button>
-                            `).join('')}
+                            <div class="samples-menu-header">
+                                <span class="samples-menu-title">Sample workflows</span>
+                                <span class="samples-menu-count">${SAMPLES.length}</span>
+                            </div>
+                            ${(['Basics', 'Logic', 'Files'] as const).map(cat => {
+                                const group = SAMPLES.filter(s => s.category === cat);
+                                if (!group.length) return '';
+                                return `
+                                    <div class="samples-group">
+                                        <div class="samples-group-label">${cat}</div>
+                                        ${group.map(s => `
+                                            <button class="samples-item" role="option" data-sample-id="${s.id}">
+                                                <div class="samples-item-body">
+                                                    <span class="samples-item-label">${s.label}</span>
+                                                    <span class="samples-item-desc">${s.description}</span>
+                                                </div>
+                                                <span class="samples-item-count" title="${s.blockCount} blocks">${s.blockCount}</span>
+                                            </button>
+                                        `).join('')}
+                                    </div>
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                     <div class="navbar-separator"></div>
@@ -155,7 +171,20 @@ export class Navbar extends BaseComponent {
 
         // Close on Escape
         this.addEventListener(document, 'keydown', (e) => {
-            if ((e as KeyboardEvent).key === 'Escape' && this.samplesOpen) closeMenu();
+            const key = (e as KeyboardEvent).key;
+            if (key === 'Escape' && this.samplesOpen) { closeMenu(); return; }
+            if (!this.samplesOpen) return;
+            if (key === 'ArrowDown' || key === 'ArrowUp') {
+                (e as KeyboardEvent).preventDefault();
+                const items = menu ? Array.from(menu.querySelectorAll<HTMLElement>('.samples-item')) : [];
+                if (!items.length) return;
+                const focused = document.activeElement as HTMLElement;
+                const idx = items.indexOf(focused);
+                const next = key === 'ArrowDown'
+                    ? (idx < items.length - 1 ? idx + 1 : 0)
+                    : (idx > 0 ? idx - 1 : items.length - 1);
+                items[next].focus();
+            }
         });
 
         // Item clicks
