@@ -1,0 +1,22 @@
+{
+  "name": "siye-flow-designer-solid",
+  "version": "2.0.0",
+  "description": "SiyeFlow Workflow Designer - SolidJS rewrite",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3002",
+    "build": "tsc && vite build",
+    "build:site": "tsc && vite build --config vite.site.config.ts",
+    "preview": "vite preview --port 3002",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.41",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vite-plugin-solid": "^2.11.6"
+  }
+}

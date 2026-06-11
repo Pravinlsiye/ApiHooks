@@ -1,0 +1,119 @@
+{
+  "id": "sample-users-posts",
+  "name": "Users & Posts",
+  "description": "Fetches users from JSONPlaceholder, extracts the first user, then fetches their posts",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "label": "Start",
+      "data": {
+        "values": {
+          "baseUrl": "https://jsonplaceholder.typicode.com"
+        }
+      }
+    },
+    {
+      "id": "http_users",
+      "type": "http-request",
+      "label": "Get Users",
+      "data": {
+        "method": "GET",
+        "url": "{{baseUrl}}/users",
+        "outputs": {
+          "firstUser": "$.[0].name",
+          "firstUserId": "$.[0].id",
+          "firstUserEmail": "$.[0].email",
+          "totalUsers": "$.length"
+        }
+      }
+    },
+    {
+      "id": "log_user",
+      "type": "log",
+      "label": "Log User Info",
+      "data": {
+        "message": "Found user: {{firstUser}} ({{firstUserEmail}}), fetching their posts...",
+        "level": "info"
+      }
+    },
+    {
+      "id": "http_posts",
+      "type": "http-request",
+      "label": "Get User Posts",
+      "data": {
+        "method": "GET",
+        "url": "{{baseUrl}}/posts?userId={{firstUserId}}",
+        "outputs": {
+          "firstPostTitle": "$.[0].title",
+          "firstPostBody": "$.[0].body"
+        }
+      }
+    },
+    {
+      "id": "log_post",
+      "type": "log",
+      "label": "Log Post",
+      "data": {
+        "message": "Latest post by {{firstUser}}: {{firstPostTitle}}",
+        "level": "success"
+      }
+    },
+    {
+      "id": "end_1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "user": "{{firstUser}}",
+          "email": "{{firstUserEmail}}",
+          "postTitle": "{{firstPostTitle}}",
+          "postBody": "{{firstPostBody}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "execution",
+      "source": "start_1",
+      "sourceHandle": "default",
+      "target": "http_users",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e2",
+      "type": "execution",
+      "source": "http_users",
+      "sourceHandle": "success",
+      "target": "log_user",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e3",
+      "type": "execution",
+      "source": "log_user",
+      "sourceHandle": "success",
+      "target": "http_posts",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e4",
+      "type": "execution",
+      "source": "http_posts",
+      "sourceHandle": "success",
+      "target": "log_post",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e5",
+      "type": "execution",
+      "source": "log_post",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    }
+  ]
+}

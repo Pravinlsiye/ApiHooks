@@ -1,0 +1,144 @@
+{
+  "id": "sample-large-csv",
+  "name": "Large CSV — World Cities (26k rows)",
+  "description": "Downloads world-cities.csv (26,000+ rows), processes it in batches of 100 lines (skip=1 to skip header), accumulates the raw data, and logs summary. Demonstrates large-file handling with FileStreamReader chunkSize + skip + limit fields. No per-line logging — only batch progress and final summary.",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "label": "Start",
+      "data": {}
+    },
+    {
+      "id": "download_1",
+      "type": "file-download",
+      "label": "Download world-cities.csv",
+      "data": {
+        "url": "https://raw.githubusercontent.com/datasets/world-cities/master/data/world-cities.csv",
+        "outputVar": "csvData",
+        "encoding": "text",
+        "saveAs": false
+      }
+    },
+    {
+      "id": "log_downloaded",
+      "type": "log",
+      "label": "Log Download Info",
+      "data": {
+        "message": "Downloaded {{fileName}} — {{fileSize}} bytes. Starting batch processing...",
+        "level": "info"
+      }
+    },
+    {
+      "id": "var_counter",
+      "type": "variable",
+      "label": "Init Counter",
+      "data": {
+        "values": {
+          "cityCount": "0"
+        }
+      }
+    },
+    {
+      "id": "reader_1",
+      "type": "file-stream-reader",
+      "label": "Read 100-line Batches",
+      "data": {
+        "source": "csvData",
+        "mode": "lines",
+        "chunkSize": 100,
+        "skip": 1,
+        "limit": 0,
+        "outputVar": "batch"
+      }
+    },
+    {
+      "id": "eval_count",
+      "type": "evaluate",
+      "label": "Count Cities",
+      "data": {
+        "expression": "return (parseInt('{{cityCount}}') || 0) + ('{{batch}}'.split('\\n').filter(l => l.trim()).length);",
+        "outputVariable": "cityCount"
+      }
+    },
+    {
+      "id": "log_done",
+      "type": "log",
+      "label": "Done",
+      "data": {
+        "message": "Processed {{chunkCount}} batches (100 lines each). Total cities counted: {{cityCount}}",
+        "level": "success"
+      }
+    },
+    {
+      "id": "end_1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "cityCount": "{{cityCount}}",
+          "batchCount": "{{chunkCount}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "execution",
+      "source": "start_1",
+      "sourceHandle": "default",
+      "target": "download_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e2",
+      "type": "execution",
+      "source": "download_1",
+      "sourceHandle": "success",
+      "target": "log_downloaded",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e3",
+      "type": "execution",
+      "source": "log_downloaded",
+      "sourceHandle": "success",
+      "target": "var_counter",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e4",
+      "type": "execution",
+      "source": "var_counter",
+      "sourceHandle": "success",
+      "target": "reader_1",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e5",
+      "type": "execution",
+      "source": "reader_1",
+      "sourceHandle": "each",
+      "target": "eval_count",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e6",
+      "type": "execution",
+      "source": "reader_1",
+      "sourceHandle": "done",
+      "target": "log_done",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e7",
+      "type": "execution",
+      "source": "log_done",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    }
+  ]
+}

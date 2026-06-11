@@ -1,0 +1,172 @@
+{
+  "id": "sample-chained-apis",
+  "name": "Chained Public APIs",
+  "description": "Chains multiple public APIs: gets a random dog image, a random activity from Bored API, and a random joke - combining results",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "label": "Start",
+      "data": {}
+    },
+    {
+      "id": "http_dog",
+      "type": "http-request",
+      "label": "Random Dog Image",
+      "data": {
+        "method": "GET",
+        "url": "https://dog.ceo/api/breeds/image/random",
+        "outputs": {
+          "dogImage": "$.message",
+          "dogStatus": "$.status"
+        }
+      }
+    },
+    {
+      "id": "log_dog",
+      "type": "log",
+      "label": "Log Dog",
+      "data": {
+        "message": "Dog image: {{dogImage}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "http_joke",
+      "type": "http-request",
+      "label": "Random Joke",
+      "data": {
+        "method": "GET",
+        "url": "https://official-joke-api.appspot.com/random_joke",
+        "outputs": {
+          "jokeSetup": "$.setup",
+          "jokePunchline": "$.punchline",
+          "jokeType": "$.type"
+        }
+      }
+    },
+    {
+      "id": "log_joke",
+      "type": "log",
+      "label": "Log Joke",
+      "data": {
+        "message": "Joke: {{jokeSetup}} ... {{jokePunchline}}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "http_country",
+      "type": "http-request",
+      "label": "Get Country Info",
+      "data": {
+        "method": "GET",
+        "url": "https://restcountries.com/v3.1/name/japan?fields=name,capital,population,region",
+        "outputs": {
+          "countryName": "$.[0].name.common",
+          "capital": "$.[0].capital[0]",
+          "population": "$.[0].population",
+          "region": "$.[0].region"
+        }
+      }
+    },
+    {
+      "id": "log_country",
+      "type": "log",
+      "label": "Log Country",
+      "data": {
+        "message": "Country: {{countryName}}, Capital: {{capital}}, Population: {{population}}, Region: {{region}}",
+        "level": "success"
+      }
+    },
+    {
+      "id": "var_summary",
+      "type": "variable",
+      "label": "Build Summary",
+      "data": {
+        "values": {
+          "summary": "Dog: {{dogImage}} | Joke: {{jokeSetup}} | Country: {{countryName}} ({{capital}})"
+        }
+      }
+    },
+    {
+      "id": "end_1",
+      "type": "end",
+      "label": "End",
+      "data": {
+        "outputs": {
+          "dogImage": "{{dogImage}}",
+          "joke": "{{jokeSetup}} - {{jokePunchline}}",
+          "country": "{{countryName}}",
+          "summary": "{{summary}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "type": "execution",
+      "source": "start_1",
+      "sourceHandle": "default",
+      "target": "http_dog",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e2",
+      "type": "execution",
+      "source": "http_dog",
+      "sourceHandle": "success",
+      "target": "log_dog",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e3",
+      "type": "execution",
+      "source": "log_dog",
+      "sourceHandle": "success",
+      "target": "http_joke",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e4",
+      "type": "execution",
+      "source": "http_joke",
+      "sourceHandle": "success",
+      "target": "log_joke",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e5",
+      "type": "execution",
+      "source": "log_joke",
+      "sourceHandle": "success",
+      "target": "http_country",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e6",
+      "type": "execution",
+      "source": "http_country",
+      "sourceHandle": "success",
+      "target": "log_country",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e7",
+      "type": "execution",
+      "source": "log_country",
+      "sourceHandle": "success",
+      "target": "var_summary",
+      "targetHandle": "trigger"
+    },
+    {
+      "id": "e8",
+      "type": "execution",
+      "source": "var_summary",
+      "sourceHandle": "success",
+      "target": "end_1",
+      "targetHandle": "trigger"
+    }
+  ]
+}
